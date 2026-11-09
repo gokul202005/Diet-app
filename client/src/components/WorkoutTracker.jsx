@@ -335,6 +335,22 @@ Day 7 - Rest: Mobility & Meal Prep`);
     }
   };
 
+  // Run AI Workout Plan Analysis
+  const handleAnalyzeWorkoutPlan = async () => {
+    if (!customPlanText.trim()) return;
+    setIsAnalyzing(true);
+    setAnalysisResult(null);
+    try {
+      const result = await api.analyzeWorkoutPlan(customPlanText);
+      setAnalysisResult(result);
+    } catch (err) {
+      console.error('Workout plan analysis error:', err);
+      alert('Failed to analyze workout plan: ' + err.message);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
   // Quick-load session template into Logger
   const handleLoadSessionTemplate = (title) => {
     const template = WORKOUT_SESSION_PRESETS.find(p => p.title === title);
