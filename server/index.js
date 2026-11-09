@@ -359,15 +359,9 @@ app.post('/api/ai/analyze-meal-photo', upload.single('photo'), async (req, res) 
 });
 
 // --- UNIVERSAL FULL-WEBSITE AI VOICE COMMAND ENGINE ---
-app.post('/api/ai/universal-voice', async (req, res) => {
-  try {
-    const { text, date = new Date().toISOString().split('T')[0] } = req.body;
-    if (!text || typeof text !== 'string' || !text.trim()) {
-      return res.status(400).json({ error: 'Voice speech text is required' });
-    }
-
-    const db = readDB();
-    const clean = text.toLowerCase().trim();
+async function executeUniversalVoice(text, date = new Date().toISOString().split('T')[0]) {
+  const db = readDB();
+  const clean = text.toLowerCase().trim();
 
     // 1. INTENT: WATER HYDRATION
     if (clean.includes('water') || clean.includes('drank') || clean.includes('thanni') || clean.includes('hydration') || (clean.includes('glass') && !clean.includes('idli')) || (clean.includes('bottle') && !clean.includes('gourd'))) {
@@ -407,14 +401,14 @@ app.post('/api/ai/universal-voice', async (req, res) => {
       }
       writeDB(db);
 
-      return res.json({
+      return {
         success: true,
         section: 'water',
         action: 'log_water',
         amountMl,
         totalMl: waterEntry.amountMl,
         feedback: `Logged +${amountMl} ml of water! Today's Total: ${waterEntry.amountMl} ml`
-      });
+      };
     }
 
     // 2. INTENT: SCALE WEIGHT
@@ -433,13 +427,13 @@ app.post('/api/ai/universal-voice', async (req, res) => {
           }
           writeDB(db);
 
-          return res.json({
+          return {
             success: true,
             section: 'weight',
             action: 'log_weight',
             weightKg: numWeight,
             feedback: `Recorded your scale weight: ${numWeight} kg!`
-          });
+          };
         }
       }
     }
@@ -469,13 +463,13 @@ app.post('/api/ai/universal-voice', async (req, res) => {
           }
           writeDB(db);
 
-          return res.json({
+          return {
             success: true,
             section: 'fastrack',
             action: 'log_steps',
             steps,
             feedback: `Logged ${steps.toLocaleString()} steps (+${activeCal} active kcal) to Fastrack!`
-          });
+          };
         }
       }
     }
@@ -531,13 +525,13 @@ app.post('/api/ai/universal-voice', async (req, res) => {
       db.workouts.unshift(newWorkout);
       writeDB(db);
 
-      return res.json({
+      return {
         success: true,
         section: 'workouts',
         action: 'log_workout',
         workout: newWorkout,
         feedback: `Logged workout: ${exerciseName} (${setsCount} sets × ${repsCount} reps @ ${weightKg} kg)!`
-      });
+      };
     }
 
     // 5. INTENT: COACH QUESTIONS
@@ -558,13 +552,13 @@ app.post('/api/ai/universal-voice', async (req, res) => {
 
       const { reply } = await aiService.askCoachChat(text, db.chatHistory || [], db.profile, coachStats);
 
-      return res.json({
+      return {
         success: true,
         section: 'coach',
         action: 'coach_reply',
         reply,
         feedback: reply
-      });
+      };
     }
 
     // 6. DEFAULT INTENT: DIET & MEAL LOGGING (SOUTH INDIAN & GLOBAL)
@@ -605,17 +599,56 @@ app.post('/api/ai/universal-voice', async (req, res) => {
 
     const itemsSummary = (newMeal.foods || []).map(f => `${f.quantity} ${f.name}`).join(', ');
 
-    return res.json({
+    return {
       success: true,
       section: 'diet',
       action: 'log_meal',
       meal: newMeal,
       feedback: `Logged to ${mealType.toUpperCase()}: ${newMeal.name} (+${newMeal.totalCalories} kcal, ${newMeal.totalProtein}g protein)!`
-    });
+    };
 
+}
+
+// POST endpoint for text-based universal voice
+app.post('/api/ai/universal-voice', async (req, res) => {
+  try {
+    const { text, date = new Date().toISOString().split('T')[0] } = req.body;
+    if (!text || typeof text !== 'string' || !text.trim()) {
+      return res.status(400).json({ error: 'Voice speech text is required' });
+    }
+    const result = await executeUniversalVoice(text, date);
+    res.json(result);
   } catch (err) {
     console.error('Universal voice processing error:', err);
     res.status(500).json({ error: 'Failed to process voice command', details: err.message });
+  }
+});
+
+// POST endpoint for direct audio recording upload with Gemini multimodal transcription
+app.post('/api/ai/universal-voice-audio', upload.single('audio'), async (req, res) => {
+  try {
+    if (!req.file || !req.file.buffer) {
+      return res.status(400).json({ error: 'No audio recording file provided' });
+    }
+    const date = req.body.date || new Date().toISOString().split('T')[0];
+    const db = readDB();
+    aiService.setApiKey(db.settings?.geminiApiKey || process.env.GEMINI_API_KEY || '');
+
+    const mimeType = req.file.mimetype || 'audio/webm';
+    const transcribedText = await aiService.transcribeAudio(req.file.buffer, mimeType);
+
+    if (!transcribedText) {
+      return res.status(400).json({ error: 'Could not detect clear speech in the audio. Please try speaking closer to the microphone.' });
+    }
+
+    const voiceResult = await executeUniversalVoice(transcribedText, date);
+    res.json({
+      ...voiceResult,
+      transcribedText
+    });
+  } catch (err) {
+    console.error('Voice audio upload error:', err);
+    res.status(500).json({ error: 'Failed to process voice audio', details: err.message });
   }
 });
 

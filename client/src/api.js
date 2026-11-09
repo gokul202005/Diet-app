@@ -124,6 +124,16 @@ export const api = {
     });
     return res.json();
   },
+  universalVoiceAudio: async (audioBlob, date) => {
+    const formData = new FormData();
+    formData.append('audio', audioBlob, 'voice-recording.webm');
+    if (date) formData.append('date', date);
+    const res = await fetch(`${BASE_URL}/ai/universal-voice-audio`, {
+      method: 'POST',
+      body: formData
+    });
+    return res.json();
+  },
 
   // Workouts
   getWorkouts: async (date) => {

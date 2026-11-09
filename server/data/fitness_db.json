@@ -16,29 +16,32 @@
     "provider": "google"
   },
   "profile": {
-    "isConfigured": false,
+    "isConfigured": true,
     "name": "Gokul",
-    "age": "",
+    "age": "21",
     "gender": "male",
-    "heightCm": "",
-    "weightKg": "",
+    "heightCm": "215",
+    "weightKg": "111.5",
     "goal": "cutting",
     "activityLevel": "moderately_active",
-    "dailyTargetCalories": 2200,
-    "dailyTargetProtein": 150,
-    "dailyTargetCarbs": 240,
-    "dailyTargetFat": 65,
-    "dailyTargetWater": 3500,
+    "dailyTargetCalories": 3406,
+    "dailyTargetProtein": 234,
+    "dailyTargetCarbs": 404,
+    "dailyTargetFat": 95,
+    "dailyTargetWater": 4200,
     "dailyTargetSteps": 10000,
     "recalculateTargets": false,
     "dietaryTags": [
-      "🍗 Non-Veg"
+      "🍗 Non-Veg",
+      "🥗 Pure Veg",
+      "🥚 Eggetarian"
     ],
     "focusAreas": [
       "🛡️ Full Body Balance"
     ],
     "goals": [
-      "cutting"
+      "cutting",
+      "recomp"
     ]
   },
   "meals": [],
