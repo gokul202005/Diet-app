@@ -185,12 +185,12 @@ export default function MealPlanner({ profile, selectedDate, onPlanLogged }) {
             </button>
 
             <button
-              onClick={handleGeneratePlan}
+              onClick={() => handleGeneratePlan(preference, daysCount)}
               disabled={isGenerating}
-              className="flex items-center space-x-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl text-xs transition-all border border-slate-700"
+              className="flex items-center space-x-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black rounded-xl text-xs transition-all shadow-md shadow-emerald-500/20 cursor-pointer"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isGenerating ? 'animate-spin' : ''}`} />
-              <span>{isGenerating ? 'Calculating...' : 'Regenerate Plan'}</span>
+              <span>{isGenerating ? 'Calculating Plan...' : 'Generate / Update Plan'}</span>
             </button>
           </div>
         </div>
@@ -207,11 +207,8 @@ export default function MealPlanner({ profile, selectedDate, onPlanLogged }) {
             ].map((p) => (
               <button
                 key={p.id}
-                onClick={() => {
-                  setPreference(p.id);
-                  handleGeneratePlan(p.id, daysCount);
-                }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${
+                onClick={() => setPreference(p.id)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
                   preference === p.id
                     ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50'
                     : 'bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-700'
@@ -230,11 +227,8 @@ export default function MealPlanner({ profile, selectedDate, onPlanLogged }) {
             ].map((dur) => (
               <button
                 key={dur.count}
-                onClick={() => {
-                  setDaysCount(dur.count);
-                  handleGeneratePlan(preference, dur.count);
-                }}
-                className={`px-3 py-1 rounded-xl text-xs font-bold transition-all border ${
+                onClick={() => setDaysCount(dur.count)}
+                className={`px-3 py-1 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
                   daysCount === dur.count
                     ? 'bg-emerald-500 text-slate-950 border-emerald-400 font-bold'
                     : 'bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-700'

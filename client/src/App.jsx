@@ -9,38 +9,72 @@ import MealPlanner from './components/MealPlanner';
 import ProgressAnalytics from './components/ProgressAnalytics';
 import OnboardingModal from './components/OnboardingModal';
 import SettingsModal from './components/SettingsModal';
+import UniversalVoiceAssistant from './components/UniversalVoiceAssistant';
+import AuthModal from './components/AuthModal';
 import { api } from './api';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [profile, setProfile] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [isVoiceOpen, setIsVoiceOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  // Fetch Profile on App Mount
+  // Fetch Profile and Current User on App Mount
   useEffect(() => {
-    async function initProfile() {
+    async function initProfileAndAuth() {
       try {
-        const data = await api.getProfile();
-        setProfile(data);
+        const [profileData, authData] = await Promise.all([
+          api.getProfile().catch(() => null),
+          api.getCurrentUser().catch(() => null)
+        ]);
+
+        if (profileData) setProfile(profileData);
+        if (authData?.user) setCurrentUser(authData.user);
+
         // Automatically trigger onboarding wizard if user profile has not been configured yet
-        if (!data || !data.isConfigured || !data.name) {
+        if (!profileData || !profileData.isConfigured || !profileData.name) {
           setIsOnboardingOpen(true);
         }
       } catch (err) {
-        console.error('Failed to load profile:', err);
+        console.error('Failed to load profile or auth:', err);
         setIsOnboardingOpen(true);
       } finally {
         setLoading(false);
       }
     }
-    initProfile();
+    initProfileAndAuth();
   }, []);
 
   const handleProfileSaved = (updatedProfile) => {
     setProfile(updatedProfile);
+  };
+
+  const handleAuthSuccess = (user) => {
+    setCurrentUser(user);
+    if (user?.name && profile) {
+      setProfile(prev => ({ ...prev, name: user.name }));
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await api.logout();
+      setCurrentUser(null);
+    } catch (e) {}
+  };
+
+  const handleVoiceActionCompleted = (res) => {
+    // Automatically trigger live refresh of active views
+    setRefreshKey(k => k + 1);
+    if (res?.section === 'coach' && activeTab !== 'coach') {
+      setActiveTab('coach');
+    }
   };
 
   if (loading) {
@@ -62,14 +96,19 @@ export default function App() {
         selectedDate={selectedDate}
         setSelectedDate={setSelectedDate}
         profile={profile}
+        currentUser={currentUser}
         onOpenProfile={() => setIsOnboardingOpen(true)}
         onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenVoice={() => setIsVoiceOpen(true)}
+        onOpenAuth={() => setIsAuthOpen(true)}
+        onLogout={handleLogout}
       />
 
       {/* Main App Content Body */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6">
         {activeTab === 'dashboard' && (
           <Dashboard
+            key={`dashboard-${selectedDate}-${refreshKey}`}
             selectedDate={selectedDate}
             profile={profile}
             onNavigateToDiet={() => setActiveTab('diet')}
@@ -82,6 +121,7 @@ export default function App() {
 
         {activeTab === 'planner' && (
           <MealPlanner
+            key={`planner-${refreshKey}`}
             profile={profile}
             selectedDate={selectedDate}
             onPlanLogged={() => setActiveTab('diet')}
@@ -90,6 +130,7 @@ export default function App() {
 
         {activeTab === 'diet' && (
           <DietTracker
+            key={`diet-${selectedDate}-${refreshKey}`}
             selectedDate={selectedDate}
             profile={profile}
           />
@@ -97,6 +138,7 @@ export default function App() {
 
         {activeTab === 'workouts' && (
           <WorkoutTracker
+            key={`workouts-${selectedDate}-${refreshKey}`}
             selectedDate={selectedDate}
             profile={profile}
           />
@@ -104,6 +146,7 @@ export default function App() {
 
         {activeTab === 'progress' && (
           <ProgressAnalytics
+            key={`progress-${refreshKey}`}
             profile={profile}
             selectedDate={selectedDate}
             onNavigateToDiet={() => setActiveTab('diet')}
@@ -113,6 +156,7 @@ export default function App() {
 
         {activeTab === 'fastrack' && (
           <FastrackWatch
+            key={`fastrack-${selectedDate}-${refreshKey}`}
             selectedDate={selectedDate}
             profile={profile}
           />
@@ -120,11 +164,29 @@ export default function App() {
 
         {activeTab === 'coach' && (
           <CoachChat
+            key={`coach-${refreshKey}`}
             profile={profile}
             selectedDate={selectedDate}
           />
         )}
       </main>
+
+      {/* Universal Floating & Modal Voice Assistant (Active on Every Screen) */}
+      <UniversalVoiceAssistant
+        isOpen={isVoiceOpen}
+        onClose={() => setIsVoiceOpen(false)}
+        onOpen={() => setIsVoiceOpen(true)}
+        selectedDate={selectedDate}
+        onActionCompleted={handleVoiceActionCompleted}
+      />
+
+      {/* Cloud Account Sign In / Sign Up Modal */}
+      <AuthModal
+        isOpen={isAuthOpen}
+        onClose={() => setIsAuthOpen(false)}
+        onAuthSuccess={handleAuthSuccess}
+        currentUser={currentUser || profile}
+      />
 
       {/* Interactive Onboarding / Profile Setup Wizard Modal */}
       <OnboardingModal

@@ -23,6 +23,33 @@ import {
   Volume2
 } from 'lucide-react';
 import { api } from '../api';
+import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
+
+// Safe native Android & mobile web haptic vibration trigger
+const triggerHapticFeedback = async (isWarning = false) => {
+  // 1. Native Android hardware vibrator via Capacitor plugin
+  try {
+    if (isWarning) {
+      await Haptics.impact({ style: ImpactStyle.Medium });
+    } else {
+      await Haptics.notification({ type: NotificationType.Success });
+      await Haptics.vibrate({ duration: 600 });
+    }
+  } catch (err) {
+    // Falls back to web vibration if plugin unavailable
+  }
+
+  // 2. HTML5 Navigation Vibration API fallback
+  try {
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      if (isWarning) {
+        navigator.vibrate(80);
+      } else {
+        navigator.vibrate([250, 100, 250, 100, 450]);
+      }
+    }
+  } catch (err) {}
+};
 
 // Comprehensive Gym Exercise Variations Database (Zero Manual Typing)
 export const EXERCISE_DATABASE = {
@@ -265,10 +292,10 @@ Day 7 - Rest: 8,000 steps active recovery walk & stretching`);
         setTimerSeconds(sec => {
           if (sec <= 4 && sec > 1) {
             playRestSound(true); // Short warning tick at 3, 2, 1s
-            if ('vibrate' in navigator) navigator.vibrate(60);
+            triggerHapticFeedback(true);
           } else if (sec === 1) {
             playRestSound(false); // Loud finish chime!
-            if ('vibrate' in navigator) navigator.vibrate([200, 100, 200, 100, 300]);
+            triggerHapticFeedback(false);
             setRestAlert(true);
             setTimeout(() => setRestAlert(false), 5000);
           }
@@ -283,6 +310,7 @@ Day 7 - Rest: 8,000 steps active recovery walk & stretching`);
   }, [isTimerActive, timerSeconds]);
 
   const startTimer = (seconds) => {
+    triggerHapticFeedback(true); // Immediate tactile click confirmation
     setTimerSeconds(seconds);
     setIsTimerActive(true);
     setRestAlert(false);

@@ -11,7 +11,11 @@ import {
   Calendar,
   Sparkles,
   User,
-  TrendingUp
+  TrendingUp,
+  Mic,
+  LogIn,
+  LogOut,
+  Cloud
 } from 'lucide-react';
 
 export default function Navbar({ 
@@ -20,8 +24,12 @@ export default function Navbar({
   selectedDate, 
   setSelectedDate, 
   profile, 
+  currentUser,
   onOpenProfile, 
-  onOpenSettings
+  onOpenSettings,
+  onOpenVoice,
+  onOpenAuth,
+  onLogout
 }) {
   const isToday = selectedDate === new Date().toISOString().split('T')[0];
 
@@ -107,9 +115,19 @@ export default function Navbar({
               })}
             </nav>
 
-            {/* 3. Right: Date Switcher + User Profile + Settings */}
+            {/* 3. Right: Voice Assistant + Date Switcher + User Profile + Settings */}
             <div className="flex items-center space-x-2 shrink-0">
               
+              {/* Universal Voice Assistant Pill */}
+              <button
+                onClick={onOpenVoice || (() => window.dispatchEvent(new CustomEvent('open-universal-voice')))}
+                className="flex items-center space-x-1.5 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 hover:border-emerald-500/60 px-2.5 py-1.5 rounded-xl transition-all cursor-pointer font-bold text-xs shadow-sm"
+                title="Universal Voice Assistant: Speak to log meals, water, workouts, or weight"
+              >
+                <Mic className="w-3.5 h-3.5 animate-pulse text-emerald-400" />
+                <span className="hidden sm:inline">Voice Log</span>
+              </button>
+
               {/* Date Switcher Pill */}
               <div className="flex items-center bg-slate-900 border border-slate-800 rounded-xl p-0.5 text-xs text-slate-300">
                 <button
@@ -150,6 +168,32 @@ export default function Navbar({
                   </div>
                 </div>
               </button>
+
+              {/* Cloud Account Sign-in / User Button */}
+              {currentUser ? (
+                <div className="flex items-center space-x-1.5 bg-slate-900 border border-emerald-500/30 px-2 py-1 rounded-xl text-xs">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="text-[11px] font-bold text-slate-200 hidden md:inline truncate max-w-[80px]">
+                    {currentUser.name}
+                  </span>
+                  <button
+                    onClick={onLogout}
+                    title="Sign Out of Cloud Account"
+                    className="text-[10px] text-slate-500 hover:text-rose-400 p-0.5 ml-1 transition-colors cursor-pointer"
+                  >
+                    <LogOut className="w-3 h-3" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={onOpenAuth}
+                  className="flex items-center space-x-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black px-2.5 py-1.5 rounded-xl transition-all cursor-pointer text-xs shadow-md shadow-emerald-500/20"
+                  title="Sign In / Create Account with Google or Email"
+                >
+                  <LogIn className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Sign In</span>
+                </button>
+              )}
 
               {/* Settings Cog */}
               <button

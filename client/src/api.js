@@ -3,6 +3,40 @@
 const BASE_URL = '/api';
 
 export const api = {
+  // Authentication & Cloud Sync
+  signup: async (userData) => {
+    const res = await fetch(`${BASE_URL}/auth/signup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(userData)
+    });
+    return res.json();
+  },
+  login: async (credentials) => {
+    const res = await fetch(`${BASE_URL}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(credentials)
+    });
+    return res.json();
+  },
+  googleAuth: async (googleData) => {
+    const res = await fetch(`${BASE_URL}/auth/google`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(googleData)
+    });
+    return res.json();
+  },
+  getCurrentUser: async () => {
+    const res = await fetch(`${BASE_URL}/auth/me`);
+    return res.json();
+  },
+  logout: async () => {
+    const res = await fetch(`${BASE_URL}/auth/logout`, { method: 'POST' });
+    return res.json();
+  },
+
   // Profile
   getProfile: async () => {
     const res = await fetch(`${BASE_URL}/profile`);
@@ -77,6 +111,16 @@ export const api = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
+    });
+    return res.json();
+  },
+
+  // Universal Full-Website Voice Command Engine
+  universalVoiceCommand: async (text, date) => {
+    const res = await fetch(`${BASE_URL}/ai/universal-voice`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, date })
     });
     return res.json();
   },
