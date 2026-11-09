@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import ConfirmModal from './ConfirmModal';
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -45,6 +46,7 @@ export default function ProgressAnalytics({ profile, selectedDate, onNavigateToD
   // Comparison selections
   const [beforePhotoId, setBeforePhotoId] = useState(null);
   const [afterPhotoId, setAfterPhotoId] = useState(null);
+  const [photoToDelete, setPhotoToDelete] = useState(null);
 
   // Fetch Trends & Photos
   const loadTrendsAndPhotos = async () => {
@@ -130,13 +132,15 @@ export default function ProgressAnalytics({ profile, selectedDate, onNavigateToD
     }
   };
 
-  const handleDeletePhoto = async (id) => {
-    if (!confirm('Remove this photo from your progress vault?')) return;
+  const handleConfirmDeletePhoto = async () => {
+    if (!photoToDelete) return;
     try {
-      await api.deleteProgressPhoto(id);
+      await api.deleteProgressPhoto(photoToDelete.id);
       loadTrendsAndPhotos();
     } catch (err) {
-      alert('Failed to delete photo');
+      console.error('Failed to delete photo:', err);
+    } finally {
+      setPhotoToDelete(null);
     }
   };
 
@@ -661,8 +665,8 @@ export default function ProgressAnalytics({ profile, selectedDate, onNavigateToD
                     <span className="text-slate-400">{p.weightKg ? `${p.weightKg} kg` : p.pose}</span>
                   </div>
                   <button
-                    onClick={() => handleDeletePhoto(p.id)}
-                    className="absolute top-1.5 right-1.5 p-1 bg-rose-500/80 hover:bg-rose-600 text-white rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={() => setPhotoToDelete(p)}
+                    className="absolute top-1.5 right-1.5 p-1 bg-rose-500/80 hover:bg-rose-600 text-white rounded-md opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
                     title="Delete photo"
                   >
                     <Trash2 className="w-3 h-3" />
@@ -674,6 +678,18 @@ export default function ProgressAnalytics({ profile, selectedDate, onNavigateToD
         )}
 
       </div>
+
+      {/* Sleek Dark Confirmation Modal for Progress Photos */}
+      <ConfirmModal
+        isOpen={Boolean(photoToDelete)}
+        onClose={() => setPhotoToDelete(null)}
+        onConfirm={handleConfirmDeletePhoto}
+        title="Delete Progress Photo?"
+        message={`Are you sure you want to delete this ${photoToDelete?.pose || ''} physique check-in from ${photoToDelete?.date || 'your vault'}?`}
+        confirmText="Yes, Delete Photo"
+        cancelText="Cancel"
+        danger={true}
+      />
 
     </div>
   );

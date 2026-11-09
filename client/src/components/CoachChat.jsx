@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import ConfirmModal from './ConfirmModal';
 import { Bot, Send, Sparkles, User, Flame, Dumbbell, Watch, RefreshCw, Trash2 } from 'lucide-react';
 import { api } from '../api';
 
@@ -160,6 +161,7 @@ export default function CoachChat({ profile, selectedDate }) {
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [isConfirmClearOpen, setIsConfirmClearOpen] = useState(false);
   const messagesEndRef = useRef(null);
 
   const loadHistory = async () => {
@@ -207,13 +209,14 @@ export default function CoachChat({ profile, selectedDate }) {
     }
   };
 
-  const handleClearHistory = async () => {
-    if (!window.confirm('Clear all AI Coach conversation history?')) return;
+  const handleConfirmClearHistory = async () => {
     try {
       await api.clearChatHistory();
       setMessages([]);
     } catch (err) {
-      alert('Failed to clear chat: ' + err.message);
+      console.error('Failed to clear chat:', err);
+    } finally {
+      setIsConfirmClearOpen(false);
     }
   };
 
@@ -254,8 +257,8 @@ export default function CoachChat({ profile, selectedDate }) {
             <RefreshCw className="w-4 h-4" />
           </button>
           <button
-            onClick={handleClearHistory}
-            className="p-2 text-rose-400 hover:text-rose-300 bg-slate-950 border border-slate-800 hover:border-rose-500/40 rounded-xl transition-colors"
+            onClick={() => setIsConfirmClearOpen(true)}
+            className="p-2 text-rose-400 hover:text-rose-300 bg-slate-950 border border-slate-800 hover:border-rose-500/40 rounded-xl transition-colors cursor-pointer"
             title="Clear Chat History"
           >
             <Trash2 className="w-4 h-4" />
@@ -351,6 +354,18 @@ export default function CoachChat({ profile, selectedDate }) {
           <Send className="w-4 h-4" />
         </button>
       </form>
+
+      {/* Sleek Dark Confirmation Modal for Clearing Coach Chat */}
+      <ConfirmModal
+        isOpen={isConfirmClearOpen}
+        onClose={() => setIsConfirmClearOpen(false)}
+        onConfirm={handleConfirmClearHistory}
+        title="Clear AI Coach Conversation?"
+        message="This will delete your current coach chat history. You can start a fresh conversation anytime."
+        confirmText="Yes, Clear History"
+        cancelText="Cancel"
+        danger={true}
+      />
 
     </div>
   );

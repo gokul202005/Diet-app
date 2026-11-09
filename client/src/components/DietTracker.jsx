@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import ConfirmModal from './ConfirmModal';
 import { 
   Search, 
   Sparkles, 
@@ -72,6 +73,9 @@ export default function DietTracker({ selectedDate, profile }) {
 
   // Active logging mode: 'search' | 'ai-text' | 'photo'
   const [activeMode, setActiveMode] = useState('search');
+
+  // Confirmation Modal state
+  const [mealToDelete, setMealToDelete] = useState(null);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -308,14 +312,16 @@ export default function DietTracker({ selectedDate, profile }) {
     }
   };
 
-  // Delete Meal
-  const handleDeleteMeal = async (id) => {
-    if (!confirm('Remove this meal from daily log?')) return;
+  // Delete Meal Confirmation Action
+  const handleConfirmDeleteMeal = async () => {
+    if (!mealToDelete) return;
     try {
-      await api.deleteMeal(id);
+      await api.deleteMeal(mealToDelete.id);
       loadMeals();
     } catch (err) {
-      alert('Failed to delete meal');
+      console.error('Failed to delete meal:', err);
+    } finally {
+      setMealToDelete(null);
     }
   };
 
@@ -976,8 +982,8 @@ export default function DietTracker({ selectedDate, profile }) {
                   </div>
 
                   <button
-                    onClick={() => handleDeleteMeal(meal.id)}
-                    className="p-2 text-slate-500 hover:text-rose-400 hover:bg-slate-800 rounded-xl transition-colors"
+                    onClick={() => setMealToDelete(meal)}
+                    className="p-2 text-slate-500 hover:text-rose-400 hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
                     title="Delete meal"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -992,6 +998,18 @@ export default function DietTracker({ selectedDate, profile }) {
           </div>
         )}
       </div>
+
+      {/* Sleek Dark Confirmation Modal for Deleting Meals */}
+      <ConfirmModal
+        isOpen={Boolean(mealToDelete)}
+        onClose={() => setMealToDelete(null)}
+        onConfirm={handleConfirmDeleteMeal}
+        title="Remove Meal from Log?"
+        message={`Are you sure you want to remove "${mealToDelete?.name || 'this meal'}"? Your daily calories and macronutrient totals will update automatically.`}
+        confirmText="Yes, Remove Meal"
+        cancelText="Cancel"
+        danger={true}
+      />
 
     </div>
   );

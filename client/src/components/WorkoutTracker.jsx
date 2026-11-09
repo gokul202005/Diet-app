@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import confetti from 'canvas-confetti';
+import ConfirmModal from './ConfirmModal';
 import { 
   Dumbbell, 
   Sparkles, 
@@ -213,6 +214,9 @@ Day 7 - Rest: 8,000 steps active recovery walk & stretching`);
 
   // Personal Record (PR) state
   const [prsData, setPrsData] = useState({});
+
+  // Confirmation Modal state
+  const [workoutToDelete, setWorkoutToDelete] = useState(null);
 
   // Rest Timer & Audio Synthesizer state
   const [timerSeconds, setTimerSeconds] = useState(0);
@@ -465,13 +469,15 @@ Day 7 - Rest: Mobility & Meal Prep`);
     }
   };
 
-  const handleDeleteWorkout = async (id) => {
-    if (!confirm('Delete this workout entry?')) return;
+  const handleConfirmDeleteWorkout = async () => {
+    if (!workoutToDelete) return;
     try {
-      await api.deleteWorkout(id);
+      await api.deleteWorkout(workoutToDelete.id);
       loadData();
     } catch (err) {
-      alert('Failed to delete workout');
+      console.error('Failed to delete workout:', err);
+    } finally {
+      setWorkoutToDelete(null);
     }
   };
 
@@ -1008,8 +1014,9 @@ Day 7 - Rest: Mobility & Meal Prep`);
                       </div>
                     </div>
                     <button
-                      onClick={() => handleDeleteWorkout(w.id)}
-                      className="p-2 text-slate-500 hover:text-rose-400 hover:bg-slate-800 rounded-xl transition-colors"
+                      onClick={() => setWorkoutToDelete(w)}
+                      className="p-2 text-slate-500 hover:text-rose-400 hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
+                      title="Delete workout"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -1107,6 +1114,18 @@ Day 7 - Rest: Mobility & Meal Prep`);
           </div>
         </div>
       )}
+
+      {/* Sleek Dark Confirmation Modal for Deleting Workouts */}
+      <ConfirmModal
+        isOpen={Boolean(workoutToDelete)}
+        onClose={() => setWorkoutToDelete(null)}
+        onConfirm={handleConfirmDeleteWorkout}
+        title="Delete Workout Session?"
+        message={`Are you sure you want to delete "${workoutToDelete?.title || 'this session'}"? This will recalculate your burned calories and exercise records.`}
+        confirmText="Yes, Delete Workout"
+        cancelText="Cancel"
+        danger={true}
+      />
 
     </div>
   );
