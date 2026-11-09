@@ -22,15 +22,34 @@ export class FastrackService {
     const totalExpenditure = bmr + activeBurn;
     const netCalories = consumedCalories - totalExpenditure;
 
+    const userGoal = (profile.goal || (Array.isArray(profile.goals) ? profile.goals[0] : 'recomp')).toLowerCase();
+    const isBulking = userGoal.includes('bulk') || userGoal.includes('muscle');
+    const isCutting = userGoal.includes('cut') || userGoal.includes('shred');
+    const isRecomp = userGoal.includes('recomp');
+
     let status = 'neutral';
     let message = 'Balanced energy intake';
 
     if (netCalories < -200) {
       status = 'deficit';
-      message = `Fat-loss deficit of ${Math.abs(netCalories)} kcal`;
+      if (isBulking) {
+        message = `Deficit of ${Math.abs(netCalories)} kcal (eat more to hit surplus for muscle growth)`;
+      } else if (isCutting) {
+        message = `Fat-loss deficit of ${Math.abs(netCalories)} kcal`;
+      } else if (isRecomp) {
+        message = `Body recomp deficit of ${Math.abs(netCalories)} kcal`;
+      } else {
+        message = `Net deficit of ${Math.abs(netCalories)} kcal`;
+      }
     } else if (netCalories > 200) {
       status = 'surplus';
-      message = `Muscle-building surplus of ${netCalories} kcal`;
+      if (isBulking) {
+        message = `Muscle-building surplus of +${netCalories} kcal`;
+      } else if (isCutting) {
+        message = `Caloric surplus of +${netCalories} kcal (above cut target)`;
+      } else {
+        message = `Net surplus of +${netCalories} kcal`;
+      }
     } else {
       status = 'maintenance';
       message = 'Maintenance caloric balance';

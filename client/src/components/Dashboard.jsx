@@ -26,7 +26,8 @@ export default function Dashboard({
   onNavigateToWorkouts, 
   onNavigateToFastrack,
   onNavigateToProgress,
-  onOpenCoach
+  onOpenCoach,
+  onOpenProfile
 }) {
   const [mealsData, setMealsData] = useState(null);
   const [fastrackLog, setFastrackLog] = useState(null);
@@ -90,6 +91,23 @@ export default function Dashboard({
   const steps = fastrackLog?.steps || 0;
   const stepTarget = profile?.dailyTargetSteps || 10000;
   const stepPercent = Math.min(100, Math.round((steps / stepTarget) * 100));
+
+  const getGoalDisplay = () => {
+    const rawGoal = profile?.goal || (Array.isArray(profile?.goals) ? profile.goals[0] : 'recomp');
+    switch (rawGoal) {
+      case 'cutting': return { label: '🔥 Fat Loss (Cut)', color: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' };
+      case 'rapid_cut': return { label: '⚡ Rapid Shred', color: 'border-rose-500/30 bg-rose-500/10 text-rose-300' };
+      case 'recomp': return { label: '⚖️ Body Recomp', color: 'border-sky-500/30 bg-sky-500/10 text-sky-300' };
+      case 'lean_bulk': return { label: '💪 Lean Bulk', color: 'border-amber-500/30 bg-amber-500/10 text-amber-300' };
+      case 'power_bulk': return { label: '🦍 Power Bulk', color: 'border-orange-500/30 bg-orange-500/10 text-orange-300' };
+      case 'endurance': return { label: '🏃 Athletic Stamina', color: 'border-indigo-500/30 bg-indigo-500/10 text-indigo-300' };
+      case 'maintenance': return { label: '🛡️ Maintenance', color: 'border-teal-500/30 bg-teal-500/10 text-teal-300' };
+      case 'metabolic_health': return { label: '🩺 Low-GI / Health', color: 'border-purple-500/30 bg-purple-500/10 text-purple-300' };
+      default: return { label: `${rawGoal || 'Recomp'} Goal`, color: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' };
+    }
+  };
+
+  const goalInfo = getGoalDisplay();
 
   return (
     <div className="space-y-6 pb-20">
