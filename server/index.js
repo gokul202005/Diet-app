@@ -285,6 +285,73 @@ app.delete('/api/workouts/:id', (req, res) => {
   res.json({ success: true, message: 'Workout deleted' });
 });
 
+// Calculate Personal Records (PR) & Last Session Weights per Exercise
+app.get('/api/workouts/prs', (req, res) => {
+  const db = readDB();
+  const workouts = db.workouts || [];
+  
+  // Sort ascending by date to track history sequentially
+  const sorted = [...workouts].sort((a, b) => new Date(a.date) - new Date(b.date));
+  
+  const prs = {};
+  
+  sorted.forEach(w => {
+    (w.exercises || []).forEach(ex => {
+      const name = ex.name?.trim();
+      if (!name) return;
+      
+      if (!prs[name]) {
+        prs[name] = {
+          name,
+          maxWeight: 0,
+          repsAtMaxWeight: 0,
+          prDate: w.date,
+          lastWeight: 0,
+          lastReps: 0,
+          lastDate: w.date,
+          history: []
+        };
+      }
+      
+      let sessionMaxWeight = 0;
+      let sessionRepsAtMax = 0;
+      
+      (ex.sets || []).forEach(set => {
+        const wt = Number(set.weight) || 0;
+        const reps = Number(set.reps) || 0;
+        
+        if (wt > sessionMaxWeight) {
+          sessionMaxWeight = wt;
+          sessionRepsAtMax = reps;
+        } else if (wt === sessionMaxWeight && reps > sessionRepsAtMax) {
+          sessionRepsAtMax = reps;
+        }
+      });
+      
+      if (sessionMaxWeight > 0) {
+        prs[name].lastWeight = sessionMaxWeight;
+        prs[name].lastReps = sessionRepsAtMax;
+        prs[name].lastDate = w.date;
+        
+        if (sessionMaxWeight > prs[name].maxWeight || 
+           (sessionMaxWeight === prs[name].maxWeight && sessionRepsAtMax > prs[name].repsAtMaxWeight)) {
+          prs[name].maxWeight = sessionMaxWeight;
+          prs[name].repsAtMaxWeight = sessionRepsAtMax;
+          prs[name].prDate = w.date;
+        }
+        
+        prs[name].history.push({
+          date: w.date,
+          weight: sessionMaxWeight,
+          reps: sessionRepsAtMax
+        });
+      }
+    });
+  });
+  
+  res.json({ success: true, prs });
+});
+
 app.get('/api/workout-plans', (req, res) => {
   const db = readDB();
   res.json({ workoutPlans: db.workoutPlans || [] });
@@ -528,6 +595,146 @@ app.post('/api/weight/log', (req, res) => {
 
   writeDB(db);
   res.json({ success: true, currentWeight: numWeight });
+});
+
+// --- INTERACTIVE 7-DAY & 30-DAY TREND ANALYTICS ---
+app.get('/api/analytics/trends', (req, res) => {
+  const db = readDB();
+  const daysCount = parseInt(req.query.days) || 7;
+  const profile = db.profile || {};
+  
+  const targetCalories = Number(profile.dailyTargetCalories) || 2100;
+  const targetProtein = Number(profile.dailyTargetProtein) || 140;
+  const targetSteps = Number(profile.dailyTargetSteps) || 10000;
+  const bmr = Number(profile.weightKg ? profile.weightKg * 22 : 1800);
+
+  const today = new Date();
+  const dailyTrend = [];
+
+  for (let i = daysCount - 1; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const dateStr = d.toISOString().split('T')[0];
+    const dayLabel = d.toLocaleDateString('en-US', { weekday: 'short' });
+    const shortDate = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+    // Meals on this date
+    const dayMeals = (db.meals || []).filter(m => m.date === dateStr);
+    const calories = dayMeals.reduce((s, m) => s + (m.totalCalories || 0), 0);
+    const protein = Number(dayMeals.reduce((s, m) => s + (m.totalProtein || 0), 0).toFixed(1));
+    const carbs = Number(dayMeals.reduce((s, m) => s + (m.totalCarbs || 0), 0).toFixed(1));
+    const fat = Number(dayMeals.reduce((s, m) => s + (m.totalFat || 0), 0).toFixed(1));
+
+    // Fastrack log
+    const watchLog = (db.fastrackLogs || []).find(l => l.date === dateStr);
+    const steps = watchLog?.steps || 0;
+    const activeBurn = watchLog?.activeCalories || 0;
+    const totalBurn = Math.round(bmr + activeBurn);
+
+    // Water log
+    const waterEntry = (db.waterLogs || []).find(w => w.date === dateStr);
+    const waterMl = waterEntry?.amountMl || 0;
+
+    // Weight log
+    const weightEntry = (db.weightLogs || []).find(w => w.date === dateStr);
+    const weightKg = weightEntry?.weightKg || null;
+
+    // Workouts
+    const dayWorkouts = (db.workouts || []).filter(w => w.date === dateStr);
+
+    dailyTrend.push({
+      date: dateStr,
+      dayLabel,
+      shortDate,
+      calories,
+      targetCalories,
+      protein,
+      targetProtein,
+      carbs,
+      fat,
+      waterMl,
+      steps,
+      targetSteps,
+      activeBurn,
+      totalBurn,
+      netDeficit: totalBurn - calories,
+      weightKg,
+      workoutsCount: dayWorkouts.length
+    });
+  }
+
+  // Calculate summary metrics
+  const loggedDaysWithFood = dailyTrend.filter(d => d.calories > 0);
+  const avgCalories = loggedDaysWithFood.length > 0 
+    ? Math.round(loggedDaysWithFood.reduce((s, d) => s + d.calories, 0) / loggedDaysWithFood.length) 
+    : 0;
+
+  const avgProtein = loggedDaysWithFood.length > 0 
+    ? Math.round(loggedDaysWithFood.reduce((s, d) => s + d.protein, 0) / loggedDaysWithFood.length) 
+    : 0;
+
+  const loggedDaysWithSteps = dailyTrend.filter(d => d.steps > 0);
+  const avgSteps = loggedDaysWithSteps.length > 0 
+    ? Math.round(loggedDaysWithSteps.reduce((s, d) => s + d.steps, 0) / loggedDaysWithSteps.length) 
+    : 0;
+
+  const proteinHitDays = loggedDaysWithFood.filter(d => d.protein >= targetProtein * 0.85).length;
+  const proteinConsistencyRate = loggedDaysWithFood.length > 0 
+    ? Math.round((proteinHitDays / loggedDaysWithFood.length) * 100) 
+    : 0;
+
+  res.json({
+    success: true,
+    daysCount,
+    dailyTrend,
+    summary: {
+      avgCalories,
+      avgProtein,
+      avgSteps,
+      proteinConsistencyRate,
+      currentWeight: profile.weightKg || null
+    }
+  });
+});
+
+// --- BEFORE / AFTER BODY PROGRESS PHOTO VAULT ---
+app.get('/api/progress/photos', (req, res) => {
+  const db = readDB();
+  res.json({ success: true, photos: db.photoVault || [] });
+});
+
+app.post('/api/progress/photos', (req, res) => {
+  const db = readDB();
+  const { date = new Date().toISOString().split('T')[0], type = 'checkin', photoUrl, weightKg, pose = 'front', notes = '' } = req.body;
+
+  if (!photoUrl) {
+    return res.status(400).json({ error: 'photoUrl is required' });
+  }
+
+  const newPhoto = {
+    id: `photo-${Date.now()}`,
+    date,
+    type, // 'before' | 'after' | 'checkin'
+    pose, // 'front' | 'side' | 'back'
+    photoUrl,
+    weightKg: weightKg ? parseFloat(weightKg) : (db.profile?.weightKg || null),
+    notes,
+    createdAt: new Date().toISOString()
+  };
+
+  db.photoVault = db.photoVault || [];
+  db.photoVault.unshift(newPhoto);
+  writeDB(db);
+
+  res.status(201).json({ success: true, photo: newPhoto });
+});
+
+app.delete('/api/progress/photos/:id', (req, res) => {
+  const db = readDB();
+  const id = req.params.id;
+  db.photoVault = (db.photoVault || []).filter(p => p.id !== id);
+  writeDB(db);
+  res.json({ success: true, message: 'Photo deleted' });
 });
 
 // --- AI FITNESS COACH CHAT ---

@@ -6,6 +6,7 @@ import WorkoutTracker from './components/WorkoutTracker';
 import FastrackWatch from './components/FastrackWatch';
 import CoachChat from './components/CoachChat';
 import MealPlanner from './components/MealPlanner';
+import ProgressAnalytics from './components/ProgressAnalytics';
 import OnboardingModal from './components/OnboardingModal';
 import SettingsModal from './components/SettingsModal';
 import { api } from './api';
@@ -74,6 +75,7 @@ export default function App() {
             onNavigateToDiet={() => setActiveTab('diet')}
             onNavigateToWorkouts={() => setActiveTab('workouts')}
             onNavigateToFastrack={() => setActiveTab('fastrack')}
+            onNavigateToProgress={() => setActiveTab('progress')}
             onOpenCoach={() => setActiveTab('coach')}
           />
         )}
@@ -97,6 +99,15 @@ export default function App() {
           <WorkoutTracker
             selectedDate={selectedDate}
             profile={profile}
+          />
+        )}
+
+        {activeTab === 'progress' && (
+          <ProgressAnalytics
+            profile={profile}
+            selectedDate={selectedDate}
+            onNavigateToDiet={() => setActiveTab('diet')}
+            onNavigateToWorkouts={() => setActiveTab('workouts')}
           />
         )}
 

@@ -25,6 +25,7 @@ export default function Dashboard({
   onNavigateToDiet, 
   onNavigateToWorkouts, 
   onNavigateToFastrack,
+  onNavigateToProgress,
   onOpenCoach
 }) {
   const [mealsData, setMealsData] = useState(null);
@@ -111,13 +112,24 @@ export default function Dashboard({
               </h1>
             </div>
 
-            <button
-              onClick={onNavigateToDiet}
-              className="flex items-center space-x-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold rounded-xl text-xs transition-all shadow-md shadow-emerald-500/20 self-start sm:self-auto"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Log Meal (South Indian / AI)</span>
-            </button>
+            <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+              <button
+                onClick={onNavigateToProgress}
+                className="flex items-center space-x-1.5 px-3.5 py-2 bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-emerald-500/50 text-slate-200 rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer"
+                title="View 7-day/30-day Trends & Photo Vault"
+              >
+                <TrendingUp className="w-4 h-4 text-emerald-400" />
+                <span>Body Trends & Vault</span>
+              </button>
+
+              <button
+                onClick={onNavigateToDiet}
+                className="flex items-center space-x-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold rounded-xl text-xs transition-all shadow-md shadow-emerald-500/20 cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Log Meal</span>
+              </button>
+            </div>
           </div>
 
           {/* Three Metric Pillars */}

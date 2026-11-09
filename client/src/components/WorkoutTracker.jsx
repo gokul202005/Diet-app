@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import confetti from 'canvas-confetti';
 import { 
   Dumbbell, 
   Sparkles, 
@@ -14,7 +15,11 @@ import {
   Clock,
   Layers,
   ChevronRight,
-  Filter
+  Filter,
+  Trophy,
+  Award,
+  Bell,
+  Volume2
 } from 'lucide-react';
 import { api } from '../api';
 
@@ -206,15 +211,65 @@ Day 7 - Rest: 8,000 steps active recovery walk & stretching`);
   const [selectedCategory, setSelectedCategory] = useState('Chest');
   const [selectedVariation, setSelectedVariation] = useState(EXERCISE_DATABASE['Chest'][0].name);
 
-  // Rest Timer
+  // Personal Record (PR) state
+  const [prsData, setPrsData] = useState({});
+
+  // Rest Timer & Audio Synthesizer state
   const [timerSeconds, setTimerSeconds] = useState(0);
   const [isTimerActive, setIsTimerActive] = useState(false);
+  const [restAlert, setRestAlert] = useState(false);
+
+  // Web Audio API Synthesizer (Zero-Token, Native Gym Countdown Beeps)
+  const playRestSound = (isTick = false) => {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      if (isTick) {
+        // Warning tick countdown at 3, 2, 1s
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(520, ctx.currentTime);
+        gain.gain.setValueAtTime(0.2, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.08);
+      } else {
+        // Finish gym chime / bell!
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(880, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(1320, ctx.currentTime + 0.2);
+        gain.gain.setValueAtTime(0.35, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.45);
+      }
+    } catch (e) {
+      console.error('Audio playback error:', e);
+    }
+  };
 
   useEffect(() => {
     let interval = null;
     if (isTimerActive && timerSeconds > 0) {
       interval = setInterval(() => {
-        setTimerSeconds(sec => sec - 1);
+        setTimerSeconds(sec => {
+          if (sec <= 4 && sec > 1) {
+            playRestSound(true); // Short warning tick at 3, 2, 1s
+            if ('vibrate' in navigator) navigator.vibrate(60);
+          } else if (sec === 1) {
+            playRestSound(false); // Loud finish chime!
+            if ('vibrate' in navigator) navigator.vibrate([200, 100, 200, 100, 300]);
+            setRestAlert(true);
+            setTimeout(() => setRestAlert(false), 5000);
+          }
+          return sec - 1;
+        });
       }, 1000);
     } else if (timerSeconds === 0) {
       setIsTimerActive(false);
@@ -226,16 +281,19 @@ Day 7 - Rest: 8,000 steps active recovery walk & stretching`);
   const startTimer = (seconds) => {
     setTimerSeconds(seconds);
     setIsTimerActive(true);
+    setRestAlert(false);
   };
 
   const loadData = async () => {
     try {
-      const [wRes, pRes] = await Promise.all([
+      const [wRes, pRes, prRes] = await Promise.all([
         api.getWorkouts(selectedDate),
-        api.getWorkoutPlans()
+        api.getWorkoutPlans(),
+        api.getWorkoutPRs()
       ]);
       setWorkouts(wRes.workouts || []);
       setSavedPlans(pRes.workoutPlans || []);
+      if (prRes?.success) setPrsData(prRes.prs || {});
     } catch (err) {
       console.error('Error fetching workout data:', err);
     } finally {
@@ -350,8 +408,22 @@ Day 7 - Rest: Mobility & Meal Prep`);
 
   const handleToggleSet = (exIdx, setIdx) => {
     const updated = [...exercises];
-    updated[exIdx].sets[setIdx].done = !updated[exIdx].sets[setIdx].done;
+    const targetSet = updated[exIdx].sets[setIdx];
+    const willBeDone = !targetSet.done;
+    targetSet.done = willBeDone;
     setExercises(updated);
+
+    if (willBeDone) {
+      const exName = updated[exIdx].name;
+      const currentPR = prsData[exName]?.maxWeight || 0;
+      if (targetSet.weight > currentPR && currentPR > 0) {
+        confetti({
+          particleCount: 60,
+          spread: 70,
+          origin: { y: 0.7 }
+        });
+      }
+    }
   };
 
   // Save Workout Session
@@ -404,28 +476,39 @@ Day 7 - Rest: Mobility & Meal Prep`);
             </p>
           </div>
 
-          <div className="flex bg-slate-950 p-1.5 rounded-2xl border border-slate-800 self-start sm:self-auto">
-            <button
-              onClick={() => setViewMode('analyzer')}
-              className={`px-4 py-2 text-xs font-bold rounded-xl flex items-center space-x-1.5 transition-all ${
-                viewMode === 'analyzer'
-                  ? 'bg-emerald-500 text-slate-950 shadow-sm'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>AI Plan Analyzer</span>
-            </button>
+          <div className="flex bg-slate-950 p-1.5 rounded-2xl border border-slate-800 self-start sm:self-auto gap-1">
             <button
               onClick={() => setViewMode('logger')}
-              className={`px-4 py-2 text-xs font-bold rounded-xl flex items-center space-x-1.5 transition-all ${
+              className={`px-3.5 py-1.5 text-xs font-bold rounded-xl flex items-center space-x-1.5 transition-all ${
                 viewMode === 'logger'
-                  ? 'bg-emerald-500 text-slate-950 shadow-sm'
+                  ? 'bg-emerald-500 text-slate-950 shadow-sm font-black'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
               <Play className="w-3.5 h-3.5" />
               <span>Workout Logger</span>
+            </button>
+            <button
+              onClick={() => setViewMode('prs')}
+              className={`px-3.5 py-1.5 text-xs font-bold rounded-xl flex items-center space-x-1.5 transition-all ${
+                viewMode === 'prs'
+                  ? 'bg-emerald-500 text-slate-950 shadow-sm font-black'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Trophy className="w-3.5 h-3.5 text-amber-400" />
+              <span>PR Hall of Fame</span>
+            </button>
+            <button
+              onClick={() => setViewMode('analyzer')}
+              className={`px-3.5 py-1.5 text-xs font-bold rounded-xl flex items-center space-x-1.5 transition-all ${
+                viewMode === 'analyzer'
+                  ? 'bg-emerald-500 text-slate-950 shadow-sm font-black'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>AI Plan Analyzer</span>
             </button>
           </div>
         </div>
@@ -641,6 +724,14 @@ Day 7 - Rest: Mobility & Meal Prep`);
             </div>
           </div>
 
+          {/* Rest Finished Banner Alert */}
+          {restAlert && (
+            <div className="w-full bg-emerald-500/20 border border-emerald-500/50 p-3 rounded-2xl text-center flex items-center justify-center space-x-2 text-xs font-bold text-emerald-300 animate-bounce shadow-lg shadow-emerald-500/20">
+              <Bell className="w-4 h-4 text-emerald-400" />
+              <span>⏱️ Rest Time Complete! Muscle recovery refreshed — get ready for your next set!</span>
+            </div>
+          )}
+
           {/* Workout Logging Form */}
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-5">
             
@@ -743,6 +834,27 @@ Day 7 - Rest: Mobility & Meal Prep`);
                   </button>
                 </div>
               </div>
+
+              {/* Working Weight Memory & All-Time PR Badge */}
+              {selectedVariation && (
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-2 px-1 border-t border-slate-800/80 text-xs">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-slate-400">Previous Session:</span>
+                    <span className="font-bold text-white font-mono bg-slate-900 px-2 py-0.5 rounded-lg border border-slate-800">
+                      {prsData[selectedVariation]?.lastWeight 
+                        ? `${prsData[selectedVariation].lastWeight} kg × ${prsData[selectedVariation].lastReps} reps` 
+                        : 'First session for this exercise'}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center space-x-1.5 text-amber-400 font-bold bg-amber-500/10 border border-amber-500/30 px-2.5 py-0.5 rounded-lg">
+                    <Trophy className="w-3.5 h-3.5" />
+                    <span>All-Time PR: {prsData[selectedVariation]?.maxWeight 
+                      ? `${prsData[selectedVariation].maxWeight} kg (${prsData[selectedVariation].repsAtMaxWeight} reps)` 
+                      : 'Set your first PR today!'}</span>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Exercise List */}
@@ -816,6 +928,21 @@ Day 7 - Rest: Mobility & Meal Prep`);
                           <span className="text-slate-400">reps</span>
                         </div>
 
+                        {/* Memory indicator from previous session */}
+                        {prsData[ex.name]?.lastWeight && (
+                          <span className="text-[10px] text-slate-500 font-mono hidden sm:inline">
+                            (Prev: {prsData[ex.name].lastWeight}kg)
+                          </span>
+                        )}
+
+                        {/* Celebratory PR Badge if weight beats all-time PR */}
+                        {prsData[ex.name]?.maxWeight > 0 && set.weight > prsData[ex.name].maxWeight && (
+                          <span className="px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-black animate-pulse flex items-center space-x-1">
+                            <Trophy className="w-3 h-3 text-amber-400" />
+                            <span>NEW PR!</span>
+                          </span>
+                        )}
+
                         <button
                           onClick={() => handleToggleSet(exIdx, setIdx)}
                           className={`ml-auto px-2.5 py-1 rounded-lg text-xs font-bold transition-all border ${
@@ -880,6 +1007,88 @@ Day 7 - Rest: Mobility & Meal Prep`);
             )}
           </div>
 
+        </div>
+      )}
+
+      {/* VIEW 3: 🏆 PERSONAL RECORDS (PR) HALL OF FAME */}
+      {viewMode === 'prs' && (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center space-x-2 text-xs font-bold uppercase tracking-wider text-amber-400 mb-1">
+                  <Trophy className="w-4 h-4" />
+                  <span>Strength & Progression Vault</span>
+                </div>
+                <h2 className="text-xl font-black text-white">🏆 Personal Record (PR) Trophy Room</h2>
+                <p className="text-xs text-slate-400 mt-1">
+                  Automatically tracks and remembers your all-time peak weights and reps across barbell, dumbbell, and machine lifts.
+                </p>
+              </div>
+
+              <div className="flex items-center space-x-2 bg-slate-950 px-3.5 py-2 rounded-2xl border border-slate-800 self-start sm:self-auto">
+                <Award className="w-4 h-4 text-amber-400" />
+                <span className="text-xs font-bold text-white">
+                  {Object.keys(prsData).length} Lifts Tracked
+                </span>
+              </div>
+            </div>
+
+            {/* Top Lifts Showcase Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
+              {[
+                { name: 'Barbell Flat Bench Press', category: 'Chest', icon: '🏋️‍♂️' },
+                { name: 'Incline Dumbbell Press', category: 'Chest', icon: '💪' },
+                { name: 'Conventional Barbell Deadlift', category: 'Back', icon: '⚡' },
+                { name: 'Barbell Back Squat', category: 'Legs', icon: '🦵' },
+                { name: 'Standing Overhead Barbell Press (OHP)', category: 'Shoulders', icon: '🛡️' },
+                { name: 'Barbell Bicep Curl', category: 'Arms', icon: '💥' },
+                { name: 'Leg Press (45-Degree Sled)', category: 'Legs', icon: '🚀' },
+                { name: 'Wide-Grip Lat Pulldown', category: 'Back', icon: '🦅' },
+                { name: 'Romanian Deadlift (RDL - Barbell)', category: 'Legs', icon: '🎯' }
+              ].map((bench) => {
+                const pr = prsData[bench.name];
+                return (
+                  <div key={bench.name} className="bg-slate-950 border border-slate-800/80 p-4 rounded-2xl space-y-3 relative overflow-hidden group hover:border-amber-500/40 transition-all">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-md bg-slate-900 border border-slate-800 text-slate-400">
+                        {bench.category}
+                      </span>
+                      <span className="text-base">{bench.icon}</span>
+                    </div>
+
+                    <div>
+                      <h4 className="text-xs font-black text-white group-hover:text-amber-400 transition-colors">
+                        {bench.name}
+                      </h4>
+                    </div>
+
+                    <div className="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800/60 flex items-center justify-between">
+                      <div>
+                        <div className="text-[10px] text-slate-500 uppercase font-semibold">Max PR Weight</div>
+                        <div className="text-lg font-black text-amber-400 font-mono">
+                          {pr?.maxWeight ? `${pr.maxWeight} kg` : '--'}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-[10px] text-slate-500 uppercase font-semibold">Reps at PR</div>
+                        <div className="text-sm font-bold text-slate-200">
+                          {pr?.repsAtMaxWeight ? `${pr.repsAtMaxWeight} reps` : '--'}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1">
+                      <span>{pr?.prDate ? `Achieved: ${pr.prDate}` : 'Log this lift to set PR'}</span>
+                      {pr?.lastWeight && (
+                        <span className="text-slate-400">Recent: {pr.lastWeight}kg</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
       )}
 

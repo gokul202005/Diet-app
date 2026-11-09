@@ -10,7 +10,8 @@ import {
   ChevronRight, 
   Calendar,
   Sparkles,
-  User
+  User,
+  TrendingUp
 } from 'lucide-react';
 
 export default function Navbar({ 
@@ -41,6 +42,7 @@ export default function Navbar({
     { id: 'planner', label: 'Meal Planner', icon: Sparkles },
     { id: 'diet', label: 'Diet Tracker', icon: Utensils },
     { id: 'workouts', label: 'Workouts', icon: Dumbbell },
+    { id: 'progress', label: 'Progress & Vault', icon: TrendingUp },
     { id: 'fastrack', label: 'Fastrack', icon: Watch },
     { id: 'coach', label: 'AI Coach', icon: Bot },
   ];

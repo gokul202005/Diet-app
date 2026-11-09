@@ -103,6 +103,10 @@ export const api = {
     const res = await fetch(`${BASE_URL}/workout-plans`);
     return res.json();
   },
+  getWorkoutPRs: async () => {
+    const res = await fetch(`${BASE_URL}/workouts/prs`);
+    return res.json();
+  },
   analyzeWorkoutPlan: async (planText) => {
     const res = await fetch(`${BASE_URL}/ai/analyze-workout-plan`, {
       method: 'POST',
@@ -166,6 +170,30 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ weightKg, date })
     });
+    return res.json();
+  },
+
+  // Trends & Analytics
+  getTrends: async (days = 7) => {
+    const res = await fetch(`${BASE_URL}/analytics/trends?days=${days}`);
+    return res.json();
+  },
+
+  // Progress Photo Vault
+  getProgressPhotos: async () => {
+    const res = await fetch(`${BASE_URL}/progress/photos`);
+    return res.json();
+  },
+  addProgressPhoto: async (payload) => {
+    const res = await fetch(`${BASE_URL}/progress/photos`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    return res.json();
+  },
+  deleteProgressPhoto: async (id) => {
+    const res = await fetch(`${BASE_URL}/progress/photos/${id}`, { method: 'DELETE' });
     return res.json();
   },
 

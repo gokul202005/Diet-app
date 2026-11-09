@@ -5,7 +5,7 @@
     "age": "21",
     "gender": "male",
     "heightCm": "210.312",
-    "weightKg": "111",
+    "weightKg": 111,
     "goal": "cutting",
     "activityLevel": "moderately_active",
     "dailyTargetCalories": 3202,
@@ -116,10 +116,15 @@
   "waterLogs": [
     {
       "date": "2026-11-09",
-      "amountMl": 250
+      "amountMl": 0
     }
   ],
-  "weightLogs": [],
+  "weightLogs": [
+    {
+      "date": "2026-11-09",
+      "weightKg": 111
+    }
+  ],
   "aiCache": {},
   "chatHistory": [
     {
@@ -169,8 +174,8 @@
     "cacheTokens": true,
     "fastrackDeviceName": "Fastrack Smartwatch",
     "tokenUsage": {
-      "requestsToday": 49,
-      "tokensEstimated": 33950,
+      "requestsToday": 50,
+      "tokensEstimated": 34300,
       "lastResetDate": "2026-11-09"
     }
   },
