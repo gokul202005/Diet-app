@@ -1,9 +1,23 @@
 {
-  "users": [],
-  "currentUser": null,
+  "users": [
+    {
+      "id": "user-google-1794233434386",
+      "name": "Gokul",
+      "email": "gokul@gmail.com",
+      "googleId": "google-user-1794233433390",
+      "provider": "google",
+      "createdAt": "2026-11-09T14:10:34.386Z"
+    }
+  ],
+  "currentUser": {
+    "id": "user-google-1794233434386",
+    "name": "Gokul",
+    "email": "gokul@gmail.com",
+    "provider": "google"
+  },
   "profile": {
     "isConfigured": false,
-    "name": "",
+    "name": "Gokul",
     "age": "",
     "gender": "male",
     "heightCm": "",
