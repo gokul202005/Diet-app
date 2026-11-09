@@ -1,32 +1,30 @@
 {
+  "users": [],
+  "currentUser": null,
   "profile": {
-    "isConfigured": true,
-    "name": "gokul krishna",
-    "age": "21",
+    "isConfigured": false,
+    "name": "",
+    "age": "",
     "gender": "male",
-    "heightCm": "210.312",
-    "weightKg": 111.5,
+    "heightCm": "",
+    "weightKg": "",
     "goal": "cutting",
     "activityLevel": "moderately_active",
-    "dailyTargetCalories": 3344,
-    "dailyTargetProtein": 232,
-    "dailyTargetCarbs": 395,
-    "dailyTargetFat": 93,
-    "dailyTargetWater": 4200,
+    "dailyTargetCalories": 2200,
+    "dailyTargetProtein": 150,
+    "dailyTargetCarbs": 240,
+    "dailyTargetFat": 65,
+    "dailyTargetWater": 3500,
     "dailyTargetSteps": 10000,
     "recalculateTargets": false,
     "dietaryTags": [
-      "Non-Veg",
-      "🍗 Non-Veg",
-      "🥗 Pure Veg"
+      "🍗 Non-Veg"
     ],
     "focusAreas": [
-      "Full Body",
       "🛡️ Full Body Balance"
     ],
     "goals": [
-      "cutting",
-      "recomp"
+      "cutting"
     ]
   },
   "meals": [],
@@ -61,292 +59,67 @@
         },
         {
           "day": "Day 3 - Legs A",
-          "focus": "Quads, Calves, Abs",
+          "focus": "Quads, Hamstrings, Calves",
           "exercises": [
-            "Barbell Squats 4x8",
+            "Barbell Back Squat 4x8",
+            "Romanian Deadlift (RDL) 3x10",
             "Leg Press 3x12",
-            "Leg Extensions 3x15",
-            "Standing Calf Raises 4x15",
-            "Hanging Knee Raises 3x15"
+            "Seated Leg Curls 3x12",
+            "Standing Calf Raises 4x15"
           ]
         },
         {
           "day": "Day 4 - Push B",
           "focus": "Shoulders, Upper Chest, Triceps",
           "exercises": [
-            "Overhead Overhead Press 4x8",
+            "Standing Overhead Press (OHP) 4x8",
+            "Dumbbell Incline Bench 3x10",
             "Dips 3x10",
             "Cable Lateral Raises 4x15",
-            "Skull Crushers 3x12"
+            "Tricep Rope Pushdowns 3x12"
           ]
         },
         {
           "day": "Day 5 - Pull B",
-          "focus": "Upper Back, Lats, Biceps",
+          "focus": "Upper Back, Lats, Arms",
           "exercises": [
-            "Pull-ups 4x8",
+            "Pull-ups / Chin-ups 4x8",
             "Barbell Bent Over Row 3x8",
-            "Seated Cable Row 3x10",
-            "Incline DB Curl 3x10",
-            "Hammer Curls 3x12"
+            "Neutral Grip Cable Pulldown 3x10",
+            "Incline Dumbbell Curl 3x10",
+            "Reverse Pec Deck (Rear Delts) 4x15"
           ]
         },
         {
           "day": "Day 6 - Legs B",
-          "focus": "Hamstrings, Glutes, Calves",
+          "focus": "Hamstrings, Glutes, Abs",
           "exercises": [
-            "Romanian Deadlift (RDL) 4x8",
-            "Bulgarian Split Squats 3x10",
-            "Lying Hamstring Curls 4x12",
-            "Seated Calf Raises 4x15"
-          ]
-        },
-        {
-          "day": "Day 7 - Rest",
-          "focus": "Active Recovery & Mobility",
-          "exercises": [
-            "8,000 steps brisk walk",
-            "Mobility & stretching"
+            "Barbell Hip Thrust 4x10",
+            "Bulgarian Split Squats 3x10 each",
+            "Leg Extensions 3x12",
+            "Hanging Leg Raises 3x15",
+            "Plank 3x60s"
           ]
         }
       ]
     }
   ],
+  "waterLogs": [],
+  "weightLogs": [],
+  "progressPhotos": [],
   "fastrackLogs": [],
-  "waterLogs": [
-    {
-      "date": "2026-11-09",
-      "amountMl": 0
-    }
-  ],
-  "weightLogs": [
-    {
-      "date": "2026-11-09",
-      "weightKg": 111.5
-    }
-  ],
+  "chatHistory": [],
+  "savedMealPlan": null,
   "aiCache": {},
-  "chatHistory": [
-    {
-      "id": "msg-1794224833982",
-      "sender": "user",
-      "text": "hello",
-      "timestamp": "2026-11-09T11:47:13.982Z"
-    },
-    {
-      "id": "msg-1794224836509",
-      "sender": "assistant",
-      "text": "Hello Gokul Krishna! Great to connect with you. \n\nLooking at your live tracking stats for today: you're currently at **0 kcal consumed out of your 3202 kcal target**, and **0g protein out of your 233g goal**. You've had a solid night with 7 hours of sleep, and you're already well ahead on hydration with **8000 ml of water** (though make sure to pace that out comfortably throughout the day!). Your Fastrack smartwatch currently shows 0 steps and 0 active calories burned, so your day is a clean slate waiting to be conquered.\n\nSince it's a fresh start, let's look at a powerhouse South Indian breakfast to kickstart those 233g of protein without touching any North Indian items like rotis or chapati. \n\n**Recommended Breakfast (High Protein South Indian):**\n* **4 Egg Whites & 1 Whole Egg Podimas/Scramble** (cooked with a small teaspoon of coconut oil, onions, green chilies, and curry leaves)\n* **3 Medium Idlis** served with a generous side of **Sambar** (rich in toor dal for extra plant protein) and spicy tomato-garlic chutney.\n* **Macros for this meal:** ~450 kcal and roughly **30g of protein** to get you rolling toward your 233g target.\n\nWhat's on the menu for your first meal today, Gokul? Let me know if you want to lock this in or if you have something else from the South Indian kitchen ready to go!",
-      "source": "gemini-ai",
-      "timestamp": "2026-11-09T11:47:16.508Z"
-    },
-    {
-      "id": "msg-1794225075670",
-      "sender": "user",
-      "text": "Suggest a high-protein South Indian dinner under 450 kcal",
-      "timestamp": "2026-11-09T11:51:15.670Z"
-    },
-    {
-      "id": "msg-1794225077169",
-      "sender": "assistant",
-      "text": "Gokul, for a high-protein South Indian dinner under 450 kcal, here is your exact meal plan:\n\n**The Dish: Chettinad Chicken Kozhambu with 2 Medium Dosa**\n* **Portion:** 200g of boneless skinless chicken breast cooked in a traditional onion-tomato Chettinad spice gravy (minimal oil), paired with 2 medium-sized plain dosas (or Kal dosas).\n* **Macros:** ~430 kcal and **42g of protein**.\n\n**Your Live Tracking Status & Progress:**\n* **Calories:** 0 / 3202 kcal consumed *(3202 kcal remaining)*\n* **Protein:** 0 / 233 g consumed *(233 g remaining)*\n* **Water:** 8000 ml / 4200 ml\n* **Activity:** 0 steps, 0 active kcal burned, 7h sleep.\n\nHow does this Chettinad chicken and dosa pairing sound for locking in your evening protein, Gokul? Let me know if you want to log it or adjust it!",
-      "source": "gemini-ai",
-      "timestamp": "2026-11-09T11:51:17.168Z"
-    },
-    {
-      "id": "msg-1794225089612",
-      "sender": "user",
-      "text": "I have 35g protein left to reach my goal. What are my quickest options?",
-      "timestamp": "2026-11-09T11:51:29.612Z"
-    },
-    {
-      "id": "msg-1794225091598",
-      "sender": "assistant",
-      "text": "To hit your remaining **35g of protein** quickly with zero fuss, here are your fastest, zero-prep South Indian options:\n\n1. **The Instant Buttermilk & Whey/Egg Boost (Fastest):**\n   * **1 Scoop Whey Protein** (unflavored or vanilla) mixed directly into **400 ml of Neer Mor** (Spiced South Indian Buttermilk with ginger, curry leaves, and green chili). \n   * **Macros:** ~180 kcal and **30–35g protein**. Takes 30 seconds to shake up.\n\n2. **The Hard-Boiled Egg & Pepper Route:**\n   * **4 Egg Whites & 1 Whole Egg** hard-boiled, sprinkled generously with black pepper and salt. \n   * **Macros:** ~220 kcal and **25g protein** (pair with a glass of rasam for the remaining boost).\n\n3. **The Quick Chicken Suka/Fry Snack:**\n   * **120g of ready-to-eat/leftover boneless South Indian chicken fry or Pepper Chicken.**\n   * **Macros:** ~200 kcal and **35g protein**.\n\nSince you are at **0 / 3202 kcal** and **0 / 233g protein** for the day, which of these quick fixes do you want to log right now to get those 35g out of the way?",
-      "source": "gemini-ai",
-      "timestamp": "2026-11-09T11:51:31.597Z"
-    }
-  ],
   "settings": {
+    "theme": "dark",
     "geminiApiKey": "",
-    "preferredModel": "gemini-flash-lite-latest",
-    "useHeuristicFallback": true,
     "cacheTokens": true,
     "fastrackDeviceName": "Fastrack Smartwatch",
     "tokenUsage": {
-      "requestsToday": 52,
-      "tokensEstimated": 35800,
+      "requestsToday": 0,
+      "tokensEstimated": 0,
       "lastResetDate": "2026-11-09"
     }
-  },
-  "savedMealPlan": {
-    "preference": "south_indian_mixed",
-    "targetCalories": 3352,
-    "targetProtein": 233,
-    "days": [
-      {
-        "dayNumber": 1,
-        "dayName": "Day 1 (Monday)",
-        "meals": [
-          {
-            "mealType": "Breakfast",
-            "title": "Steamed Idlis with Drumstick Sambar & Boiled Eggs",
-            "time": "08:30 AM",
-            "foods": [
-              {
-                "name": "Steamed Idli",
-                "portion": "6 pieces",
-                "calories": 364,
-                "protein": 12.9,
-                "carbs": 72.8,
-                "fat": 1.7
-              },
-              {
-                "name": "Drumstick Sambar",
-                "portion": "1.4 bowl (200ml)",
-                "calories": 196,
-                "protein": 9.1,
-                "carbs": 30.8,
-                "fat": 3.9
-              },
-              {
-                "name": "Boiled Eggs",
-                "portion": "4 large eggs",
-                "calories": 302,
-                "protein": 26.5,
-                "carbs": 1.7,
-                "fat": 21
-              }
-            ],
-            "mealCalories": 862,
-            "mealProtein": 48.5,
-            "mealCarbs": 105.3,
-            "mealFat": 26.6
-          },
-          {
-            "mealType": "Lunch",
-            "title": "Ponni Rice with Simple Home Chicken Curry & Fresh Thayir",
-            "time": "01:30 PM",
-            "foods": [
-              {
-                "name": "Cooked Ponni Rice",
-                "portion": "2.5 cups (280g)",
-                "calories": 500,
-                "protein": 10.5,
-                "carbs": 112.5,
-                "fat": 1
-              },
-              {
-                "name": "Simple Home Chicken Curry (Veetu Kozhi Curry)",
-                "portion": "1.7 bowls (240g)",
-                "calories": 527,
-                "protein": 54.4,
-                "carbs": 11.9,
-                "fat": 27.2
-              },
-              {
-                "name": "Fresh Curd (Thayir)",
-                "portion": "1.4 bowl (150g)",
-                "calories": 133,
-                "protein": 7,
-                "carbs": 9.1,
-                "fat": 7.7
-              }
-            ],
-            "mealCalories": 1160,
-            "mealProtein": 71.9,
-            "mealCarbs": 133.5,
-            "mealFat": 35.9
-          },
-          {
-            "mealType": "Evening Snack",
-            "title": "Kala Chana Sundal & Degree Filter Coffee",
-            "time": "05:00 PM",
-            "foods": [
-              {
-                "name": "Black Chickpea Sundal",
-                "portion": "1.7 cups (150g)",
-                "calories": 374,
-                "protein": 20.4,
-                "carbs": 59.5,
-                "fat": 6
-              },
-              {
-                "name": "Degree Filter Coffee (with Toned Milk)",
-                "portion": "1.4 davarah (150ml)",
-                "calories": 91,
-                "protein": 4.9,
-                "carbs": 11.2,
-                "fat": 2.1
-              }
-            ],
-            "mealCalories": 465,
-            "mealProtein": 25.3,
-            "mealCarbs": 70.7,
-            "mealFat": 8.1
-          },
-          {
-            "mealType": "Dinner",
-            "title": "Crispy Plain Dosa with Tomato Chutney & Boiled Eggs",
-            "time": "08:30 PM",
-            "foods": [
-              {
-                "name": "Crispy Plain Dosa",
-                "portion": "4 medium dosas",
-                "calories": 466,
-                "protein": 11.2,
-                "carbs": 80.5,
-                "fat": 10.5
-              },
-              {
-                "name": "South Indian Tomato Chutney",
-                "portion": "1.4 serving (60g)",
-                "calories": 84,
-                "protein": 2.1,
-                "carbs": 9.8,
-                "fat": 4.2
-              },
-              {
-                "name": "Boiled Eggs",
-                "portion": "4 large eggs",
-                "calories": 302,
-                "protein": 26.5,
-                "carbs": 1.7,
-                "fat": 21
-              }
-            ],
-            "mealCalories": 852,
-            "mealProtein": 39.8,
-            "mealCarbs": 92,
-            "mealFat": 35.7
-          }
-        ],
-        "dayTotalCalories": 3339,
-        "dayTotalProtein": 185.5,
-        "dayTotalCarbs": 401.5,
-        "dayTotalFat": 106.3,
-        "hydrationGoal": "4.2 Liters",
-        "dieticianTip": "Keep dinner 2.5 hours before sleeping for optimal digestion and growth hormone release."
-      }
-    ],
-    "source": "south-indian-algorithmic-engine"
-  },
-  "users": [
-    {
-      "id": "user-google-1794232876298",
-      "name": "Gokul",
-      "email": "gokul@gmail.com",
-      "provider": "google",
-      "createdAt": "2026-11-09T14:01:16.298Z"
-    },
-    {
-      "id": "user-google-1794232888456",
-      "name": "gokul krishna",
-      "email": "gokulkrishna@gmail.com",
-      "googleId": "google-user-1794232888433",
-      "provider": "google",
-      "createdAt": "2026-11-09T14:01:28.456Z"
-    }
-  ],
-  "currentUser": null
+  }
 }

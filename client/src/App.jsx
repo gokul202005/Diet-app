@@ -10,7 +10,7 @@ import ProgressAnalytics from './components/ProgressAnalytics';
 import OnboardingModal from './components/OnboardingModal';
 import SettingsModal from './components/SettingsModal';
 import UniversalVoiceAssistant from './components/UniversalVoiceAssistant';
-import AuthModal from './components/AuthModal';
+import AuthScreen from './components/AuthScreen';
 import { api } from './api';
 
 export default function App() {
@@ -20,7 +20,6 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isVoiceOpen, setIsVoiceOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -57,8 +56,8 @@ export default function App() {
 
   const handleAuthSuccess = (user) => {
     setCurrentUser(user);
-    if (user?.name && profile) {
-      setProfile(prev => ({ ...prev, name: user.name }));
+    if (!profile || !profile.isConfigured || !profile.name) {
+      setIsOnboardingOpen(true);
     }
   };
 
@@ -86,6 +85,11 @@ export default function App() {
     );
   }
 
+  // 1. Full-Screen Login & Signup Screen comes first if not signed in
+  if (!currentUser) {
+    return <AuthScreen onAuthSuccess={handleAuthSuccess} />;
+  }
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col selection:bg-emerald-500 selection:text-slate-950">
       
@@ -100,7 +104,6 @@ export default function App() {
         onOpenProfile={() => setIsOnboardingOpen(true)}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenVoice={() => setIsVoiceOpen(true)}
-        onOpenAuth={() => setIsAuthOpen(true)}
         onLogout={handleLogout}
       />
 
@@ -178,14 +181,6 @@ export default function App() {
         onOpen={() => setIsVoiceOpen(true)}
         selectedDate={selectedDate}
         onActionCompleted={handleVoiceActionCompleted}
-      />
-
-      {/* Cloud Account Sign In / Sign Up Modal */}
-      <AuthModal
-        isOpen={isAuthOpen}
-        onClose={() => setIsAuthOpen(false)}
-        onAuthSuccess={handleAuthSuccess}
-        currentUser={currentUser || profile}
       />
 
       {/* Interactive Onboarding / Profile Setup Wizard Modal */}
