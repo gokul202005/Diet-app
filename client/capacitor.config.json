@@ -1,0 +1,9 @@
+{
+  "appId": "com.antigravity.dietfit",
+  "appName": "AGY Fit",
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https"
+  }
+}
