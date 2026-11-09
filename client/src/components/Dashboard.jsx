@@ -208,13 +208,15 @@ export default function Dashboard({
                 </div>
               </div>
               <div className="text-right">
-                <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded-full border ${
-                  energyBalance?.status === 'deficit'
-                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-                    : 'bg-amber-500/10 border-amber-500/30 text-amber-300'
-                }`}>
-                  {profile?.goal || 'Recomp'} Goal
-                </span>
+                <button
+                  type="button"
+                  onClick={onOpenProfile}
+                  title="Click to switch your fitness goal (Cut, Bulk, Recomp, Maintenance)"
+                  className={`text-[10px] uppercase font-black px-2.5 py-1 rounded-full border transition-all hover:scale-105 active:scale-95 cursor-pointer flex items-center space-x-1.5 shadow-sm ${goalInfo.color}`}
+                >
+                  <span>{goalInfo.label}</span>
+                  <span className="text-[9px] opacity-75 underline font-normal lowercase">tap to change</span>
+                </button>
               </div>
             </div>
 
