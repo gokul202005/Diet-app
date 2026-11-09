@@ -115,9 +115,26 @@ app.post('/api/auth/login', (req, res) => {
 
 app.post('/api/auth/google', (req, res) => {
   try {
-    const { email, name, googleId } = req.body;
+    let { email, name, picture, googleId, credential } = req.body;
+
+    // Decode Google JWT if credential token was provided directly by Google SDK
+    if (credential && typeof credential === 'string') {
+      try {
+        const parts = credential.split('.');
+        if (parts.length >= 2) {
+          const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf8'));
+          if (payload.email) email = payload.email;
+          if (payload.name) name = payload.name;
+          if (payload.picture) picture = payload.picture;
+          if (payload.sub) googleId = payload.sub;
+        }
+      } catch (e) {
+        console.warn('Failed to decode Google JWT token:', e.message);
+      }
+    }
+
     if (!email) {
-      return res.status(400).json({ error: 'Google email is required' });
+      return res.status(400).json({ error: 'Valid Google email is required' });
     }
 
     const db = readDB();
@@ -127,16 +144,20 @@ app.post('/api/auth/google', (req, res) => {
     if (!user) {
       user = {
         id: `user-google-${Date.now()}`,
-        name: name || 'Google User',
+        name: name || email.split('@')[0],
         email: email.toLowerCase(),
-        googleId,
+        picture: picture || null,
+        googleId: googleId || `gid-${Date.now()}`,
         provider: 'google',
         createdAt: new Date().toISOString()
       };
       db.users.push(user);
+    } else {
+      if (name) user.name = name;
+      if (picture) user.picture = picture;
     }
 
-    db.currentUser = { id: user.id, name: user.name, email: user.email, provider: 'google' };
+    db.currentUser = { id: user.id, name: user.name, email: user.email, picture: user.picture, provider: 'google' };
     if (db.profile) {
       db.profile.name = user.name;
     }
