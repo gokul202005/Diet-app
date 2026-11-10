@@ -1,6 +1,62 @@
-// Central API Client for Diet & Fitness Tracker
+// Central API Client for Diet & Fitness Tracker (Web & Capacitor Android)
 
-const BASE_URL = '/api';
+export const RENDER_BACKEND = 'https://diet-app-backend-udje.onrender.com';
+
+// Dynamically determine the best API endpoint
+const getBaseUrl = () => {
+  if (typeof window !== 'undefined') {
+    // 1. If running on Render or locally on node server port 5000:
+    if (window.location.hostname.includes('onrender.com') || window.location.port === '5000') {
+      return '/api';
+    }
+    // 2. If running inside Capacitor Native Android App:
+    if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+      return `${RENDER_BACKEND}/api`;
+    }
+  }
+  // 3. Fallback to live Render backend for external callers:
+  return `${RENDER_BACKEND}/api`;
+};
+
+const BASE_URL = getBaseUrl();
+
+// Safe Fetch Wrapper: Handles HTML/502/cold-start gracefully without crashing on res.json()
+async function safeFetch(url, options = {}) {
+  try {
+    const res = await fetch(url, {
+      ...options,
+      headers: {
+        'Accept': 'application/json',
+        ...(options.headers || {})
+      }
+    });
+
+    const contentType = res.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      return await res.json();
+    }
+
+    const text = await res.text();
+    // Intercept HTML responses (e.g. Render spin-up pages or 404/502 fallbacks)
+    if (text.trim().startsWith('<')) {
+      console.warn(`[API] Server returned HTML for ${url}. Backend is likely starting up on Render.`);
+      return { 
+        error: 'Backend server is starting up. Please allow 15-30 seconds...', 
+        isWakingUp: true,
+        status: 'turning-on' 
+      };
+    }
+
+    try {
+      return JSON.parse(text);
+    } catch {
+      return { error: text || 'Non-JSON server response' };
+    }
+  } catch (err) {
+    console.warn(`[API] Request error for ${url}:`, err.message);
+    return { error: err.message || 'Network connection failed' };
+  }
+}
 
 export const api = {
   // Server Health & Connectivity Check
@@ -8,15 +64,17 @@ export const api = {
     try {
       const start = performance.now();
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 4000);
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
       const res = await fetch(`${BASE_URL}/health`, { signal: controller.signal });
       clearTimeout(timeoutId);
       const latency = Math.round(performance.now() - start);
-      if (res.ok) {
+
+      const contentType = res.headers.get('content-type') || '';
+      if (res.ok && contentType.includes('application/json')) {
         const data = await res.json();
         return { status: 'running', latency, ...data };
       }
-      return { status: 'turning-on', latency, error: `HTTP ${res.status}` };
+      return { status: 'turning-on', latency, error: 'Server waking up' };
     } catch (err) {
       return { status: 'offline', latency: null, error: err.message };
     }
@@ -24,281 +82,240 @@ export const api = {
 
   // Authentication & Cloud Sync
   signup: async (userData) => {
-    const res = await fetch(`${BASE_URL}/auth/signup`, {
+    return safeFetch(`${BASE_URL}/auth/signup`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(userData)
     });
-    return res.json();
   },
   login: async (credentials) => {
-    const res = await fetch(`${BASE_URL}/auth/login`, {
+    return safeFetch(`${BASE_URL}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(credentials)
     });
-    return res.json();
   },
   googleAuth: async (googleData) => {
-    const res = await fetch(`${BASE_URL}/auth/google`, {
+    return safeFetch(`${BASE_URL}/auth/google`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(googleData)
     });
-    return res.json();
   },
   getCurrentUser: async () => {
-    const res = await fetch(`${BASE_URL}/auth/me`);
-    return res.json();
+    return safeFetch(`${BASE_URL}/auth/me`);
   },
   logout: async () => {
-    const res = await fetch(`${BASE_URL}/auth/logout`, { method: 'POST' });
-    return res.json();
+    return safeFetch(`${BASE_URL}/auth/logout`, { method: 'POST' });
   },
 
   // Profile
   getProfile: async () => {
-    const res = await fetch(`${BASE_URL}/profile`);
-    return res.json();
+    return safeFetch(`${BASE_URL}/profile`);
   },
   updateProfile: async (data, recalculateTargets = true) => {
-    const res = await fetch(`${BASE_URL}/profile`, {
+    return safeFetch(`${BASE_URL}/profile`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...data, recalculateTargets })
     });
-    return res.json();
   },
   calculateTargets: async (data) => {
-    const res = await fetch(`${BASE_URL}/profile/calculate`, {
+    return safeFetch(`${BASE_URL}/profile/calculate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
-    return res.json();
   },
 
   // Meals & Diet
   getMeals: async (date) => {
     const query = date ? `?date=${date}` : '';
-    const res = await fetch(`${BASE_URL}/meals${query}`);
-    return res.json();
+    return safeFetch(`${BASE_URL}/meals${query}`);
   },
   addMeal: async (mealData) => {
-    const res = await fetch(`${BASE_URL}/meals`, {
+    return safeFetch(`${BASE_URL}/meals`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(mealData)
     });
-    return res.json();
   },
   deleteMeal: async (id) => {
-    const res = await fetch(`${BASE_URL}/meals/${id}`, { method: 'DELETE' });
-    return res.json();
+    return safeFetch(`${BASE_URL}/meals/${id}`, { method: 'DELETE' });
   },
 
   // Food Database (Zero-Token Search)
   searchFoodDb: async (q, diet = 'all') => {
     if (!q) return [];
-    const res = await fetch(`${BASE_URL}/nutrition-db/search?q=${encodeURIComponent(q)}&diet=${encodeURIComponent(diet)}`);
-    const data = await res.json();
+    const data = await safeFetch(`${BASE_URL}/nutrition-db/search?q=${encodeURIComponent(q)}&diet=${encodeURIComponent(diet)}`);
     return data.results || [];
   },
 
   // AI Meal Breakdown
   analyzeMealText: async (text) => {
-    const res = await fetch(`${BASE_URL}/ai/analyze-meal-text`, {
+    return safeFetch(`${BASE_URL}/ai/analyze-meal-text`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text })
     });
-    return res.json();
   },
   analyzeMealPhoto: async (formData) => {
-    const res = await fetch(`${BASE_URL}/ai/analyze-meal-photo`, {
+    return safeFetch(`${BASE_URL}/ai/analyze-meal-photo`, {
       method: 'POST',
       body: formData
     });
-    return res.json();
   },
   getSavedMealPlan: async () => {
-    const res = await fetch(`${BASE_URL}/ai/saved-meal-plan`);
-    return res.json();
+    return safeFetch(`${BASE_URL}/ai/saved-meal-plan`);
   },
   generateMealPlan: async (payload) => {
-    const res = await fetch(`${BASE_URL}/ai/generate-meal-plan`, {
+    return safeFetch(`${BASE_URL}/ai/generate-meal-plan`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-    return res.json();
   },
 
   // Universal Full-Website Voice Command Engine
   universalVoiceCommand: async (text, date) => {
-    const res = await fetch(`${BASE_URL}/ai/universal-voice`, {
+    return safeFetch(`${BASE_URL}/ai/universal-voice`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text, date })
     });
-    return res.json();
   },
   universalVoiceAudio: async (audioBlob, date) => {
     const formData = new FormData();
     formData.append('audio', audioBlob, 'voice-recording.webm');
     if (date) formData.append('date', date);
-    const res = await fetch(`${BASE_URL}/ai/universal-voice-audio`, {
+    return safeFetch(`${BASE_URL}/ai/universal-voice-audio`, {
       method: 'POST',
       body: formData
     });
-    return res.json();
   },
 
   // Workouts
   getWorkouts: async (date) => {
     const query = date ? `?date=${date}` : '';
-    const res = await fetch(`${BASE_URL}/workouts${query}`);
-    return res.json();
+    return safeFetch(`${BASE_URL}/workouts${query}`);
   },
   addWorkout: async (workoutData) => {
-    const res = await fetch(`${BASE_URL}/workouts`, {
+    return safeFetch(`${BASE_URL}/workouts`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(workoutData)
     });
-    return res.json();
   },
   deleteWorkout: async (id) => {
-    const res = await fetch(`${BASE_URL}/workouts/${id}`, { method: 'DELETE' });
-    return res.json();
+    return safeFetch(`${BASE_URL}/workouts/${id}`, { method: 'DELETE' });
   },
   getWorkoutPlans: async () => {
-    const res = await fetch(`${BASE_URL}/workout-plans`);
-    return res.json();
+    return safeFetch(`${BASE_URL}/workout-plans`);
   },
   getWorkoutPRs: async () => {
-    const res = await fetch(`${BASE_URL}/workouts/prs`);
-    return res.json();
+    return safeFetch(`${BASE_URL}/workouts/prs`);
   },
   analyzeWorkoutPlan: async (planText) => {
-    const res = await fetch(`${BASE_URL}/ai/analyze-workout-plan`, {
+    return safeFetch(`${BASE_URL}/ai/analyze-workout-plan`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ planText })
     });
-    return res.json();
   },
 
   // Fastrack Smartwatch
   getFastrackSummary: async (date) => {
     const query = date ? `?date=${date}` : '';
-    const res = await fetch(`${BASE_URL}/fastrack/summary${query}`);
-    return res.json();
+    return safeFetch(`${BASE_URL}/fastrack/summary${query}`);
   },
   syncFastrack: async (syncData) => {
-    const res = await fetch(`${BASE_URL}/fastrack/sync`, {
+    return safeFetch(`${BASE_URL}/fastrack/sync`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(syncData)
     });
-    return res.json();
   },
   autoSyncFastrack: async (syncData) => {
-    const res = await fetch(`${BASE_URL}/fastrack/auto-sync`, {
+    return safeFetch(`${BASE_URL}/fastrack/auto-sync`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(syncData)
     });
-    return res.json();
   },
 
   // Energy Balance
   getEnergyBalance: async (date) => {
     const query = date ? `?date=${date}` : '';
-    const res = await fetch(`${BASE_URL}/energy-balance${query}`);
-    return res.json();
+    return safeFetch(`${BASE_URL}/energy-balance${query}`);
   },
 
   // Water & Weight
   getWater: async (date) => {
     const query = date ? `?date=${date}` : '';
-    const res = await fetch(`${BASE_URL}/water${query}`);
-    return res.json();
+    return safeFetch(`${BASE_URL}/water${query}`);
   },
   logWater: async (amountMl, date) => {
-    const res = await fetch(`${BASE_URL}/water/log`, {
+    return safeFetch(`${BASE_URL}/water/log`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ amountMl, date })
     });
-    return res.json();
   },
   getWeight: async () => {
-    const res = await fetch(`${BASE_URL}/weight`);
-    return res.json();
+    return safeFetch(`${BASE_URL}/weight`);
   },
   logWeight: async (weightKg, date) => {
-    const res = await fetch(`${BASE_URL}/weight/log`, {
+    return safeFetch(`${BASE_URL}/weight/log`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ weightKg, date })
     });
-    return res.json();
   },
 
   // Trends & Analytics
   getTrends: async (days = 7) => {
-    const res = await fetch(`${BASE_URL}/analytics/trends?days=${days}`);
-    return res.json();
+    return safeFetch(`${BASE_URL}/analytics/trends?days=${days}`);
   },
 
   // Progress Photo Vault
   getProgressPhotos: async () => {
-    const res = await fetch(`${BASE_URL}/progress/photos`);
-    return res.json();
+    return safeFetch(`${BASE_URL}/progress/photos`);
   },
   addProgressPhoto: async (payload) => {
-    const res = await fetch(`${BASE_URL}/progress/photos`, {
+    return safeFetch(`${BASE_URL}/progress/photos`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-    return res.json();
   },
   deleteProgressPhoto: async (id) => {
-    const res = await fetch(`${BASE_URL}/progress/photos/${id}`, { method: 'DELETE' });
-    return res.json();
+    return safeFetch(`${BASE_URL}/progress/photos/${id}`, { method: 'DELETE' });
   },
 
   // AI Coach Chat
   getChatHistory: async () => {
-    const res = await fetch(`${BASE_URL}/coach/history`);
-    return res.json();
+    return safeFetch(`${BASE_URL}/coach/history`);
   },
   sendCoachMessage: async (message) => {
-    const res = await fetch(`${BASE_URL}/coach/chat`, {
+    return safeFetch(`${BASE_URL}/coach/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message })
     });
-    return res.json();
   },
   clearChatHistory: async () => {
-    const res = await fetch(`${BASE_URL}/coach/history`, { method: 'DELETE' });
-    return res.json();
+    return safeFetch(`${BASE_URL}/coach/history`, { method: 'DELETE' });
   },
 
   // Settings
   getSettings: async () => {
-    const res = await fetch(`${BASE_URL}/settings`);
-    return res.json();
+    return safeFetch(`${BASE_URL}/settings`);
   },
   updateSettings: async (settings) => {
-    const res = await fetch(`${BASE_URL}/settings`, {
+    return safeFetch(`${BASE_URL}/settings`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(settings)
     });
-    return res.json();
   }
 };
