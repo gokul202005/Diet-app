@@ -28,7 +28,7 @@ function extractJSON(text) {
 export class AIService {
   constructor(apiKey = process.env.GEMINI_API_KEY) {
     this.apiKey = apiKey;
-    this.modelName = 'gemini-2.0-flash-lite-preview-02-05';
+    this.modelName = 'gemini-flash-lite-latest';
   }
 
   setApiKey(key) {
@@ -50,11 +50,10 @@ export class AIService {
     const candidateModels = customModels && customModels.length > 0
       ? customModels
       : [
-          this.modelName || 'gemini-2.0-flash-lite-preview-02-05',
-          'gemini-2.0-flash-lite-preview-02-05',
-          'gemini-1.5-flash-8b',
-          'gemini-2.0-flash',
-          'gemini-1.5-flash'
+          this.modelName || 'gemini-flash-lite-latest',
+          'gemini-flash-lite-latest',
+          'gemini-3.8-flash',
+          'gemini-2.5-flash'
         ];
     const uniqueCandidates = [...new Set(candidateModels)];
 
@@ -109,7 +108,7 @@ Return ONLY the transcribed sentence as plain text without quotation marks, bull
         }
       },
       prompt
-    ], {}, ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.0-flash-lite-preview-02-05', 'gemini-1.5-flash-8b']);
+    ], {}, ['gemini-flash-lite-latest', 'gemini-3.8-flash']);
 
     const text = result?.response?.text();
     return (text || '').replace(/^["']|["']$/g, '').trim();

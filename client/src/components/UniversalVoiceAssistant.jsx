@@ -192,7 +192,7 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
     } catch (e) {}
   };
 
-  // Start Real-Time Google / Gemini Style Live Speech Recognition + Dual Audio Recorder
+  // Start Real-Time Google / Gemini Style Live Speech Recognition
   const startRecording = async () => {
     setErrorMsg('');
     setResult(null);
@@ -204,50 +204,10 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
     recognizedTextRef.current = '';
     audioChunksRef.current = [];
 
-    // 1. Acquire microphone stream for both audio fallback & volume visualizer
-    let stream = null;
-    try {
-      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaStreamRef.current = stream;
-        setupAudioVisualizer(stream);
-
-        // Start background MediaRecorder from t=0 so no syllable is ever lost
-        let mimeType = 'audio/webm';
-        if (typeof MediaRecorder !== 'undefined') {
-          if (!MediaRecorder.isTypeSupported('audio/webm')) {
-            if (MediaRecorder.isTypeSupported('audio/mp4')) mimeType = 'audio/mp4';
-            else if (MediaRecorder.isTypeSupported('audio/ogg')) mimeType = 'audio/ogg';
-            else mimeType = '';
-          }
-        }
-        const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
-        mediaRecorderRef.current = recorder;
-        recorder.ondataavailable = (e) => {
-          if (e.data && e.data.size > 0) {
-            audioChunksRef.current.push(e.data);
-          }
-        };
-        recorder.start(100);
-      }
-    } catch (micErr) {
-      console.warn('Microphone stream warning:', micErr.message);
-      if (micErr.name === 'NotAllowedError' || micErr.name === 'PermissionDeniedError') {
-        setErrorMsg('Microphone access was denied. Please allow microphone permissions in your browser or phone settings.');
-        setIsRecording(false);
-        isRecordingRef.current = false;
-        setStateMode('idle');
-        return;
-      }
-    }
-
-    setIsRecording(true);
-    isRecordingRef.current = true;
-    setStateMode('listening');
-    playBeep(700, 0.12);
-
-    // 2. Real-time Web Speech Recognition (Google / Gemini style instant word streaming)
     const SpeechRecognition = typeof window !== 'undefined' ? (window.SpeechRecognition || window.webkitSpeechRecognition) : null;
+
+    // PRIMARY PIPELINE: Real-time Web Speech Recognition (Google / Gemini style instant word streaming)
+    // Run directly without opening conflicting getUserMedia stream so the microphone is never locked
     if (SpeechRecognition) {
       try {
         if (recognitionRef.current) {
@@ -256,13 +216,19 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
         }
 
         const recognition = new SpeechRecognition();
-        // Use continuous: false to eliminate Chromium's notorious WebSocket network disconnection bugs
-        recognition.continuous = false;
+        recognition.continuous = true;
         recognition.interimResults = true;
         recognition.lang = speechLang || 'en-IN';
         recognition.maxAlternatives = 1;
 
         let sessionAccumulated = '';
+
+        recognition.onstart = () => {
+          setIsRecording(true);
+          isRecordingRef.current = true;
+          setStateMode('listening');
+          playBeep(700, 0.12);
+        };
 
         recognition.onresult = (event) => {
           let currentFinal = '';
@@ -288,30 +254,92 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
         };
 
         recognition.onerror = (event) => {
-          console.warn('WebSpeech event notice:', event.error);
+          console.warn('SpeechRecognition notice:', event.error);
           if (event.error === 'not-allowed') {
-            setErrorMsg('Microphone access was denied. Please allow microphone permission in your browser address bar.');
-            cleanupAudio();
+            setErrorMsg('Microphone access was denied. Please allow microphone permission in your browser address bar or device settings.');
             setIsRecording(false);
             isRecordingRef.current = false;
             setStateMode('idle');
+          } else if (event.error === 'network') {
+            console.warn('SpeechRecognition network glitch, switching to direct audio recorder...');
+            try { recognition.stop(); } catch (e) {}
+            startMediaRecorderFallback();
           }
-          // On network or no-speech error, do not crash! MediaRecorder is actively recording audio.
         };
 
         recognition.onend = () => {
-          // If the user is still speaking and hasn't clicked stop, restart seamlessly for next sentence
+          // If the user hasn't clicked stop and silence happened, auto-restart to keep listening
           if (isRecordingRef.current) {
             try {
               recognition.start();
-            } catch (e) {}
+            } catch (e) {
+              if (recognizedTextRef.current.trim()) {
+                isRecordingRef.current = false;
+                setIsRecording(false);
+                finishSpeechAndPreview(recognizedTextRef.current.trim());
+              }
+            }
           }
         };
 
         recognitionRef.current = recognition;
         recognition.start();
+        return;
       } catch (err) {
-        console.warn('WebSpeech start notice (will use direct audio recorder):', err.message);
+        console.warn('SpeechRecognition start error, falling back to MediaRecorder:', err.message);
+      }
+    }
+
+    // FALLBACK PIPELINE: Direct Hardware Audio Recording (for browsers without Web Speech)
+    await startMediaRecorderFallback();
+  };
+
+  const startMediaRecorderFallback = async () => {
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setErrorMsg('Microphone access is not supported by this browser. You can type what you did below!');
+        setIsRecording(false);
+        isRecordingRef.current = false;
+        setStateMode('idle');
+        return;
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaStreamRef.current = stream;
+      setupAudioVisualizer(stream);
+
+      let mimeType = 'audio/webm';
+      if (typeof MediaRecorder !== 'undefined') {
+        if (!MediaRecorder.isTypeSupported('audio/webm')) {
+          if (MediaRecorder.isTypeSupported('audio/mp4')) mimeType = 'audio/mp4';
+          else if (MediaRecorder.isTypeSupported('audio/ogg')) mimeType = 'audio/ogg';
+          else mimeType = '';
+        }
+      }
+
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          audioChunksRef.current.push(e.data);
+        }
+      };
+
+      recorder.start(100);
+      setIsRecording(true);
+      isRecordingRef.current = true;
+      setStateMode('listening');
+      playBeep(700, 0.12);
+    } catch (err) {
+      console.error('Microphone fallback error:', err);
+      setIsRecording(false);
+      isRecordingRef.current = false;
+      setStateMode('idle');
+      cleanupAudio();
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        setErrorMsg('Microphone permission was denied. Please allow microphone access in your browser or phone settings.');
+      } else {
+        setErrorMsg('Could not access microphone: ' + (err.message || 'Unknown device error'));
       }
     }
   };

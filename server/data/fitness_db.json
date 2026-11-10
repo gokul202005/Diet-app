@@ -1,24 +1,101 @@
 {
-  "users": [],
-  "currentUser": null,
-  "profiles": {},
+  "users": [
+    {
+      "id": "user-1794326427954",
+      "name": "GOKUL KRISHNA JN",
+      "email": "jn.gokulkrishna@gmail.com",
+      "password": "gokul@2k05",
+      "provider": "email",
+      "createdAt": "2026-11-10T16:00:27.955Z"
+    }
+  ],
+  "currentUser": {
+    "id": "user-1794326427954",
+    "name": "GOKUL KRISHNA JN",
+    "email": "jn.gokulkrishna@gmail.com",
+    "provider": "email"
+  },
+  "profiles": {
+    "user-1794309303113": {
+      "isConfigured": false,
+      "name": "",
+      "age": "",
+      "gender": "male",
+      "heightCm": "",
+      "weightKg": "",
+      "goal": "recomp",
+      "activityLevel": "moderately_active",
+      "dailyTargetCalories": 2100,
+      "dailyTargetProtein": 140,
+      "dailyTargetCarbs": 220,
+      "dailyTargetFat": 60,
+      "dailyTargetWater": 3000,
+      "dailyTargetSteps": 10000,
+      "recalculateTargets": true,
+      "dietaryTags": [
+        "🍗 Non-Veg"
+      ],
+      "focusAreas": [
+        "🛡️ Full Body Balance"
+      ],
+      "goals": [
+        "recomp"
+      ]
+    },
+    "user-1794326427954": {
+      "isConfigured": true,
+      "name": "GOKUL KRISHNA JN",
+      "age": "21",
+      "gender": "male",
+      "heightCm": "207.264",
+      "weightKg": "111.5",
+      "goal": "recomp",
+      "activityLevel": "moderately_active",
+      "dailyTargetCalories": 3331,
+      "dailyTargetProtein": 234,
+      "dailyTargetCarbs": 390,
+      "dailyTargetFat": 93,
+      "dailyTargetWater": 4200,
+      "dailyTargetSteps": 10000,
+      "recalculateTargets": false,
+      "dietaryTags": [
+        "🍗 Non-Veg"
+      ],
+      "focusAreas": [
+        "🛡️ Full Body Balance"
+      ],
+      "goals": [
+        "recomp",
+        "cutting"
+      ]
+    }
+  },
   "profile": {
-    "isConfigured": false,
-    "name": "",
-    "age": null,
+    "isConfigured": true,
+    "name": "GOKUL KRISHNA JN",
+    "age": "21",
     "gender": "male",
-    "heightCm": null,
-    "weightKg": null,
-    "targetWeightKg": null,
-    "goal": "recomposition",
+    "heightCm": "207.264",
+    "weightKg": "111.5",
+    "goal": "recomp",
     "activityLevel": "moderately_active",
-    "dietPreference": "south_indian_mixed",
-    "dailyTargetCalories": 2100,
-    "dailyTargetProtein": 140,
-    "dailyTargetCarbs": 220,
-    "dailyTargetFat": 60,
-    "dailyTargetWater": 3000,
-    "dailyTargetSteps": 10000
+    "dailyTargetCalories": 3331,
+    "dailyTargetProtein": 234,
+    "dailyTargetCarbs": 390,
+    "dailyTargetFat": 93,
+    "dailyTargetWater": 4200,
+    "dailyTargetSteps": 10000,
+    "recalculateTargets": false,
+    "dietaryTags": [
+      "🍗 Non-Veg"
+    ],
+    "focusAreas": [
+      "🛡️ Full Body Balance"
+    ],
+    "goals": [
+      "recomp",
+      "cutting"
+    ]
   },
   "meals": [],
   "workouts": [],
@@ -29,5 +106,8 @@
   "photoVault": [],
   "chatHistory": [],
   "savedMealPlan": null,
-  "settings": {}
+  "settings": {
+    "fastrackDeviceName": "Fastrack Reflex Curve",
+    "useHeuristicFallback": true
+  }
 }
