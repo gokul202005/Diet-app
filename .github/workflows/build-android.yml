@@ -54,9 +54,13 @@ jobs:
           cd client/android
           ./gradlew assembleDebug --no-daemon --stacktrace
 
+      - name: Rename APK with Official App Name
+        run: |
+          cp client/android/app/build/outputs/apk/debug/app-debug.apk client/android/app/build/outputs/apk/debug/AGY-Fit-v1.0.apk
+
       - name: Upload Android APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AGY-FIT-Android-App
-          path: client/android/app/build/outputs/apk/debug/app-debug.apk
+          name: AGY-Fit-v1.0-APK
+          path: client/android/app/build/outputs/apk/debug/AGY-Fit-v1.0.apk
           retention-days: 14

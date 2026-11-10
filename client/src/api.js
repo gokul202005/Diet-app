@@ -3,6 +3,25 @@
 const BASE_URL = '/api';
 
 export const api = {
+  // Server Health & Connectivity Check
+  checkServerHealth: async () => {
+    try {
+      const start = performance.now();
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
+      const res = await fetch(`${BASE_URL}/health`, { signal: controller.signal });
+      clearTimeout(timeoutId);
+      const latency = Math.round(performance.now() - start);
+      if (res.ok) {
+        const data = await res.json();
+        return { status: 'running', latency, ...data };
+      }
+      return { status: 'turning-on', latency, error: `HTTP ${res.status}` };
+    } catch (err) {
+      return { status: 'offline', latency: null, error: err.message };
+    }
+  },
+
   // Authentication & Cloud Sync
   signup: async (userData) => {
     const res = await fetch(`${BASE_URL}/auth/signup`, {

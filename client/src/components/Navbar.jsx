@@ -1,4 +1,5 @@
 import React from 'react';
+import ServerStatusWidget from './ServerStatusWidget';
 import { 
   Flame, 
   Utensils, 
@@ -115,9 +116,12 @@ export default function Navbar({
               })}
             </nav>
 
-            {/* 3. Right: Voice Assistant + Date Switcher + User Profile + Settings */}
+            {/* 3. Right: Server Health + Voice Assistant + Date Switcher + User Profile + Settings */}
             <div className="flex items-center space-x-2 shrink-0">
               
+              {/* Live Backend Server Health Indicator (Running / Turning On / Offline) */}
+              <ServerStatusWidget variant="pill" />
+
               {/* Universal Voice Assistant Pill */}
               <button
                 onClick={onOpenVoice || (() => window.dispatchEvent(new CustomEvent('open-universal-voice')))}

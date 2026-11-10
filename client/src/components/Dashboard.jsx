@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import ServerStatusWidget from './ServerStatusWidget';
 import { 
   Flame, 
   Watch, 
@@ -513,6 +514,9 @@ export default function Dashboard({
         </div>
 
       </div>
+
+      {/* 5. LIVE BACKEND SERVER STATUS & HEALTH MONITOR */}
+      <ServerStatusWidget variant="card" />
 
     </div>
   );

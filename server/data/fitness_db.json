@@ -7,13 +7,21 @@
       "googleId": "google-user-1794233433390",
       "provider": "google",
       "createdAt": "2026-11-09T14:10:34.386Z"
+    },
+    {
+      "id": "user-1794309303113",
+      "name": "gokul krishna",
+      "email": "jn.gokulkrishna@gmail.com",
+      "password": "gokul@2k05",
+      "provider": "email",
+      "createdAt": "2026-11-10T11:15:03.113Z"
     }
   ],
   "currentUser": {
-    "id": "user-google-1794233434386",
-    "name": "Gokul",
-    "email": "gokul@gmail.com",
-    "provider": "google"
+    "id": "user-1794309303113",
+    "name": "gokul krishna",
+    "email": "jn.gokulkrishna@gmail.com",
+    "provider": "email"
   },
   "profile": {
     "isConfigured": true,
@@ -23,13 +31,13 @@
     "heightCm": "215",
     "weightKg": "111.5",
     "goal": "cutting",
-    "activityLevel": "moderately_active",
-    "dailyTargetCalories": 3406,
+    "activityLevel": "athlete_double",
+    "dailyTargetCalories": 4232,
     "dailyTargetProtein": 234,
-    "dailyTargetCarbs": 404,
-    "dailyTargetFat": 95,
+    "dailyTargetCarbs": 559,
+    "dailyTargetFat": 118,
     "dailyTargetWater": 4200,
-    "dailyTargetSteps": 10000,
+    "dailyTargetSteps": 16000,
     "recalculateTargets": false,
     "dietaryTags": [
       "🍗 Non-Veg",

@@ -34,11 +34,28 @@ const dbInitial = readDB();
 const aiService = new AIService(dbInitial.settings?.geminiApiKey || process.env.GEMINI_API_KEY || '');
 
 // --- HEALTH & STATUS ---
+app.get('/api/health', (req, res) => {
+  try {
+    const db = readDB();
+    res.json({
+      status: 'running',
+      uptimeSeconds: Math.round(process.uptime()),
+      timestamp: new Date().toISOString(),
+      database: 'connected',
+      environment: process.env.NODE_ENV || 'production',
+      version: '1.0.0'
+    });
+  } catch (err) {
+    res.status(500).json({ status: 'turning-on', error: err.message });
+  }
+});
+
 app.get('/api/status', (req, res) => {
   const db = readDB();
   res.json({
-    status: 'online',
+    status: 'running',
     version: '1.0.0',
+    uptimeSeconds: Math.round(process.uptime()),
     aiEnabled: Boolean(db.settings?.geminiApiKey || process.env.GEMINI_API_KEY),
     fastrackConnected: Boolean(db.fastrackLogs && db.fastrackLogs.length > 0)
   });
