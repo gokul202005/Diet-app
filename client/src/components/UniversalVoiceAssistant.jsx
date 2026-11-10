@@ -80,6 +80,8 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
   const [stateMode, setStateMode] = useState('idle');
   const [speechLang, setSpeechLang] = useState('en-IN'); // 'en-IN' | 'en-US' | 'ta-IN' | 'hi-IN'
   const [isRecording, setIsRecording] = useState(false);
+  const [liveFinalText, setLiveFinalText] = useState('');
+  const [liveInterimText, setLiveInterimText] = useState('');
   const [transcript, setTranscript] = useState('');
   const [editableSpeech, setEditableSpeech] = useState('');
   const [manualText, setManualText] = useState('');
@@ -93,6 +95,7 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
   const [audioVolume, setAudioVolume] = useState(0); // 0 - 100 for live visualizer
 
   // Hardware & Audio references
+  const isRecordingRef = useRef(false);
   const mediaStreamRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
@@ -154,58 +157,121 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
     } catch (e) {}
   };
 
-  // Start Hardware Audio Recording + Parallel Speech Recognition
+  const finishSpeechAndPreview = async (rawSpeech) => {
+    const normalized = normalizeFitnessSpeech(rawSpeech);
+    setEditableSpeech(normalized);
+    setTranscript(normalized);
+    await parseIntentForPreview(normalized);
+  };
+
+  // Start Real-Time Google / Gemini Style Live Speech Recognition
   const startRecording = async () => {
     setErrorMsg('');
     setResult(null);
     setPreviewData(null);
     setTranscript('');
+    setLiveFinalText('');
+    setLiveInterimText('');
     setEditableSpeech('');
     recognizedTextRef.current = '';
     audioChunksRef.current = [];
 
-    // Check mediaDevices support
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      setErrorMsg('Microphone access is not supported by this browser. You can type what you did below!');
-      return;
+    const SpeechRecognition = typeof window !== 'undefined' ? (window.SpeechRecognition || window.webkitSpeechRecognition) : null;
+
+    // PRIMARY MODE: Google / Chromium Web Speech API (Instant word-by-word streaming)
+    if (SpeechRecognition) {
+      try {
+        if (recognitionRef.current) {
+          try { recognitionRef.current.abort(); } catch (e) {}
+          recognitionRef.current = null;
+        }
+
+        const recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = speechLang || 'en-IN';
+        recognition.maxAlternatives = 1;
+
+        recognition.onstart = () => {
+          setIsRecording(true);
+          isRecordingRef.current = true;
+          setStateMode('listening');
+          playBeep(700, 0.12);
+        };
+
+        // Real-time word-by-word streaming updates like Google / Gemini
+        recognition.onresult = (event) => {
+          let final = '';
+          let interim = '';
+          for (let i = 0; i < event.results.length; ++i) {
+            const item = event.results[i];
+            if (item.isFinal) {
+              final += item[0].transcript + ' ';
+            } else {
+              interim += item[0].transcript;
+            }
+          }
+          const fullText = (final + interim).trim();
+          setLiveFinalText(final);
+          setLiveInterimText(interim);
+          setTranscript(fullText);
+          recognizedTextRef.current = fullText;
+        };
+
+        recognition.onerror = (event) => {
+          console.warn('SpeechRecognition event error:', event.error);
+          if (event.error === 'not-allowed') {
+            setErrorMsg('Microphone access was denied. Please allow microphone permission in your browser address bar.');
+            setIsRecording(false);
+            isRecordingRef.current = false;
+            setStateMode('idle');
+          } else if (event.error === 'network') {
+            setErrorMsg('Network error connecting to speech recognition service.');
+            setIsRecording(false);
+            isRecordingRef.current = false;
+            setStateMode('idle');
+          }
+        };
+
+        recognition.onend = () => {
+          // If stopped while recording was active, process captured speech
+          if (isRecordingRef.current) {
+            const speech = recognizedTextRef.current.trim();
+            if (speech) {
+              isRecordingRef.current = false;
+              setIsRecording(false);
+              finishSpeechAndPreview(speech);
+            } else {
+              // Restart recognition if user didn't stop it and silence occurred
+              try {
+                recognition.start();
+              } catch (e) {
+                setIsRecording(false);
+                isRecordingRef.current = false;
+                setStateMode('idle');
+              }
+            }
+          }
+        };
+
+        recognitionRef.current = recognition;
+        recognition.start();
+        return;
+      } catch (err) {
+        console.warn('WebSpeech direct start failed, falling back to MediaRecorder:', err);
+      }
     }
 
+    // FALLBACK: MediaRecorder for browsers without WebSpeech (e.g. Firefox)
     try {
-      // 1. Prompt real device microphone access
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setErrorMsg('Microphone access is not supported by this browser. You can type what you did below!');
+        return;
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       mediaStreamRef.current = stream;
 
-      // 2. Setup live audio waveform analyzer
-      try {
-        const AudioCtx = window.AudioContext || window.webkitAudioContext;
-        if (AudioCtx) {
-          const audioCtx = new AudioCtx();
-          audioCtxRef.current = audioCtx;
-          const source = audioCtx.createMediaStreamSource(stream);
-          const analyser = audioCtx.createAnalyser();
-          analyser.fftSize = 64;
-          source.connect(analyser);
-          analyserRef.current = analyser;
-
-          const dataArray = new Uint8Array(analyser.frequencyBinCount);
-          const updateVolume = () => {
-            if (!analyserRef.current) return;
-            analyserRef.current.getByteFrequencyData(dataArray);
-            let sum = 0;
-            for (let i = 0; i < dataArray.length; i++) {
-              sum += dataArray[i];
-            }
-            const avg = sum / dataArray.length;
-            setAudioVolume(Math.min(100, Math.round((avg / 128) * 100)));
-            animFrameRef.current = requestAnimationFrame(updateVolume);
-          };
-          updateVolume();
-        }
-      } catch (err) {
-        console.warn('AudioContext visualizer notice:', err);
-      }
-
-      // 3. Setup MediaRecorder for direct audio capture
       let mimeType = 'audio/webm';
       if (typeof MediaRecorder !== 'undefined') {
         if (!MediaRecorder.isTypeSupported('audio/webm')) {
@@ -226,43 +292,13 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
 
       recorder.start(100);
       setIsRecording(true);
+      isRecordingRef.current = true;
       setStateMode('listening');
       playBeep(700, 0.12);
-
-      // 4. In parallel, run Web SpeechRecognition for instantaneous live subtitles
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (SpeechRecognition) {
-        try {
-          const recognition = new SpeechRecognition();
-          recognition.continuous = true;
-          recognition.interimResults = true;
-          recognition.lang = speechLang || 'en-IN'; // Indian English / Global fitness terms
-
-          recognition.onresult = (event) => {
-            let current = '';
-            for (let i = event.resultIndex; i < event.results.length; i++) {
-              current += event.results[i][0].transcript;
-            }
-            if (current.trim()) {
-              setTranscript(current);
-              recognizedTextRef.current = current;
-            }
-          };
-
-          recognition.onerror = (e) => {
-            console.log('WebSpeech fallback note:', e.error);
-          };
-
-          recognitionRef.current = recognition;
-          recognition.start();
-        } catch (e) {
-          console.warn('SpeechRecognition startup skipped:', e);
-        }
-      }
-
     } catch (err) {
-      console.error('Microphone error:', err);
+      console.error('Fallback microphone error:', err);
       setIsRecording(false);
+      isRecordingRef.current = false;
       setStateMode('idle');
       cleanupAudio();
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
@@ -275,42 +311,45 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
 
   // Stop recording and parse speech into Human-in-the-Loop verification preview
   const stopRecordingAndProcess = () => {
-    if (!mediaRecorderRef.current || !isRecording) return;
+    isRecordingRef.current = false;
     setIsRecording(false);
     playBeep(500, 0.15);
-
-    const recorder = mediaRecorderRef.current;
-    
-    recorder.onstop = async () => {
-      const mime = recorder.mimeType || 'audio/webm';
-      const audioBlob = new Blob(audioChunksRef.current, { type: mime });
-      cleanupAudio();
-
-      const recognizedSpeech = recognizedTextRef.current.trim() || transcript.trim();
-
-      if (recognizedSpeech) {
-        // Transcribed via SpeechRecognition -> Normalize & Preview for user review
-        const normalized = normalizeFitnessSpeech(recognizedSpeech);
-        setEditableSpeech(normalized);
-        await parseIntentForPreview(normalized);
-      } else if (audioBlob.size > 1000) {
-        // Send audio to backend for transcription
-        await executeVoiceAudio(audioBlob);
-      } else {
-        setStateMode('idle');
-        setErrorMsg('No speech detected. Please speak closer to your microphone or click an example below.');
-      }
-    };
-
-    try {
-      recorder.stop();
-    } catch (e) {
-      cleanupAudio();
-    }
 
     if (recognitionRef.current) {
       try { recognitionRef.current.stop(); } catch (e) {}
     }
+
+    const liveCaptured = recognizedTextRef.current.trim() || transcript.trim() || (liveFinalText + ' ' + liveInterimText).trim();
+
+    if (liveCaptured) {
+      finishSpeechAndPreview(liveCaptured);
+      cleanupAudio();
+      return;
+    }
+
+    // Fallback: If using MediaRecorder
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      const recorder = mediaRecorderRef.current;
+      recorder.onstop = async () => {
+        const mime = recorder.mimeType || 'audio/webm';
+        const audioBlob = new Blob(audioChunksRef.current, { type: mime });
+        cleanupAudio();
+
+        if (audioBlob.size > 1000) {
+          await executeVoiceAudio(audioBlob);
+        } else {
+          setStateMode('idle');
+          setErrorMsg('No speech detected. Please speak closer to your microphone or click an example below.');
+        }
+      };
+
+      try { recorder.stop(); } catch (e) { cleanupAudio(); }
+      return;
+    }
+
+    cleanupAudio();
+    setStateMode('idle');
+    setErrorMsg('No speech detected. Please tap the microphone and speak your meal or workout.');
   };
 
   // Step 1 -> Step 2: Parse intent and generate structured verification card
@@ -502,6 +541,8 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
     setPreviewData(null);
     setErrorMsg('');
     setTranscript('');
+    setLiveFinalText('');
+    setLiveInterimText('');
     setEditableSpeech('');
     setManualText('');
   };
@@ -647,77 +688,111 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
                   ))}
                 </div>
 
-                <div className="relative inline-block my-1">
-                  {isRecording && (
-                    <div className="absolute inset-0 rounded-full bg-rose-500/30 animate-ping scale-150 pointer-events-none" />
-                  )}
-                  <button
-                    type="button"
-                    onClick={isRecording ? stopRecordingAndProcess : startRecording}
-                    disabled={isProcessing}
-                    className={`relative z-10 w-24 h-24 rounded-full flex flex-col items-center justify-center transition-all shadow-2xl cursor-pointer mx-auto ${
-                      isRecording
-                        ? 'bg-rose-500 text-white shadow-rose-500/50 scale-105 animate-pulse'
-                        : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-500/30'
-                    } ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  >
-                    {isRecording ? (
-                      <>
-                        <MicOff className="w-8 h-8" />
-                        <span className="text-[10px] font-black uppercase mt-1">Tap to Stop</span>
-                      </>
-                    ) : (
-                      <>
-                        <Mic className="w-8 h-8" />
-                        <span className="text-[10px] font-black uppercase mt-1">Tap to Speak</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                {/* Audio Waveform */}
+                {/* ACTIVE LISTENING (GEMINI / GOOGLE REAL-TIME TYPING STREAM) */}
                 {isRecording ? (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-center space-x-1.5 h-8">
-                      {[0.6, 1.2, 0.9, 1.5, 0.8, 1.3, 0.5].map((multiplier, i) => {
-                        const barHeight = Math.max(6, Math.min(32, Math.round((audioVolume * multiplier) * 0.4)));
-                        return (
-                          <div
-                            key={i}
-                            style={{ height: `${barHeight}px` }}
-                            className="w-1.5 bg-gradient-to-t from-rose-500 to-amber-400 rounded-full transition-all duration-75"
-                          />
-                        );
-                      })}
+                  <div className="space-y-4 py-1">
+                    {/* Glowing Pulsing Mic Orb */}
+                    <div className="relative inline-block my-1">
+                      <div className="absolute -inset-2 rounded-full bg-emerald-400/30 animate-ping pointer-events-none" />
+                      <button
+                        type="button"
+                        onClick={stopRecordingAndProcess}
+                        className="relative z-10 w-24 h-24 rounded-full flex flex-col items-center justify-center transition-all shadow-2xl cursor-pointer mx-auto bg-gradient-to-tr from-rose-500 via-rose-600 to-amber-500 text-white shadow-rose-500/50 scale-105 active:scale-95 animate-pulse"
+                      >
+                        <MicOff className="w-8 h-8" />
+                        <span className="text-[10px] font-black uppercase mt-1">Tap to Finish</span>
+                      </button>
                     </div>
-                    <div className="flex items-center justify-center space-x-2 text-rose-400 text-xs font-bold animate-pulse">
-                      <Radio className="w-3.5 h-3.5" />
-                      <span>Listening... Speak naturally, then tap to stop</span>
+
+                    {/* LIVE REAL-TIME WORD-BY-WORD STREAMING CARD */}
+                    <div className="bg-slate-900 border-2 border-emerald-500/60 rounded-2xl p-4 text-left shadow-2xl space-y-2 relative overflow-hidden">
+                      <div className="flex items-center justify-between text-[11px] pb-1.5 border-b border-slate-800">
+                        <span className="flex items-center space-x-1.5 text-emerald-400 font-bold">
+                          <span className="relative flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                          </span>
+                          <span>Streaming Speech Live (Word-by-word)</span>
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-mono">
+                          {speechLang === 'en-IN' ? 'English (India)' : speechLang === 'ta-IN' ? 'Tamil' : speechLang === 'hi-IN' ? 'Hindi' : 'Global English'}
+                        </span>
+                      </div>
+
+                      {/* Live Text Body */}
+                      <div className="min-h-[70px] flex items-center py-1">
+                        {(liveFinalText || liveInterimText || transcript) ? (
+                          <p className="text-base sm:text-lg font-bold text-white leading-relaxed break-words">
+                            <span>{liveFinalText} </span>
+                            <span className="text-emerald-300 italic">
+                              {liveInterimText}
+                            </span>
+                            <span className="inline-block w-2 h-4 ml-1 bg-emerald-400 animate-pulse align-middle" />
+                          </p>
+                        ) : (
+                          <div className="text-slate-400 text-sm italic animate-pulse">
+                            Speak now... words will appear here live in real-time as you speak!
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ) : isProcessing ? (
-                  <div className="flex items-center justify-center space-x-2 text-emerald-400 text-xs font-bold py-2">
-                    <div className="w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
-                    <span>{processingStatus || 'Analyzing your speech...'}</span>
+
+                    {/* Equalizer Sound Waves */}
+                    <div className="flex items-center justify-center space-x-1.5 h-6">
+                      {[6, 14, 22, 16, 26, 14, 8, 18, 12, 20, 10].map((h, i) => (
+                        <div
+                          key={i}
+                          style={{
+                            height: `${h}px`,
+                            animation: `pulse 0.7s ease-in-out infinite ${(i * 0.08).toFixed(2)}s`
+                          }}
+                          className="w-1.5 bg-gradient-to-t from-emerald-500 via-teal-400 to-cyan-400 rounded-full"
+                        />
+                      ))}
+                    </div>
+
+                    {/* One-Tap Finish Button */}
+                    <button
+                      type="button"
+                      onClick={stopRecordingAndProcess}
+                      className="w-full py-3 bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center space-x-2 cursor-pointer active:scale-95"
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Done Speaking — Analyze & Review</span>
+                    </button>
                   </div>
                 ) : (
-                  <div className="space-y-1">
-                    <div className="text-xs font-bold text-white">
-                      Tap the microphone button to start recording
+                  /* IDLE / READY STATE */
+                  <div className="space-y-4 py-2">
+                    <div className="relative inline-block my-1">
+                      <button
+                        type="button"
+                        onClick={startRecording}
+                        disabled={isProcessing}
+                        className={`relative z-10 w-24 h-24 rounded-full flex flex-col items-center justify-center transition-all shadow-2xl cursor-pointer mx-auto bg-gradient-to-tr from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 shadow-emerald-500/30 hover:scale-105 active:scale-95 ${
+                          isProcessing ? 'opacity-50 cursor-not-allowed' : ''
+                        }`}
+                      >
+                        <Mic className="w-8 h-8" />
+                        <span className="text-[10px] font-black uppercase mt-1">Tap to Speak</span>
+                      </button>
                     </div>
-                    <div className="text-[11px] text-slate-400">
-                      Auto-categorizes meals, water, gym workouts, and scale weight
-                    </div>
-                  </div>
-                )}
 
-                {/* Live Speech Subtitle Stream */}
-                {transcript && (
-                  <div className="bg-slate-900 border border-emerald-500/40 rounded-xl p-3 text-left space-y-1">
-                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Hearing:</span>
-                    <p className="text-xs font-bold text-emerald-300 italic bg-slate-950 p-2.5 rounded-lg border border-slate-800">
-                      &ldquo;{transcript}&rdquo;
-                    </p>
+                    {isProcessing ? (
+                      <div className="flex items-center justify-center space-x-2 text-emerald-400 text-xs font-bold py-2">
+                        <div className="w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+                        <span>{processingStatus || 'Analyzing your speech with AI...'}</span>
+                      </div>
+                    ) : (
+                      <div className="space-y-1">
+                        <div className="text-xs font-bold text-white">
+                          Tap the microphone to speak your meal or workout
+                        </div>
+                        <div className="text-[11px] text-slate-400">
+                          Adds text live on screen as you speak, like Google &amp; Gemini
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
