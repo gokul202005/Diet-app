@@ -95,7 +95,9 @@ export default function OnboardingModal({ isOpen, onClose, currentProfile, curre
   const handleSubmit = async (e) => {
     e?.preventDefault();
     if (!formData.name.trim()) {
-      alert('Please enter your name');
+      if (typeof window !== 'undefined' && window.showToast) {
+        window.showToast('Please enter your name to continue', 'warning', 'Name Required');
+      }
       return;
     }
     setIsSubmitting(true);
@@ -105,11 +107,16 @@ export default function OnboardingModal({ isOpen, onClose, currentProfile, curre
         isConfigured: true
       }, false); // Already calculated
       if (res.success) {
+        if (typeof window !== 'undefined' && window.showToast) {
+          window.showToast('Fitness profile & macro calibrations saved!', 'success', 'Profile Saved');
+        }
         onProfileSaved(res.profile);
         onClose();
       }
     } catch (err) {
-      alert('Failed to save profile: ' + err.message);
+      if (typeof window !== 'undefined' && window.showToast) {
+        window.showToast('Failed to save profile: ' + err.message, 'error', 'Profile Error');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -561,7 +568,9 @@ export default function OnboardingModal({ isOpen, onClose, currentProfile, curre
               type="button"
               onClick={() => {
                 if (step === 1 && !formData.name.trim()) {
-                  alert('Please enter your name');
+                  if (typeof window !== 'undefined' && window.showToast) {
+                    window.showToast('Please enter your name to proceed', 'warning', 'Name Required');
+                  }
                   return;
                 }
                 setStep(step + 1);

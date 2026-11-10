@@ -203,7 +203,9 @@ export default function CoachChat({ profile, selectedDate }) {
         setMessages(prev => [...prev, res.message]);
       }
     } catch (err) {
-      alert('Error contacting coach: ' + err.message);
+      if (typeof window !== 'undefined' && window.showToast) {
+        window.showToast('Error contacting coach: ' + err.message, 'error', 'Coach Error');
+      }
     } finally {
       setIsSending(false);
     }

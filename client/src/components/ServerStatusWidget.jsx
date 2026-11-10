@@ -181,22 +181,24 @@ export default function ServerStatusWidget({ variant = 'pill', onOpenModal }) {
       {isModalOpen && (
         <div 
           onClick={() => setIsModalOpen(false)}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-xl animate-in fade-in duration-150"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-xl overflow-y-auto animate-in fade-in duration-150"
         >
           <div 
-            className="relative w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150"
+            className="relative w-full max-w-md my-auto bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Close Button */}
+            {/* Highly Visible Close Button */}
             <button
+              type="button"
               onClick={() => setIsModalOpen(false)}
-              className="absolute top-4 right-4 p-1.5 text-slate-500 hover:text-white hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
+              className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-full transition-all cursor-pointer shadow-md z-20 border border-slate-700"
+              title="Close Server Status"
             >
               <X className="w-4 h-4" />
             </button>
 
             {/* Header */}
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-3 pr-8">
               <div className={`p-3 rounded-2xl border ${badge.bgClass}`}>
                 <Server className="w-5 h-5" />
               </div>
@@ -250,7 +252,14 @@ export default function ServerStatusWidget({ variant = 'pill', onOpenModal }) {
             </div>
 
             {/* Actions */}
-            <div className="flex items-center justify-end space-x-2 pt-2">
+            <div className="flex items-center space-x-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                className="py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs transition-all cursor-pointer border border-slate-700"
+              >
+                Close
+              </button>
               <button
                 type="button"
                 onClick={checkHealth}

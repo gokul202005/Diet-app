@@ -250,7 +250,9 @@ Day 7 - Rest: 8,000 steps active recovery walk & stretching`);
         setGeneratedSplitPlan(res.plan);
       }
     } catch (err) {
-      alert('Failed to generate AI split: ' + err.message);
+      if (typeof window !== 'undefined' && window.showToast) {
+        window.showToast('Failed to generate AI split: ' + err.message, 'error', 'AI Generator Error');
+      }
     } finally {
       setIsGeneratingSplit(false);
     }
@@ -429,7 +431,9 @@ Day 7 - Rest: Mobility & Meal Prep`);
       setAnalysisResult(result);
     } catch (err) {
       console.error('Workout plan analysis error:', err);
-      alert('Failed to analyze workout plan: ' + err.message);
+      if (typeof window !== 'undefined' && window.showToast) {
+        window.showToast('Failed to analyze workout plan: ' + err.message, 'error', 'Analysis Error');
+      }
     } finally {
       setIsAnalyzing(false);
     }
@@ -541,11 +545,15 @@ Day 7 - Rest: Mobility & Meal Prep`);
     try {
       const res = await api.addWorkout(payload);
       if (res.success) {
-        alert('Workout logged successfully!');
+        if (typeof window !== 'undefined' && window.showToast) {
+          window.showToast('Workout session logged successfully!', 'success', 'Workout Saved');
+        }
         loadData();
       }
     } catch (err) {
-      alert('Failed to log workout: ' + err.message);
+      if (typeof window !== 'undefined' && window.showToast) {
+        window.showToast('Failed to log workout: ' + err.message, 'error', 'Log Error');
+      }
     }
   };
 

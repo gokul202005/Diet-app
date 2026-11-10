@@ -7,8 +7,14 @@ export const RENDER_BACKEND = 'https://diet-app-backend-udje.onrender.com';
 // Dynamically determine the best API endpoint
 const getBaseUrl = () => {
   if (typeof window !== 'undefined') {
-    // 1. If running on Render or locally on node server port 5000:
-    if (window.location.hostname.includes('onrender.com') || window.location.port === '5000') {
+    // 1. If running locally (port 3000 Vite proxy, port 5000 Node, localhost) or directly on Render:
+    if (
+      window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1' ||
+      window.location.hostname.includes('onrender.com') ||
+      window.location.port === '5000' ||
+      window.location.port === '3000'
+    ) {
       return '/api';
     }
     // 2. If running inside Capacitor Native Android App:

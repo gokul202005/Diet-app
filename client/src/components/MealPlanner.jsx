@@ -79,7 +79,9 @@ export default function MealPlanner({ profile, selectedDate, onPlanLogged }) {
         } catch (e) {}
       }
     } catch (err) {
-      alert('Failed to generate meal plan: ' + err.message);
+      if (typeof window !== 'undefined' && window.showToast) {
+        window.showToast('Failed to generate meal plan: ' + err.message, 'error', 'Meal Plan Error');
+      }
     } finally {
       setIsGenerating(false);
     }
@@ -114,7 +116,9 @@ export default function MealPlanner({ profile, selectedDate, onPlanLogged }) {
         mealsHistory: sampleHistory
       });
     } catch (err) {
-      alert('Excel export error: ' + err.message);
+      if (typeof window !== 'undefined' && window.showToast) {
+        window.showToast('Excel export error: ' + err.message, 'error', 'Export Error');
+      }
     }
   };
 
@@ -143,10 +147,15 @@ export default function MealPlanner({ profile, selectedDate, onPlanLogged }) {
         await api.addMeal(mealPayload);
       }
       setLoggedSuccess(true);
+      if (typeof window !== 'undefined' && window.showToast) {
+        window.showToast("All meals for today's AI plan logged to diary!", 'success', 'Meals Logged');
+      }
       if (onPlanLogged) onPlanLogged();
       setTimeout(() => setLoggedSuccess(false), 4000);
     } catch (err) {
-      alert('Failed to log meals: ' + err.message);
+      if (typeof window !== 'undefined' && window.showToast) {
+        window.showToast('Failed to log meals: ' + err.message, 'error', 'Log Error');
+      }
     } finally {
       setIsLoggingAll(false);
     }

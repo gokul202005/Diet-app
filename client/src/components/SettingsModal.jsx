@@ -47,12 +47,16 @@ export default function SettingsModal({ isOpen, onClose, onEditProfile }) {
 
       const res = await api.updateSettings(payload);
       if (res.success) {
-        alert('Settings saved successfully!');
+        if (typeof window !== 'undefined' && window.showToast) {
+          window.showToast('Settings and preferences saved successfully!', 'success', 'Settings Saved');
+        }
         setApiKeyInput('');
         onClose();
       }
     } catch (err) {
-      alert('Failed to save settings: ' + err.message);
+      if (typeof window !== 'undefined' && window.showToast) {
+        window.showToast('Failed to save settings: ' + err.message, 'error', 'Error');
+      }
     } finally {
       setIsSaving(false);
     }

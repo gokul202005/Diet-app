@@ -46,13 +46,13 @@ export default function App() {
           localStorage.setItem('agy_current_user', JSON.stringify(authData.user));
         }
 
-        // Automatically trigger onboarding wizard if user profile has not been configured yet
-        if (!profileData || !profileData.isConfigured || !profileData.heightCm || !profileData.weightKg) {
+        // Only trigger onboarding setup wizard if user is brand new and has never configured or dismissed
+        const isDismissed = sessionStorage.getItem('onboarding_wizard_dismissed');
+        if (profileData && !profileData.isConfigured && !isDismissed) {
           setIsOnboardingOpen(true);
         }
       } catch (err) {
         console.error('Failed to load profile or auth:', err);
-        setIsOnboardingOpen(true);
       } finally {
         setLoading(false);
       }
@@ -204,10 +204,16 @@ export default function App() {
       {/* Interactive Onboarding / Profile Setup Wizard Modal */}
       <OnboardingModal
         isOpen={isOnboardingOpen}
-        onClose={() => setIsOnboardingOpen(false)}
+        onClose={() => {
+          setIsOnboardingOpen(false);
+          sessionStorage.setItem('onboarding_wizard_dismissed', 'true');
+        }}
         currentProfile={profile}
         currentUser={currentUser}
-        onProfileSaved={handleProfileSaved}
+        onProfileSaved={(p) => {
+          handleProfileSaved(p);
+          sessionStorage.setItem('onboarding_wizard_dismissed', 'true');
+        }}
       />
 
       {/* Settings & Token Guard Modal */}

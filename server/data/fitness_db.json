@@ -279,8 +279,8 @@
     "smartWatchType": "Fastrack Reflex Beat+ / Active Pro",
     "cacheTokens": true,
     "tokenUsage": {
-      "requestsToday": 0,
-      "tokensEstimated": 0
+      "requestsToday": 1,
+      "tokensEstimated": 350
     }
   }
 }

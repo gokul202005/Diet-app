@@ -132,10 +132,12 @@ export default function FastrackWatch({ selectedDate, profile }) {
     } catch (err) {
       console.warn('Pairing cancelled or error:', err);
       const msg = err.message || '';
-      if (msg.includes('cancel') || msg.includes('User cancelled') || msg.includes('cancelled')) {
-        // User closed the Bluetooth picker
+      if (msg.toLowerCase().includes('cancel') || msg.toLowerCase().includes('user cancelled')) {
+        // User closed the Bluetooth picker without pairing
       } else {
-        alert('Bluetooth Watch Pairing:\n' + msg + '\n\nTip: Ensure phone Bluetooth is turned ON and your Fastrack watch is awake nearby.');
+        if (typeof window !== 'undefined' && window.showToast) {
+          window.showToast(`${msg}. Ensure phone Bluetooth is turned ON and your Fastrack watch is awake nearby.`, 'warning', 'Bluetooth Pairing');
+        }
       }
     } finally {
       setIsPairingBle(false);
@@ -186,10 +188,14 @@ export default function FastrackWatch({ selectedDate, profile }) {
         const balanceRes = await api.getEnergyBalance(selectedDate);
         setEnergyBalance(balanceRes.balance);
 
-        alert('Real watch readings saved successfully!');
+        if (typeof window !== 'undefined' && window.showToast) {
+          window.showToast('Real watch readings saved successfully to your diary!', 'success', 'Watch Synced');
+        }
       }
     } catch (err) {
-      alert('Failed to save watch reading: ' + err.message);
+      if (typeof window !== 'undefined' && window.showToast) {
+        window.showToast('Failed to save watch reading: ' + err.message, 'error', 'Sync Error');
+      }
     } finally {
       setIsSavingRealData(false);
     }

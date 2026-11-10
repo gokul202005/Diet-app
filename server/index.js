@@ -113,6 +113,19 @@ function getUserProfile(db, userId, fallbackName = '') {
   return db.profiles[userId];
 }
 
+// Helper: Retrieve isolated Gemini API Key unique for every user, with fallback to global settings/.env
+function getUserApiKey(db, userId) {
+  const profile = db.profiles && db.profiles[userId];
+  const user = (db.users || []).find(u => u.id === userId);
+  return (
+    profile?.geminiApiKey || 
+    user?.geminiApiKey || 
+    db.settings?.geminiApiKey || 
+    process.env.GEMINI_API_KEY || 
+    ''
+  );
+}
+
 // --- USER AUTHENTICATION & CLOUD SYNC ---
 app.post('/api/auth/signup', (req, res) => {
   try {
@@ -445,7 +458,8 @@ app.post('/api/ai/analyze-meal-text', async (req, res) => {
     }
 
     const db = readDB();
-    aiService.setApiKey(db.settings?.geminiApiKey || process.env.GEMINI_API_KEY || '');
+    const userId = getAuthUserId(req, db);
+    aiService.setApiKey(getUserApiKey(db, userId));
 
     const analysis = await aiService.analyzeMealText(text);
 
@@ -470,6 +484,8 @@ app.post('/api/ai/analyze-meal-photo', upload.single('photo'), async (req, res) 
     }
 
     const db = readDB();
+    const userId = getAuthUserId(req, db);
+    aiService.setApiKey(getUserApiKey(db, userId));
     aiService.setApiKey(db.settings?.geminiApiKey || process.env.GEMINI_API_KEY || '');
 
     const analysis = await aiService.analyzeMealPhoto(req.file.buffer, req.file.mimetype);
@@ -489,9 +505,64 @@ app.post('/api/ai/analyze-meal-photo', upload.single('photo'), async (req, res) 
 });
 
 // --- UNIVERSAL FULL-WEBSITE AI VOICE COMMAND ENGINE ---
+function normalizeFitnessSpeech(rawText) {
+  if (!rawText || typeof rawText !== 'string') return '';
+  let clean = rawText;
+  const replacements = [
+    // Quantities & Homophones
+    [/\bfree eggs\b/gi, '3 eggs'],
+    [/\bto eggs\b/gi, '2 eggs'],
+    [/\bfor eggs\b/gi, '4 eggs'],
+    [/\bwon\b(?=.*(?:egg|roti|dosa|idli|banana))/gi, '1'],
+    [/\bto\b(?=.*(?:eggs|rotis|dosas|idlis|bananas))/gi, '2'],
+    // South Indian & Global Foods Phonetic Normalization
+    [/\bcheap at ease\b/gi, 'chapatis'],
+    [/\bcheap party\b/gi, 'chapati'],
+    [/\bchapathi\b/gi, 'chapati'],
+    [/\bchapattis?\b/gi, 'chapatis'],
+    [/\bitaly\b/gi, 'idli'],
+    [/\bidly\b/gi, 'idli'],
+    [/\bidlies\b/gi, 'idlis'],
+    [/\bedli\b/gi, 'idli'],
+    [/\bdoshe\b/gi, 'dosa'],
+    [/\bdosai\b/gi, 'dosa'],
+    [/\bdhose\b/gi, 'dosa'],
+    [/\bdose\b(?=.*(?:sambar|chutney))/gi, 'dosa'],
+    [/\bsamba\b/gi, 'sambar'],
+    [/\bsambhar\b/gi, 'sambar'],
+    [/\bpanier\b/gi, 'paneer'],
+    [/\bpanir\b/gi, 'paneer'],
+    [/\bbriyani\b/gi, 'biryani'],
+    [/\bbiriyani\b/gi, 'biryani'],
+    [/\bcard\b(?=.*(?:rice|curd))/gi, 'curd'],
+    [/\bcurds\b/gi, 'curd'],
+    // Gym Exercises
+    [/\bbench past\b/gi, 'bench press'],
+    [/\bbench price\b/gi, 'bench press'],
+    [/\bbench fresh\b/gi, 'bench press'],
+    [/\bbiceps? girl\b/gi, 'bicep curls'],
+    [/\bbiceps? cur\b/gi, 'bicep curl'],
+    [/\bdead left\b/gi, 'deadlift'],
+    [/\bdead lift\b/gi, 'deadlift'],
+    [/\boverhead past\b/gi, 'overhead press'],
+    // Weight & Water
+    [/\bwait is\b/gi, 'weight is'],
+    [/\brate is\b/gi, 'weight is'],
+    [/\bmy wait\b/gi, 'my weight'],
+    [/\bhalf (?:a )?liter\b/gi, '500ml water'],
+    [/\bone liter\b/gi, '1000ml water'],
+    [/\btwo liters?\b/gi, '2000ml water']
+  ];
+  for (const [pattern, rep] of replacements) {
+    clean = clean.replace(pattern, rep);
+  }
+  return clean;
+}
+
 async function parseUniversalVoiceIntent(text, date = new Date().toISOString().split('T')[0], userId = 'default_guest') {
   const db = readDB();
-  const clean = text.toLowerCase().trim();
+  const normalizedText = normalizeFitnessSpeech(text);
+  const clean = normalizedText.toLowerCase().trim();
 
   // 1. INTENT: COACH QUESTIONS
   const isQuestion = clean.startsWith('how') || clean.startsWith('what') || clean.startsWith('can i') || 
@@ -666,7 +737,8 @@ async function parseUniversalVoiceIntent(text, date = new Date().toISOString().s
     else mealType = 'dinner';
   }
 
-  aiService.setApiKey(db.settings?.geminiApiKey || process.env.GEMINI_API_KEY || '');
+  const apiKey = getUserApiKey(db, userId);
+  aiService.setApiKey(apiKey);
   const analysis = await aiService.analyzeMealText(text);
 
   return {
@@ -835,7 +907,7 @@ async function commitUniversalVoice(intent, payload, originalText = '', date = n
 
   // Commit COACH QUESTION
   if (intent === 'coach') {
-    aiService.setApiKey(db.settings?.geminiApiKey || process.env.GEMINI_API_KEY || '');
+    aiService.setApiKey(getUserApiKey(db, userId));
     const userProfile = getUserProfile(db, userId);
     const todayMeals = (db.meals || []).filter(m => (!m.userId || m.userId === userId) && m.date === date);
     const consumedCalories = todayMeals.reduce((s, m) => s + (m.totalCalories || 0), 0);
@@ -919,7 +991,7 @@ app.post('/api/ai/universal-voice-audio', upload.single('audio'), async (req, re
     const db = readDB();
     const userId = getAuthUserId(req, db);
     const date = req.body.date || new Date().toISOString().split('T')[0];
-    const apiKey = db.settings?.geminiApiKey || process.env.GEMINI_API_KEY || '';
+    const apiKey = getUserApiKey(db, userId);
 
     if (!apiKey) {
       return res.json({
@@ -971,9 +1043,11 @@ app.post('/api/ai/generate-meal-plan', async (req, res) => {
   try {
     const { preference = 'south_indian_mixed', daysCount = 7 } = req.body;
     const db = readDB();
+    const userId = getAuthUserId(req, db);
+    const userProfile = getUserProfile(db, userId);
 
-    aiService.setApiKey(db.settings?.geminiApiKey || process.env.GEMINI_API_KEY || '');
-    const plan = await aiService.generateDailyMealPlan(db.profile, preference, Number(daysCount) || 7);
+    aiService.setApiKey(getUserApiKey(db, userId));
+    const plan = await aiService.generateDailyMealPlan(userProfile, preference, Number(daysCount) || 7);
 
     // Persist saved meal plan so it doesn't re-roll automatically
     db.savedMealPlan = plan;
@@ -1537,7 +1611,7 @@ app.post('/api/workouts/generate-ai-split', async (req, res) => {
       focusAreas = userProfile.focusAreas || []
     } = req.body;
 
-    aiService.setApiKey(db.settings?.geminiApiKey || process.env.GEMINI_API_KEY || '');
+    aiService.setApiKey(getUserApiKey(db, userId));
     const plan = await aiService.generateWorkoutPlan({
       splitType,
       goal,
@@ -1612,7 +1686,7 @@ app.post('/api/coach/chat', async (req, res) => {
     db.chatHistory = db.chatHistory || [];
     db.chatHistory.push(userMsg);
 
-    aiService.setApiKey(db.settings?.geminiApiKey || process.env.GEMINI_API_KEY || '');
+    aiService.setApiKey(getUserApiKey(db, userId));
     const userHistory = db.chatHistory.filter(c => !c.userId || c.userId === userId);
     const { reply, source } = await aiService.askCoachChat(message, userHistory, userProfile, todayStats);
 
@@ -1644,11 +1718,15 @@ app.post('/api/coach/chat', async (req, res) => {
 // --- SETTINGS & TOKEN TRACKER ---
 app.get('/api/settings', (req, res) => {
   const db = readDB();
+  const userId = getAuthUserId(req, db);
+  const key = getUserApiKey(db, userId);
   const settings = { ...(db.settings || {}) };
+  settings.geminiApiKey = key;
+
   // Mask API key for security
-  if (settings.geminiApiKey) {
+  if (key) {
     settings.hasApiKey = true;
-    settings.maskedKey = `${settings.geminiApiKey.slice(0, 4)}...${settings.geminiApiKey.slice(-4)}`;
+    settings.maskedKey = `${key.slice(0, 4)}...${key.slice(-4)}`;
   } else {
     settings.hasApiKey = false;
     settings.maskedKey = '';
@@ -1658,12 +1736,23 @@ app.get('/api/settings', (req, res) => {
 
 app.post('/api/settings', (req, res) => {
   const db = readDB();
+  const userId = getAuthUserId(req, db);
+  const userProfile = getUserProfile(db, userId);
   const { geminiApiKey, fastrackDeviceName, useHeuristicFallback, cacheTokens } = req.body;
 
   db.settings = db.settings || {};
   if (typeof geminiApiKey === 'string') {
-    db.settings.geminiApiKey = geminiApiKey.trim();
-    aiService.setApiKey(db.settings.geminiApiKey);
+    const cleanKey = geminiApiKey.trim();
+    userProfile.geminiApiKey = cleanKey;
+    if (db.profiles && db.profiles[userId]) {
+      db.profiles[userId].geminiApiKey = cleanKey;
+    }
+    const matchedUser = (db.users || []).find(u => u.id === userId);
+    if (matchedUser) {
+      matchedUser.geminiApiKey = cleanKey;
+    }
+    db.settings.geminiApiKey = cleanKey;
+    aiService.setApiKey(cleanKey);
   }
   if (fastrackDeviceName) db.settings.fastrackDeviceName = fastrackDeviceName;
   if (typeof useHeuristicFallback === 'boolean') db.settings.useHeuristicFallback = useHeuristicFallback;

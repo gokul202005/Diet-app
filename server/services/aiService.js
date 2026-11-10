@@ -28,7 +28,7 @@ function extractJSON(text) {
 export class AIService {
   constructor(apiKey = process.env.GEMINI_API_KEY) {
     this.apiKey = apiKey;
-    this.modelName = 'gemini-1.5-flash';
+    this.modelName = 'gemini-3.5-flash-lite';
   }
 
   setApiKey(key) {
@@ -41,18 +41,19 @@ export class AIService {
   }
 
   // Resilient multi-model executor with automatic failover to prevent 404 / 503 errors
-  async callModel(contentParts, config = {}) {
+  // Uses low-token Gemini 3.5 Flash Lite & 3.1 Flash Lite with 500 RPD rate limits
+  async callModel(contentParts, config = {}, customModels = null) {
     if (!this.apiKey) return null;
     const genAI = this.getGenAI();
     if (!genAI) return null;
 
-    const candidateModels = [
-      this.modelName || 'gemini-1.5-flash',
-      'gemini-1.5-flash',
-      'gemini-2.0-flash',
-      'gemini-1.5-pro',
-      'gemini-2.0-flash-lite'
-    ];
+    const candidateModels = customModels && customModels.length > 0
+      ? customModels
+      : [
+          this.modelName || 'gemini-3.5-flash-lite',
+          'gemini-3.5-flash-lite',
+          'gemini-3.1-flash-lite'
+        ];
     const uniqueCandidates = [...new Set(candidateModels)];
 
     let lastError = null;
@@ -102,7 +103,7 @@ Return ONLY the transcribed sentence as plain text without quotation marks, bull
         }
       },
       prompt
-    ]);
+    ], {}, ['gemini-3.5-transcribe', 'gemini-2.5-flash', 'gemini-3.5-flash-lite']);
 
     const text = result?.response?.text();
     return (text || '').replace(/^["']|["']$/g, '').trim();
@@ -259,7 +260,11 @@ Return this JSON:
 }
 `;
 
-      const { result } = await this.callModel([prompt, imagePart], { responseMimeType: 'application/json' });
+      const { result } = await this.callModel(
+        [prompt, imagePart], 
+        { responseMimeType: 'application/json' }, 
+        ['gemini-3.5-flash-lite', 'gemini-2.5-flash', 'gemini-3.1-flash-lite']
+      );
       const rawText = result.response.text();
       const parsed = extractJSON(rawText) || JSON.parse(rawText);
       parsed.source = 'gemini-vision';

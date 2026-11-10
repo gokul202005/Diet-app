@@ -17,9 +17,60 @@ import {
   Radio,
   Key,
   Edit2,
-  RotateCcw
+  RotateCcw,
+  Globe
 } from 'lucide-react';
 import { api } from '../api';
+
+function normalizeFitnessSpeech(rawText) {
+  if (!rawText || typeof rawText !== 'string') return '';
+  let clean = rawText;
+  const replacements = [
+    [/\bfree eggs\b/gi, '3 eggs'],
+    [/\bto eggs\b/gi, '2 eggs'],
+    [/\bfor eggs\b/gi, '4 eggs'],
+    [/\bwon\b(?=.*(?:egg|roti|dosa|idli|banana))/gi, '1'],
+    [/\bto\b(?=.*(?:eggs|rotis|dosas|idlis|bananas))/gi, '2'],
+    [/\bcheap at ease\b/gi, 'chapatis'],
+    [/\bcheap party\b/gi, 'chapati'],
+    [/\bchapathi\b/gi, 'chapati'],
+    [/\bchapattis?\b/gi, 'chapatis'],
+    [/\bitaly\b/gi, 'idli'],
+    [/\bidly\b/gi, 'idli'],
+    [/\bidlies\b/gi, 'idlis'],
+    [/\bedli\b/gi, 'idli'],
+    [/\bdoshe\b/gi, 'dosa'],
+    [/\bdosai\b/gi, 'dosa'],
+    [/\bdhose\b/gi, 'dosa'],
+    [/\bdose\b(?=.*(?:sambar|chutney))/gi, 'dosa'],
+    [/\bsamba\b/gi, 'sambar'],
+    [/\bsambhar\b/gi, 'sambar'],
+    [/\bpanier\b/gi, 'paneer'],
+    [/\bpanir\b/gi, 'paneer'],
+    [/\bbriyani\b/gi, 'biryani'],
+    [/\bbiriyani\b/gi, 'biryani'],
+    [/\bcard\b(?=.*(?:rice|curd))/gi, 'curd'],
+    [/\bcurds\b/gi, 'curd'],
+    [/\bbench past\b/gi, 'bench press'],
+    [/\bbench price\b/gi, 'bench press'],
+    [/\bbench fresh\b/gi, 'bench press'],
+    [/\bbiceps? girl\b/gi, 'bicep curls'],
+    [/\bbiceps? cur\b/gi, 'bicep curl'],
+    [/\bdead left\b/gi, 'deadlift'],
+    [/\bdead lift\b/gi, 'deadlift'],
+    [/\boverhead past\b/gi, 'overhead press'],
+    [/\bwait is\b/gi, 'weight is'],
+    [/\brate is\b/gi, 'weight is'],
+    [/\bmy wait\b/gi, 'my weight'],
+    [/\bhalf (?:a )?liter\b/gi, '500ml water'],
+    [/\bone liter\b/gi, '1000ml water'],
+    [/\btwo liters?\b/gi, '2000ml water']
+  ];
+  for (const [pattern, rep] of replacements) {
+    clean = clean.replace(pattern, rep);
+  }
+  return clean;
+}
 
 export default function UniversalVoiceAssistant({ selectedDate, onActionCompleted, isOpen: externalIsOpen, onClose: externalOnClose, onOpen: externalOnOpen }) {
   const [internalIsOpen, setInternalIsOpen] = useState(false);
@@ -27,6 +78,7 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
 
   // Assistant State: 'idle' | 'listening' | 'preview' | 'success'
   const [stateMode, setStateMode] = useState('idle');
+  const [speechLang, setSpeechLang] = useState('en-IN'); // 'en-IN' | 'en-US' | 'ta-IN' | 'hi-IN'
   const [isRecording, setIsRecording] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [editableSpeech, setEditableSpeech] = useState('');
@@ -184,7 +236,7 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
           const recognition = new SpeechRecognition();
           recognition.continuous = true;
           recognition.interimResults = true;
-          recognition.lang = 'en-IN'; // Indian English / Global fitness terms
+          recognition.lang = speechLang || 'en-IN'; // Indian English / Global fitness terms
 
           recognition.onresult = (event) => {
             let current = '';
@@ -237,9 +289,10 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
       const recognizedSpeech = recognizedTextRef.current.trim() || transcript.trim();
 
       if (recognizedSpeech) {
-        // Transcribed via SpeechRecognition -> Preview for user review
-        setEditableSpeech(recognizedSpeech);
-        await parseIntentForPreview(recognizedSpeech);
+        // Transcribed via SpeechRecognition -> Normalize & Preview for user review
+        const normalized = normalizeFitnessSpeech(recognizedSpeech);
+        setEditableSpeech(normalized);
+        await parseIntentForPreview(normalized);
       } else if (audioBlob.size > 1000) {
         // Send audio to backend for transcription
         await executeVoiceAudio(audioBlob);
@@ -431,9 +484,13 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
       await api.updateSettings({ geminiApiKey: apiKeyInput.trim() });
       setNeedsApiKey(false);
       setErrorMsg('');
-      alert('Gemini API Key saved! Tap the microphone to record your voice.');
+      if (typeof window !== 'undefined' && window.showToast) {
+        window.showToast('Gemini API Key saved! Tap the microphone to record your voice.', 'success', 'API Key Configured');
+      }
     } catch (err) {
-      alert('Failed to save API Key: ' + err.message);
+      if (typeof window !== 'undefined' && window.showToast) {
+        window.showToast('Failed to save API Key: ' + err.message, 'error', 'Key Error');
+      }
     }
   };
 
@@ -561,6 +618,35 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
             {/* ========================================================================= */}
             {(stateMode === 'idle' || stateMode === 'listening') && (
               <div className="bg-slate-950 border border-slate-800 rounded-2xl p-6 text-center space-y-4">
+                
+                {/* Spoken Language / Dialect Switcher */}
+                <div className="flex items-center justify-center space-x-1.5 flex-wrap gap-y-1">
+                  <div className="flex items-center space-x-1 text-[10px] text-slate-500 font-bold uppercase tracking-wider mr-1">
+                    <Globe className="w-3 h-3 text-slate-400" />
+                    <span>Language:</span>
+                  </div>
+                  {[
+                    { code: 'en-IN', label: '🇮🇳 Indian English' },
+                    { code: 'en-US', label: '🌐 English (Global)' },
+                    { code: 'ta-IN', label: '🇮🇳 தமிழ்' },
+                    { code: 'hi-IN', label: '🇮🇳 हिन्दी' }
+                  ].map((lang) => (
+                    <button
+                      key={lang.code}
+                      type="button"
+                      disabled={isRecording}
+                      onClick={() => setSpeechLang(lang.code)}
+                      className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                        speechLang === lang.code
+                          ? 'bg-emerald-500 text-slate-950 font-black shadow-sm'
+                          : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                      }`}
+                    >
+                      {lang.label}
+                    </button>
+                  ))}
+                </div>
+
                 <div className="relative inline-block my-1">
                   {isRecording && (
                     <div className="absolute inset-0 rounded-full bg-rose-500/30 animate-ping scale-150 pointer-events-none" />
@@ -665,6 +751,35 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
                     >
                       Re-parse
                     </button>
+                  </div>
+
+                  {/* Quick-Fix Suggestion Chips */}
+                  <div className="flex items-center space-x-1.5 overflow-x-auto pt-1 pb-0.5">
+                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider shrink-0 mr-1">
+                      Quick Replace:
+                    </span>
+                    {[
+                      '3 idlis with sambar',
+                      '2 chapatis with curry',
+                      '1 masala dosa',
+                      '2 boiled eggs',
+                      'protein shake',
+                      'drank 500ml water',
+                      'bench press 3 sets 10 reps',
+                      'my weight is 70 kg'
+                    ].map((item, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => {
+                          setEditableSpeech(item);
+                          parseIntentForPreview(item);
+                        }}
+                        className="px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-[10px] text-slate-400 hover:text-emerald-300 border border-slate-800 hover:border-emerald-500/40 transition-colors shrink-0 cursor-pointer"
+                      >
+                        {item}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
