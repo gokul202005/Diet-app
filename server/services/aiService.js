@@ -405,6 +405,165 @@ Return ONLY valid JSON matching this schema:
     return fallbackAnalysis;
   }
 
+  // 3b. AI Dynamic Workout Plan Generator (Gemini + Sports-Science Engine)
+  async generateWorkoutPlan({ splitType = 'PPL', goal = 'recomp', daysCount = 4, experienceLevel = 'intermediate', focusAreas = [], userProfile = {} }) {
+    const cleanSplit = splitType || 'PPL';
+    const cleanGoal = goal || userProfile.goal || 'recomp';
+    const cleanDays = Math.min(7, Math.max(3, Number(daysCount) || 4));
+    const cacheKey = `gen_workout:${cleanSplit}:${cleanGoal}:${cleanDays}:${(focusAreas || []).join(',')}:${experienceLevel}`;
+
+    if (queryCache.has(cacheKey)) {
+      return { ...queryCache.get(cacheKey), cached: true };
+    }
+
+    if (this.apiKey) {
+      try {
+        const prompt = `
+You are an elite sports biomechanist and strength coach.
+Generate a tailored, high-performance ${cleanDays}-day workout routine for a client:
+- Primary Fitness Goal: ${cleanGoal}
+- Preferred Split Style: ${cleanSplit}
+- Experience Level: ${experienceLevel}
+- Focus Areas: ${(focusAreas || []).join(', ') || 'Full body muscular balance'}
+- Client Biometrics: Weight: ${userProfile.weightKg || 75}kg, Height: ${userProfile.heightCm || 175}cm, Age: ${userProfile.age || 25}, Gender: ${userProfile.gender || 'male'}
+
+Return ONLY valid JSON with this exact structure:
+{
+  "planTitle": "${cleanSplit} ${cleanDays}-Day Tailored Split",
+  "splitType": "${cleanSplit}",
+  "goal": "${cleanGoal}",
+  "daysCount": ${cleanDays},
+  "rationale": "2-3 sentences explaining why this split maximizes results for ${cleanGoal}.",
+  "days": [
+    {
+      "dayNumber": 1,
+      "dayName": "Day 1 - Push Hypertrophy",
+      "focus": "Chest, Front Delts, Triceps",
+      "estimatedDurationMin": 50,
+      "estimatedBurnKcal": 320,
+      "warmup": "5 min dynamic shoulder & thoracic mobility",
+      "exercises": [
+        {
+          "name": "Barbell Bench Press",
+          "targetMuscle": "Chest (Pectorals)",
+          "sets": 4,
+          "reps": "8-10",
+          "restSec": 90,
+          "coachingTip": "Retract scapulae, touch lower sternum, drive through palms.",
+          "startingWeightKg": 60
+        }
+      ]
+    }
+  ],
+  "recoveryTips": [
+    "Prioritize 7-8 hours deep sleep for muscle protein synthesis.",
+    "Stay hydrated with at least 3 liters of water on lifting days."
+  ]
+}
+`;
+        const { result } = await this.callModel(prompt, { responseMimeType: 'application/json' });
+        const rawText = result.response.text();
+        const parsed = extractJSON(rawText) || JSON.parse(rawText);
+        parsed.source = 'gemini-ai';
+        queryCache.set(cacheKey, parsed);
+        return parsed;
+      } catch (err) {
+        console.warn('Gemini workout generation failed, using sports-science engine:', err.message);
+      }
+    }
+
+    const fallbackPlan = this.generateAlgorithmicWorkoutSplit(cleanSplit, cleanGoal, cleanDays, focusAreas, userProfile);
+    queryCache.set(cacheKey, fallbackPlan);
+    return fallbackPlan;
+  }
+
+  // Sports-Science Algorithmic Workout Split Generator
+  generateAlgorithmicWorkoutSplit(splitType, goal, daysCount, focusAreas = [], userProfile = {}) {
+    const isCut = (goal || '').includes('cut');
+    const isBulk = (goal || '').includes('bulk');
+    const repRangeCompound = isCut ? '8-10' : isBulk ? '6-8' : '8-12';
+    const repRangeIso = isCut ? '12-15' : '10-12';
+
+    const pplDays = [
+      {
+        dayNumber: 1,
+        dayName: 'Day 1 - Push (Chest, Shoulders, Triceps)',
+        focus: 'Chest, Anterior Deltoids, Lateral Deltoids, Triceps',
+        estimatedDurationMin: 55,
+        estimatedBurnKcal: 340,
+        warmup: 'Band pull-aparts, arm circles, rotator cuff rotations',
+        exercises: [
+          { name: 'Barbell Flat Bench Press', targetMuscle: 'Mid/Lower Chest', sets: 4, reps: repRangeCompound, restSec: 90, coachingTip: 'Arch lower back slightly, drive through heels', startingWeightKg: 60 },
+          { name: 'Incline Dumbbell Press (30°)', targetMuscle: 'Upper Chest (Clavicular Head)', sets: 3, reps: '8-10', restSec: 75, coachingTip: 'Deep stretch at bottom, tuck elbows at 45°', startingWeightKg: 20 },
+          { name: 'Standing Dumbbell Lateral Raises', targetMuscle: 'Lateral Deltoids', sets: 4, reps: repRangeIso, restSec: 60, coachingTip: 'Lead with elbows, slight forward lean', startingWeightKg: 10 },
+          { name: 'Cable Tricep Rope Pushdowns', targetMuscle: 'Triceps Lateral/Medial Heads', sets: 3, reps: repRangeIso, restSec: 60, coachingTip: 'Lock elbows at sides, flare rope at bottom', startingWeightKg: 25 },
+          { name: 'Overhead Cable Tricep Extension', targetMuscle: 'Triceps Long Head', sets: 3, reps: '10-12', restSec: 60, coachingTip: 'Full overhead stretch for tricep long head growth', startingWeightKg: 20 }
+        ]
+      },
+      {
+        dayNumber: 2,
+        dayName: 'Day 2 - Pull (Back, Rear Delts, Biceps)',
+        focus: 'Lats, Rhomboids, Traps, Rear Delts, Biceps',
+        estimatedDurationMin: 55,
+        estimatedBurnKcal: 360,
+        warmup: 'Cat-cow stretches, thoracic extensions, active hangs',
+        exercises: [
+          { name: 'Barbell Conventional Deadlift', targetMuscle: 'Posterior Chain & Traps', sets: 3, reps: '5-6', restSec: 150, coachingTip: 'Brace core with Valsalva, push floor away', startingWeightKg: 90 },
+          { name: 'Wide-Grip Lat Pulldown', targetMuscle: 'Latissimus Dorsi (Width)', sets: 4, reps: repRangeCompound, restSec: 75, coachingTip: 'Pull elbows straight down into pockets', startingWeightKg: 50 },
+          { name: 'Chest-Supported Dumbbell Row', targetMuscle: 'Upper Back & Rhomboids (Thickness)', sets: 3, reps: '10-12', restSec: 75, coachingTip: 'Squeeze shoulder blades together at apex', startingWeightKg: 22 },
+          { name: 'Cable Face Pulls', targetMuscle: 'Rear Delts & Rotator Cuff', sets: 4, reps: '15', restSec: 60, coachingTip: 'Pull rope toward eye-level, externally rotate thumbs back', startingWeightKg: 20 },
+          { name: 'Incline Dumbbell Bicep Curl', targetMuscle: 'Biceps Long Head', sets: 3, reps: repRangeIso, restSec: 60, coachingTip: 'Supinate wrists at the top of contraction', startingWeightKg: 12 }
+        ]
+      },
+      {
+        dayNumber: 3,
+        dayName: 'Day 3 - Legs & Core (Quads, Hamstrings, Calves)',
+        focus: 'Quadriceps, Hamstrings, Glutes, Calves, Abs',
+        estimatedDurationMin: 60,
+        estimatedBurnKcal: 420,
+        warmup: 'Bodyweight deep squats, leg swings, hip 90/90s',
+        exercises: [
+          { name: 'Barbell Back Squat', targetMuscle: 'Quadriceps & Glutes', sets: 4, reps: repRangeCompound, restSec: 120, coachingTip: 'Break at hips and knees together, hit parallel depth', startingWeightKg: 75 },
+          { name: 'Romanian Deadlift (RDL)', targetMuscle: 'Hamstrings & Glute-Ham Tie-in', sets: 3, reps: '8-10', restSec: 90, coachingTip: 'Hinge hips back, feel hamstring stretch, neutral spine', startingWeightKg: 60 },
+          { name: 'Leg Press (45-Degree)', targetMuscle: 'Quad Hypertrophy', sets: 3, reps: '10-12', restSec: 90, coachingTip: 'Do not lock out knees at top, deep knee bend', startingWeightKg: 140 },
+          { name: 'Seated Hamstring Leg Curl', targetMuscle: 'Hamstring Hypertrophy', sets: 3, reps: '12-15', restSec: 60, coachingTip: 'Control the release, hold contraction for 1s', startingWeightKg: 40 },
+          { name: 'Standing Calf Raise', targetMuscle: 'Gastrocnemius', sets: 4, reps: '15', restSec: 45, coachingTip: '2-second pause at bottom stretch on each rep', startingWeightKg: 50 },
+          { name: 'Hanging Knee / Leg Raises', targetMuscle: 'Lower Rectus Abdominis', sets: 3, reps: '15', restSec: 45, coachingTip: 'Curl pelvis up towards chest, don’t swing', startingWeightKg: 0 }
+        ]
+      },
+      {
+        dayNumber: 4,
+        dayName: 'Day 4 - Upper Body Power & Weak Points',
+        focus: 'Upper Chest, Lats, Shoulders, Arms',
+        estimatedDurationMin: 50,
+        estimatedBurnKcal: 320,
+        warmup: 'Band dislocates, scapular push-ups, light cable flyes',
+        exercises: [
+          { name: 'Standing Overhead Barbell Press (OHP)', targetMuscle: 'Anterior Deltoids & Triceps', sets: 4, reps: '6-8', restSec: 100, coachingTip: 'Squeeze glutes to protect spine, press head through window', startingWeightKg: 40 },
+          { name: 'Pull-ups / Neutral-Grip Chin-ups', targetMuscle: 'Lats & Biceps', sets: 3, reps: '8-10', restSec: 90, coachingTip: 'Full extension at dead hang, chin over bar', startingWeightKg: 0 },
+          { name: 'Dumbbell Incline Bench Press', targetMuscle: 'Upper Pectorals', sets: 3, reps: '10-12', restSec: 75, coachingTip: 'Slight tuck of elbows, deep active stretch', startingWeightKg: 24 },
+          { name: 'Cable Lateral Raises (Behind Back)', targetMuscle: 'Lateral Deltoids', sets: 4, reps: '15', restSec: 45, coachingTip: 'Continuous tension through entire range of motion', startingWeightKg: 7.5 },
+          { name: 'Barbell Preacher Curl / Hammer Curl', targetMuscle: 'Brachialis & Forearms', sets: 3, reps: '10-12', restSec: 60, coachingTip: 'Strict form, no swinging', startingWeightKg: 14 }
+        ]
+      }
+    ];
+
+    return {
+      planTitle: `${splitType.toUpperCase()} ${daysCount}-Day Personalized Split`,
+      splitType,
+      goal,
+      daysCount,
+      rationale: `Algorithmically customized for your ${goal.replace(/_/g, ' ')} goal, balancing compound movements with high-yield isolation exercises for optimal hypertrophy and metabolic stimulus.`,
+      days: pplDays.slice(0, daysCount),
+      recoveryTips: [
+        'Allow 48 hours between training the same muscle group directly.',
+        'Drink 3-4 liters of water daily to maintain intracellular muscle volume.',
+        'Track reps and loads in your Workout Tracker to enforce progressive overload.'
+      ],
+      source: 'biomechanics-engine'
+    };
+  }
+
   // 4. Interactive AI Fitness Coach Chat
   async askCoachChat(message, chatHistory = [], userProfile = {}, todayStats = {}) {
     if (this.apiKey) {

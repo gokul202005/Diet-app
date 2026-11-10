@@ -23,33 +23,87 @@
     "email": "jn.gokulkrishna@gmail.com",
     "provider": "email"
   },
+  "profiles": {
+    "user-google-1794233434386": {
+      "isConfigured": true,
+      "name": "Gokul",
+      "age": "21",
+      "gender": "male",
+      "heightCm": "215",
+      "weightKg": "111.5",
+      "goal": "recomp",
+      "activityLevel": "athlete_double",
+      "dailyTargetCalories": 4232,
+      "dailyTargetProtein": 234,
+      "dailyTargetCarbs": 559,
+      "dailyTargetFat": 118,
+      "dailyTargetWater": 4200,
+      "dailyTargetSteps": 16000,
+      "recalculateTargets": false,
+      "dietaryTags": [
+        "🍗 Non-Veg",
+        "🥗 Pure Veg",
+        "🥚 Eggetarian"
+      ],
+      "focusAreas": [
+        "🛡️ Full Body Balance"
+      ],
+      "goals": [
+        "recomp"
+      ]
+    },
+    "user-1794309303113": {
+      "isConfigured": false,
+      "name": "gokul krishna",
+      "age": "",
+      "gender": "male",
+      "heightCm": "",
+      "weightKg": "",
+      "goal": "recomp",
+      "activityLevel": "moderately_active",
+      "dailyTargetCalories": 2100,
+      "dailyTargetProtein": 140,
+      "dailyTargetCarbs": 220,
+      "dailyTargetFat": 60,
+      "dailyTargetWater": 3000,
+      "dailyTargetSteps": 10000,
+      "recalculateTargets": true,
+      "dietaryTags": [
+        "🍗 Non-Veg"
+      ],
+      "focusAreas": [
+        "🛡️ Full Body Balance"
+      ],
+      "goals": [
+        "recomp"
+      ]
+    }
+  },
   "profile": {
     "isConfigured": true,
-    "name": "Gokul",
+    "name": "gokul krishna",
     "age": "21",
     "gender": "male",
-    "heightCm": "215",
-    "weightKg": "111.5",
-    "goal": "cutting",
-    "activityLevel": "athlete_double",
-    "dailyTargetCalories": 4232,
-    "dailyTargetProtein": 234,
-    "dailyTargetCarbs": 559,
-    "dailyTargetFat": 118,
+    "heightCm": "235",
+    "weightKg": 110,
+    "goal": "recomp",
+    "activityLevel": "moderately_active",
+    "dailyTargetCalories": 3592,
+    "dailyTargetProtein": 233,
+    "dailyTargetCarbs": 440,
+    "dailyTargetFat": 100,
     "dailyTargetWater": 4200,
-    "dailyTargetSteps": 16000,
+    "dailyTargetSteps": 10000,
     "recalculateTargets": false,
     "dietaryTags": [
-      "🍗 Non-Veg",
-      "🥗 Pure Veg",
-      "🥚 Eggetarian"
+      "🍗 Non-Veg"
     ],
     "focusAreas": [
       "🛡️ Full Body Balance"
     ],
     "goals": [
-      "cutting",
-      "recomp"
+      "recomp",
+      "cutting"
     ]
   },
   "meals": [],
@@ -58,93 +112,136 @@
     {
       "id": "default-ppl",
       "name": "Push Pull Legs (PPL) - 6 Day Split",
-      "daysPerWeek": 6,
-      "split": [
+      "description": "Hypertrophy and progressive overload split targeting all muscle groups twice weekly.",
+      "days": [
         {
-          "day": "Day 1 - Push A",
-          "focus": "Chest, Shoulders, Triceps",
+          "day": "Day 1 - Push A (Chest, Shoulders, Triceps)",
           "exercises": [
-            "Barbell Bench Press 4x8",
-            "Incline DB Press 3x10",
-            "DB Lateral Raises 4x15",
-            "Overhead Tricep Extension 3x12",
-            "Cable Flyes 3x15"
+            {
+              "name": "Barbell Flat Bench Press",
+              "sets": 4,
+              "reps": "6-8",
+              "restSec": 120
+            },
+            {
+              "name": "Incline Dumbbell Press",
+              "sets": 3,
+              "reps": "8-10",
+              "restSec": 90
+            },
+            {
+              "name": "Standing Overhead Barbell Press (OHP)",
+              "sets": 3,
+              "reps": "8-10",
+              "restSec": 90
+            },
+            {
+              "name": "Cable Lateral Raise",
+              "sets": 4,
+              "reps": "12-15",
+              "restSec": 60
+            },
+            {
+              "name": "Tricep Rope Pushdown",
+              "sets": 3,
+              "reps": "10-12",
+              "restSec": 60
+            }
           ]
         },
         {
-          "day": "Day 2 - Pull A",
-          "focus": "Back, Rear Delts, Biceps",
+          "day": "Day 2 - Pull A (Back, Rear Delts, Biceps)",
           "exercises": [
-            "Deadlift 3x5",
-            "Lat Pulldown 4x10",
-            "Chest Supported Row 3x10",
-            "Face Pulls 4x15",
-            "Barbell Bicep Curl 3x10"
+            {
+              "name": "Conventional Barbell Deadlift",
+              "sets": 3,
+              "reps": "5",
+              "restSec": 180
+            },
+            {
+              "name": "Lat Pulldown (Neutral Grip)",
+              "sets": 4,
+              "reps": "8-10",
+              "restSec": 90
+            },
+            {
+              "name": "Chest-Supported Dumbbell Row",
+              "sets": 3,
+              "reps": "10-12",
+              "restSec": 90
+            },
+            {
+              "name": "Face Pulls",
+              "sets": 4,
+              "reps": "15",
+              "restSec": 60
+            },
+            {
+              "name": "Incline Dumbbell Bicep Curl",
+              "sets": 3,
+              "reps": "10-12",
+              "restSec": 60
+            }
           ]
         },
         {
-          "day": "Day 3 - Legs A",
-          "focus": "Quads, Hamstrings, Calves",
+          "day": "Day 3 - Legs A (Quads, Hamstrings, Calves)",
           "exercises": [
-            "Barbell Back Squat 4x8",
-            "Romanian Deadlift (RDL) 3x10",
-            "Leg Press 3x12",
-            "Seated Leg Curls 3x12",
-            "Standing Calf Raises 4x15"
-          ]
-        },
-        {
-          "day": "Day 4 - Push B",
-          "focus": "Shoulders, Upper Chest, Triceps",
-          "exercises": [
-            "Standing Overhead Press (OHP) 4x8",
-            "Dumbbell Incline Bench 3x10",
-            "Dips 3x10",
-            "Cable Lateral Raises 4x15",
-            "Tricep Rope Pushdowns 3x12"
-          ]
-        },
-        {
-          "day": "Day 5 - Pull B",
-          "focus": "Upper Back, Lats, Arms",
-          "exercises": [
-            "Pull-ups / Chin-ups 4x8",
-            "Barbell Bent Over Row 3x8",
-            "Neutral Grip Cable Pulldown 3x10",
-            "Incline Dumbbell Curl 3x10",
-            "Reverse Pec Deck (Rear Delts) 4x15"
-          ]
-        },
-        {
-          "day": "Day 6 - Legs B",
-          "focus": "Hamstrings, Glutes, Abs",
-          "exercises": [
-            "Barbell Hip Thrust 4x10",
-            "Bulgarian Split Squats 3x10 each",
-            "Leg Extensions 3x12",
-            "Hanging Leg Raises 3x15",
-            "Plank 3x60s"
+            {
+              "name": "Barbell Back Squat",
+              "sets": 4,
+              "reps": "6-8",
+              "restSec": 150
+            },
+            {
+              "name": "Romanian Deadlift (RDL)",
+              "sets": 3,
+              "reps": "8-10",
+              "restSec": 90
+            },
+            {
+              "name": "Leg Press (45-Degree)",
+              "sets": 3,
+              "reps": "10-12",
+              "restSec": 90
+            },
+            {
+              "name": "Seated Hamstring Leg Curl",
+              "sets": 3,
+              "reps": "12-15",
+              "restSec": 60
+            },
+            {
+              "name": "Standing Calf Raise",
+              "sets": 4,
+              "reps": "15",
+              "restSec": 60
+            }
           ]
         }
       ]
     }
   ],
-  "waterLogs": [],
-  "weightLogs": [],
-  "progressPhotos": [],
   "fastrackLogs": [],
+  "waterLogs": [],
+  "weightLogs": [
+    {
+      "date": "2026-11-10",
+      "weightKg": 110
+    }
+  ],
+  "photoVault": [],
   "chatHistory": [],
   "savedMealPlan": null,
-  "aiCache": {},
   "settings": {
-    "theme": "dark",
     "geminiApiKey": "",
+    "measurementSystem": "metric",
+    "theme": "dark",
+    "smartWatchType": "Fastrack Reflex Beat+ / Active Pro",
     "cacheTokens": true,
-    "fastrackDeviceName": "Fastrack Smartwatch",
     "tokenUsage": {
       "requestsToday": 0,
-      "tokensEstimated": 0,
-      "lastResetDate": "2026-11-09"
+      "tokensEstimated": 0
     }
   }
 }

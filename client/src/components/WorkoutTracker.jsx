@@ -228,6 +228,58 @@ Day 7 - Rest: 8,000 steps active recovery walk & stretching`);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
 
+  // AI Workout Split Generator state
+  const [genSplitType, setGenSplitType] = useState('PPL');
+  const [genDaysCount, setGenDaysCount] = useState(4);
+  const [genGoal, setGenGoal] = useState(profile?.goal || 'recomp');
+  const [genExperience, setGenExperience] = useState('intermediate');
+  const [isGeneratingSplit, setIsGeneratingSplit] = useState(false);
+  const [generatedSplitPlan, setGeneratedSplitPlan] = useState(null);
+
+  const handleGenerateAiSplit = async () => {
+    setIsGeneratingSplit(true);
+    try {
+      const res = await api.generateAiWorkoutSplit({
+        splitType: genSplitType,
+        daysCount: genDaysCount,
+        goal: genGoal,
+        experienceLevel: genExperience,
+        focusAreas: profile?.focusAreas || []
+      });
+      if (res.success && res.plan) {
+        setGeneratedSplitPlan(res.plan);
+      }
+    } catch (err) {
+      alert('Failed to generate AI split: ' + err.message);
+    } finally {
+      setIsGeneratingSplit(false);
+    }
+  };
+
+  const handleImportAiDayToLogger = (day) => {
+    setWorkoutTitle(day.dayName);
+    setSplitType(day.dayName.includes('Push') ? 'Push' : day.dayName.includes('Pull') ? 'Pull' : day.dayName.includes('Leg') ? 'Legs' : 'Full Body');
+    setDurationMin(day.estimatedDurationMin || 50);
+    setEstimatedBurn(day.estimatedBurnKcal || 320);
+
+    const imported = (day.exercises || []).map(ex => {
+      const repsNum = parseInt(ex.reps) || 10;
+      const setsNum = parseInt(ex.sets) || 3;
+      const weight = ex.startingWeightKg || 20;
+      return {
+        name: ex.name,
+        sets: Array.from({ length: setsNum }).map(() => ({
+          reps: repsNum,
+          weight,
+          done: false
+        }))
+      };
+    });
+
+    setExercises(imported);
+    setViewMode('logger');
+  };
+
   // Workout Logger state
   const [workoutTitle, setWorkoutTitle] = useState('');
   const [splitType, setSplitType] = useState('Push');
@@ -526,43 +578,202 @@ Day 7 - Rest: Mobility & Meal Prep`);
             </p>
           </div>
 
-          <div className="flex bg-slate-950 p-1.5 rounded-2xl border border-slate-800 self-start sm:self-auto gap-1">
+          <div className="flex flex-wrap bg-slate-950 p-1.5 rounded-2xl border border-slate-800 self-start sm:self-auto gap-1">
             <button
               onClick={() => setViewMode('logger')}
-              className={`px-3.5 py-1.5 text-xs font-bold rounded-xl flex items-center space-x-1.5 transition-all ${
+              className={`px-3 py-1.5 text-xs font-bold rounded-xl flex items-center space-x-1.5 transition-all ${
                 viewMode === 'logger'
                   ? 'bg-emerald-500 text-slate-950 shadow-sm font-black'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
               <Play className="w-3.5 h-3.5" />
-              <span>Workout Logger</span>
+              <span>Logger</span>
+            </button>
+            <button
+              onClick={() => setViewMode('ai-generator')}
+              className={`px-3 py-1.5 text-xs font-bold rounded-xl flex items-center space-x-1.5 transition-all ${
+                viewMode === 'ai-generator'
+                  ? 'bg-gradient-to-r from-emerald-500 to-teal-400 text-slate-950 shadow-sm font-black'
+                  : 'text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 border border-emerald-500/20'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+              <span>AI Split Generator</span>
             </button>
             <button
               onClick={() => setViewMode('prs')}
-              className={`px-3.5 py-1.5 text-xs font-bold rounded-xl flex items-center space-x-1.5 transition-all ${
+              className={`px-3 py-1.5 text-xs font-bold rounded-xl flex items-center space-x-1.5 transition-all ${
                 viewMode === 'prs'
                   ? 'bg-emerald-500 text-slate-950 shadow-sm font-black'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
               <Trophy className="w-3.5 h-3.5 text-amber-400" />
-              <span>PR Hall of Fame</span>
+              <span>PRs</span>
             </button>
             <button
               onClick={() => setViewMode('analyzer')}
-              className={`px-3.5 py-1.5 text-xs font-bold rounded-xl flex items-center space-x-1.5 transition-all ${
+              className={`px-3 py-1.5 text-xs font-bold rounded-xl flex items-center space-x-1.5 transition-all ${
                 viewMode === 'analyzer'
                   ? 'bg-emerald-500 text-slate-950 shadow-sm font-black'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>AI Plan Analyzer</span>
+              <Activity className="w-3.5 h-3.5" />
+              <span>Analyzer</span>
             </button>
           </div>
         </div>
       </div>
+
+      {/* VIEW: AI DYNAMIC WORKOUT SPLIT GENERATOR */}
+      {viewMode === 'ai-generator' && (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-emerald-500/30 rounded-3xl p-6 shadow-xl space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-base font-bold text-white flex items-center space-x-2">
+                  <Sparkles className="w-5 h-5 text-emerald-400" />
+                  <span>AI Bespoke Workout Routine Generator</span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Gemini AI crafts a fully personalized training split tailored to your exact goal, weekly frequency, and biomechanics.
+                </p>
+              </div>
+            </div>
+
+            {/* Split Parameters Form */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-slate-950 p-4 rounded-2xl border border-slate-800">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-400 mb-1.5 uppercase">Split Template</label>
+                <select
+                  value={genSplitType}
+                  onChange={(e) => setGenSplitType(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-bold"
+                >
+                  <option value="PPL">Push / Pull / Legs (PPL)</option>
+                  <option value="Upper-Lower">Upper / Lower Split</option>
+                  <option value="Arnold">Arnold Split (Chest/Back, Shoulders/Arms, Legs)</option>
+                  <option value="Full-Body">Full Body 3x Weekly</option>
+                  <option value="Hypertrophy-4Day">4-Day Strength & Hypertrophy</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-400 mb-1.5 uppercase">Days Per Week</label>
+                <select
+                  value={genDaysCount}
+                  onChange={(e) => setGenDaysCount(Number(e.target.value))}
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-bold"
+                >
+                  <option value={3}>3 Days / Week</option>
+                  <option value={4}>4 Days / Week</option>
+                  <option value={5}>5 Days / Week</option>
+                  <option value={6}>6 Days / Week</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-400 mb-1.5 uppercase">Primary Goal</label>
+                <select
+                  value={genGoal}
+                  onChange={(e) => setGenGoal(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-bold"
+                >
+                  <option value="cutting">🔥 Fat Loss / Shred (Cut)</option>
+                  <option value="recomp">⚖️ Body Recomposition</option>
+                  <option value="lean_bulk">💪 Lean Muscle Bulk</option>
+                  <option value="maintenance">🛡️ Strength & Maintenance</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-400 mb-1.5 uppercase">Experience Level</label>
+                <select
+                  value={genExperience}
+                  onChange={(e) => setGenExperience(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-bold"
+                >
+                  <option value="beginner">Beginner (&lt; 1 Year)</option>
+                  <option value="intermediate">Intermediate (1-3 Years)</option>
+                  <option value="advanced">Advanced (3+ Years)</option>
+                </select>
+              </div>
+            </div>
+
+            <button
+              onClick={handleGenerateAiSplit}
+              disabled={isGeneratingSplit}
+              className="w-full py-3 bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-emerald-500/25 flex items-center justify-center space-x-2 cursor-pointer active:scale-95 disabled:opacity-50"
+            >
+              <Sparkles className="w-4 h-4" />
+              <span>{isGeneratingSplit ? 'Synthesizing Biomechanical Split with AI...' : 'Generate Personalized Split with AI'}</span>
+            </button>
+          </div>
+
+          {/* Generated Plan Output */}
+          {generatedSplitPlan && (
+            <div className="space-y-4 animate-in fade-in duration-300">
+              <div className="bg-slate-900 border border-emerald-500/40 rounded-3xl p-6 shadow-xl">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-4 mb-4">
+                  <div>
+                    <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                      {generatedSplitPlan.source === 'gemini-ai' ? '🤖 Powered by Gemini AI' : '🔬 Sports-Science Engine'}
+                    </span>
+                    <h2 className="text-xl font-black text-white mt-2">{generatedSplitPlan.planTitle}</h2>
+                    <p className="text-xs text-slate-400 mt-1">{generatedSplitPlan.rationale}</p>
+                  </div>
+                </div>
+
+                {/* Workout Days Carousel / Grid */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {(generatedSplitPlan.days || []).map((day, idx) => (
+                    <div key={idx} className="bg-slate-950 border border-slate-800/80 rounded-2xl p-5 space-y-3">
+                      <div className="flex items-center justify-between border-b border-slate-800/60 pb-2.5">
+                        <div>
+                          <h4 className="text-sm font-black text-white">{day.dayName}</h4>
+                          <span className="text-[11px] text-emerald-400 font-semibold">{day.focus}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleImportAiDayToLogger(day)}
+                          className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-[11px] rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer shrink-0"
+                        >
+                          Log This Day →
+                        </button>
+                      </div>
+
+                      <div className="text-[10px] text-slate-500 flex items-center space-x-3">
+                        <span>⏱️ ~{day.estimatedDurationMin || 50} min</span>
+                        <span>🔥 ~{day.estimatedBurnKcal || 320} kcal</span>
+                        {day.warmup && <span className="truncate">🧘 {day.warmup}</span>}
+                      </div>
+
+                      <div className="space-y-2 pt-1">
+                        {(day.exercises || []).map((ex, exIdx) => (
+                          <div key={exIdx} className="bg-slate-900/90 border border-slate-800 p-2.5 rounded-xl flex items-center justify-between text-xs">
+                            <div className="min-w-0 pr-2">
+                              <div className="font-bold text-slate-200 truncate">{ex.name}</div>
+                              <div className="text-[10px] text-slate-400 truncate">
+                                {ex.targetMuscle || 'Target Muscle'} • {ex.coachingTip || 'Control tempo'}
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <span className="font-mono font-black text-emerald-400 text-xs">{ex.sets} × {ex.reps}</span>
+                              <span className="block text-[9px] text-slate-500">{ex.restSec || 60}s rest</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* VIEW 1: AI WORKOUT PLAN ANALYZER */}
       {viewMode === 'analyzer' && (

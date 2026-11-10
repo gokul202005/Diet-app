@@ -14,7 +14,8 @@ import {
   Watch, 
   MessageSquare,
   Volume2,
-  Radio
+  Radio,
+  Key
 } from 'lucide-react';
 import { api } from '../api';
 
@@ -29,6 +30,8 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
   const [processingStatus, setProcessingStatus] = useState('');
   const [result, setResult] = useState(null);
   const [errorMsg, setErrorMsg] = useState('');
+  const [needsApiKey, setNeedsApiKey] = useState(false);
+  const [apiKeyInput, setApiKeyInput] = useState('');
   const [audioVolume, setAudioVolume] = useState(0); // 0 - 100 for live visualizer
 
   // Hardware & Audio references
@@ -170,7 +173,7 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
       if (SpeechRecognition) {
         try {
           const recognition = new SpeechRecognition();
-          recognition.continuous = false;
+          recognition.continuous = true;
           recognition.interimResults = true;
           recognition.lang = 'en-IN'; // Indian English: catches South Indian dishes & fitness terms accurately
 
@@ -277,15 +280,35 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
 
     try {
       const res = await api.universalVoiceAudio(audioBlob, selectedDate);
+      if (res.needsApiKey || (res.error && res.error.toLowerCase().includes('key'))) {
+        setNeedsApiKey(true);
+        setErrorMsg(res.details || res.error || 'Gemini API key is required for voice audio transcription.');
+        return;
+      }
       if (res.transcribedText) {
         setTranscript(res.transcribedText);
       }
       handleSuccessResult(res, res.transcribedText || 'Voice recording');
     } catch (err) {
       setErrorMsg('Voice processing error: ' + err.message);
+      if (err.message && err.message.toLowerCase().includes('key')) {
+        setNeedsApiKey(true);
+      }
     } finally {
       setIsProcessing(false);
       setProcessingStatus('');
+    }
+  };
+
+  const handleSaveApiKey = async () => {
+    if (!apiKeyInput.trim()) return;
+    try {
+      await api.updateSettings({ geminiApiKey: apiKeyInput.trim() });
+      setNeedsApiKey(false);
+      setErrorMsg('');
+      alert('Gemini API Key saved! Tap the microphone to record your voice.');
+    } catch (err) {
+      alert('Failed to save API Key: ' + err.message);
     }
   };
 
@@ -341,8 +364,8 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
 
   return (
     <>
-      {/* 1. PERSISTENT FLOATING TRIGGER BUTTON (Present on Every Screen) */}
-      <div className="fixed bottom-20 sm:bottom-6 right-5 z-40 flex items-center group">
+      {/* 1. PERSISTENT FLOATING TRIGGER BUTTON (Desktop Only - Mobile uses center dock button) */}
+      <div className="hidden xl:flex fixed bottom-6 right-6 z-40 items-center group">
         <button
           onClick={handleOpen}
           className="relative flex items-center space-x-2 px-4 py-3 bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black rounded-2xl shadow-xl shadow-emerald-500/30 hover:scale-105 active:scale-95 transition-all cursor-pointer border border-emerald-300/40"
@@ -463,6 +486,35 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
                       <span>Confirm & Add Now</span>
                     </button>
                   )}
+                </div>
+              )}
+
+              {/* Needs Gemini API Key Action Card */}
+              {needsApiKey && (
+                <div className="bg-amber-500/10 border border-amber-500/30 p-3.5 rounded-xl text-left space-y-2.5 animate-in fade-in">
+                  <div className="flex items-center space-x-2 text-amber-300 text-xs font-bold">
+                    <Key className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span>Gemini API Key Needed for Audio Transcription</span>
+                  </div>
+                  <p className="text-[11px] text-slate-300 leading-relaxed">
+                    Enter your Gemini API key from Google AI Studio to process direct audio recordings, or speak clearly to use instant speech recognition:
+                  </p>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="password"
+                      value={apiKeyInput}
+                      onChange={(e) => setApiKeyInput(e.target.value)}
+                      placeholder="AIzaSy..."
+                      className="flex-1 bg-slate-900 border border-slate-700 focus:border-amber-400 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleSaveApiKey}
+                      className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-lg transition-all shadow-sm cursor-pointer shrink-0"
+                    >
+                      Save Key
+                    </button>
+                  </div>
                 </div>
               )}
 

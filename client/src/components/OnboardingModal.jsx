@@ -2,17 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { Sparkles, User, Target, Flame, Heart, Scale, Activity, ArrowRight, Check } from 'lucide-react';
 import { api } from '../api';
 
-export default function OnboardingModal({ isOpen, onClose, currentProfile, onProfileSaved }) {
+export default function OnboardingModal({ isOpen, onClose, currentProfile, currentUser, onProfileSaved }) {
+  const accountName = currentProfile?.name || currentUser?.name || '';
   const [formData, setFormData] = useState({
-    name: currentProfile?.name || '',
-    age: currentProfile?.age || 24,
+    name: accountName,
+    age: currentProfile?.age || '',
     gender: currentProfile?.gender || 'male',
-    heightCm: currentProfile?.heightCm || 175,
-    weightKg: currentProfile?.weightKg || 70,
+    heightCm: currentProfile?.heightCm || '',
+    weightKg: currentProfile?.weightKg || '',
     goals: Array.isArray(currentProfile?.goals) && currentProfile.goals.length > 0
       ? currentProfile.goals
-      : (currentProfile?.goal ? [currentProfile.goal] : ['cutting']),
-    goal: currentProfile?.goal || 'cutting',
+      : (currentProfile?.goal ? [currentProfile.goal] : ['recomp']),
+    goal: currentProfile?.goal || 'recomp',
     activityLevel: currentProfile?.activityLevel || 'moderately_active',
     dietaryTags: currentProfile?.dietaryTags || ['🍗 Non-Veg'],
     focusAreas: currentProfile?.focusAreas || ['🛡️ Full Body Balance'],
@@ -24,9 +25,17 @@ export default function OnboardingModal({ isOpen, onClose, currentProfile, onPro
     dailyTargetSteps: currentProfile?.dailyTargetSteps || 10000,
   });
 
+  const [isEditingName, setIsEditingName] = useState(!accountName);
   const [liveTargets, setLiveTargets] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [step, setStep] = useState(1); // 1: Bio info, 2: Goal & Activity, 3: Review Calculated Macros
+
+  // Sync if account changes
+  useEffect(() => {
+    if (accountName && !formData.name) {
+      setFormData(prev => ({ ...prev, name: accountName }));
+    }
+  }, [accountName]);
 
   // Toggle multi-select goals
   const toggleGoal = (goalId) => {
@@ -139,20 +148,42 @@ export default function OnboardingModal({ isOpen, onClose, currentProfile, onPro
                 <p className="text-xs text-slate-400">Used to accurately calculate your Basal Metabolic Rate (BMR)</p>
               </div>
 
-              <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1.5">Your Name</label>
-                <div className="relative">
-                  <User className="absolute left-3.5 top-3 w-4 h-4 text-slate-500" />
-                  <input
-                    type="text"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="e.g. Gokul"
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 placeholder-slate-600 focus:outline-none focus:border-emerald-500 text-sm"
-                    required
-                  />
+              {/* Account identity confirmation */}
+              {!isEditingName && formData.name ? (
+                <div className="flex items-center justify-between p-3.5 bg-slate-950/80 border border-slate-800 rounded-2xl">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 font-black flex items-center justify-center text-sm">
+                      {formData.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <div className="text-[11px] text-slate-400 uppercase font-semibold">Account Member</div>
+                      <div className="text-sm font-bold text-white">{formData.name}</div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingName(true)}
+                    className="text-xs text-emerald-400 hover:text-emerald-300 underline font-semibold cursor-pointer"
+                  >
+                    Change
+                  </button>
                 </div>
-              </div>
+              ) : (
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1.5">Your Name</label>
+                  <div className="relative">
+                    <User className="absolute left-3.5 top-3 w-4 h-4 text-slate-500" />
+                    <input
+                      type="text"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      placeholder="e.g. Gokul"
+                      className="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 placeholder-slate-600 focus:outline-none focus:border-emerald-500 text-sm"
+                      required
+                    />
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-3">
                 <div>

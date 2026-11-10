@@ -4,7 +4,6 @@
   "webDir": "dist",
   "bundledWebRuntime": false,
   "server": {
-    "url": "https://diet-app-backend-udje.onrender.com",
     "cleartext": true,
     "androidScheme": "https"
   }

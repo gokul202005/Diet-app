@@ -61,6 +61,58 @@ app.get('/api/status', (req, res) => {
   });
 });
 
+// --- MULTI-TENANT USER IDENTITY & PROFILE HELPERS ---
+function getAuthUserId(req, db) {
+  const headerId = req.headers['x-user-id'];
+  if (headerId && typeof headerId === 'string' && headerId.trim()) {
+    return headerId.trim();
+  }
+  const queryId = req.query?.userId;
+  if (queryId && typeof queryId === 'string' && queryId.trim()) {
+    return queryId.trim();
+  }
+  const bodyId = req.body?.userId;
+  if (bodyId && typeof bodyId === 'string' && bodyId.trim()) {
+    return bodyId.trim();
+  }
+  if (db?.currentUser?.id) {
+    return db.currentUser.id;
+  }
+  return 'default_guest';
+}
+
+function getUserProfile(db, userId, fallbackName = '') {
+  db.profiles = db.profiles || {};
+  if (!db.profiles[userId]) {
+    const matchedUser = (db.users || []).find(u => u.id === userId);
+    const name = matchedUser?.name || fallbackName || '';
+
+    // Clean slate for new user: isConfigured is FALSE, height & weight are blank!
+    db.profiles[userId] = {
+      isConfigured: false,
+      name: name,
+      age: '',
+      gender: 'male',
+      heightCm: '',
+      weightKg: '',
+      goal: 'recomp',
+      activityLevel: 'moderately_active',
+      dailyTargetCalories: 2100,
+      dailyTargetProtein: 140,
+      dailyTargetCarbs: 220,
+      dailyTargetFat: 60,
+      dailyTargetWater: 3000,
+      dailyTargetSteps: 10000,
+      recalculateTargets: true,
+      dietaryTags: ['🍗 Non-Veg'],
+      focusAreas: ['🛡️ Full Body Balance'],
+      goals: ['recomp']
+    };
+    writeDB(db);
+  }
+  return db.profiles[userId];
+}
+
 // --- USER AUTHENTICATION & CLOUD SYNC ---
 app.post('/api/auth/signup', (req, res) => {
   try {
@@ -81,7 +133,7 @@ app.post('/api/auth/signup', (req, res) => {
       id: `user-${Date.now()}`,
       name: name || email.split('@')[0],
       email: email.toLowerCase(),
-      password, // In production, bcrypt hash
+      password,
       provider: 'email',
       createdAt: new Date().toISOString()
     };
@@ -89,10 +141,29 @@ app.post('/api/auth/signup', (req, res) => {
     db.users.push(newUser);
     db.currentUser = { id: newUser.id, name: newUser.name, email: newUser.email, provider: newUser.provider };
 
-    // Initialize or link profile name
-    if (db.profile) {
-      db.profile.name = newUser.name;
-    }
+    // Initialize NEW user profile with clean slate (isConfigured: false)
+    db.profiles = db.profiles || {};
+    db.profiles[newUser.id] = {
+      isConfigured: false,
+      name: newUser.name,
+      age: '',
+      gender: 'male',
+      heightCm: '',
+      weightKg: '',
+      goal: 'recomp',
+      activityLevel: 'moderately_active',
+      dailyTargetCalories: 2100,
+      dailyTargetProtein: 140,
+      dailyTargetCarbs: 220,
+      dailyTargetFat: 60,
+      dailyTargetWater: 3000,
+      dailyTargetSteps: 10000,
+      recalculateTargets: true,
+      dietaryTags: ['🍗 Non-Veg'],
+      focusAreas: ['🛡️ Full Body Balance'],
+      goals: ['recomp']
+    };
+    db.profile = db.profiles[newUser.id];
 
     writeDB(db);
 
@@ -118,11 +189,13 @@ app.post('/api/auth/login', (req, res) => {
     }
 
     db.currentUser = { id: user.id, name: user.name, email: user.email, provider: user.provider };
+    db.profile = getUserProfile(db, user.id, user.name);
     writeDB(db);
 
     res.json({
       success: true,
       user: db.currentUser,
+      profile: db.profile,
       message: 'Logged in successfully'
     });
   } catch (err) {
@@ -158,7 +231,9 @@ app.post('/api/auth/google', (req, res) => {
     db.users = db.users || [];
 
     let user = db.users.find(u => u.email.toLowerCase() === email.toLowerCase());
+    let isNewUser = false;
     if (!user) {
+      isNewUser = true;
       user = {
         id: `user-google-${Date.now()}`,
         name: name || email.split('@')[0],
@@ -175,14 +250,37 @@ app.post('/api/auth/google', (req, res) => {
     }
 
     db.currentUser = { id: user.id, name: user.name, email: user.email, picture: user.picture, provider: 'google' };
-    if (db.profile) {
-      db.profile.name = user.name;
+
+    db.profiles = db.profiles || {};
+    if (isNewUser || !db.profiles[user.id]) {
+      db.profiles[user.id] = {
+        isConfigured: false,
+        name: user.name,
+        age: '',
+        gender: 'male',
+        heightCm: '',
+        weightKg: '',
+        goal: 'recomp',
+        activityLevel: 'moderately_active',
+        dailyTargetCalories: 2100,
+        dailyTargetProtein: 140,
+        dailyTargetCarbs: 220,
+        dailyTargetFat: 60,
+        dailyTargetWater: 3000,
+        dailyTargetSteps: 10000,
+        recalculateTargets: true,
+        dietaryTags: ['🍗 Non-Veg'],
+        focusAreas: ['🛡️ Full Body Balance'],
+        goals: ['recomp']
+      };
     }
+    db.profile = db.profiles[user.id];
     writeDB(db);
 
     res.json({
       success: true,
       user: db.currentUser,
+      profile: db.profile,
       message: 'Google authentication successful'
     });
   } catch (err) {
@@ -192,9 +290,11 @@ app.post('/api/auth/google', (req, res) => {
 
 app.get('/api/auth/me', (req, res) => {
   const db = readDB();
+  const userId = getAuthUserId(req, db);
+  const user = (db.users || []).find(u => u.id === userId) || db.currentUser || null;
   res.json({
     success: true,
-    user: db.currentUser || null
+    user
   });
 });
 
@@ -208,7 +308,9 @@ app.post('/api/auth/logout', (req, res) => {
 // --- USER PROFILE & GOALS ---
 app.get('/api/profile', (req, res) => {
   const db = readDB();
-  res.json(db.profile);
+  const userId = getAuthUserId(req, db);
+  const profile = getUserProfile(db, userId, db.currentUser?.name);
+  res.json(profile);
 });
 
 app.post('/api/profile/calculate', (req, res) => {
@@ -218,22 +320,27 @@ app.post('/api/profile/calculate', (req, res) => {
 
 app.post('/api/profile', (req, res) => {
   const db = readDB();
+  const userId = getAuthUserId(req, db);
+  const current = getUserProfile(db, userId);
+
   const shouldRecalculate = req.body.recalculateTargets;
   let targets = {};
 
   if (shouldRecalculate) {
-    targets = calculateNutritionTargets({ ...db.profile, ...req.body });
+    targets = calculateNutritionTargets({ ...current, ...req.body });
   }
 
-  db.profile = {
-    ...db.profile,
+  db.profiles = db.profiles || {};
+  db.profiles[userId] = {
+    ...current,
     ...req.body,
     ...targets,
     isConfigured: true
   };
+  db.profile = db.profiles[userId];
 
   writeDB(db);
-  res.json({ success: true, profile: db.profile });
+  res.json({ success: true, profile: db.profiles[userId] });
 });
 
 // --- FOOD DATABASE ZERO-TOKEN SEARCH ---
@@ -247,8 +354,10 @@ app.get('/api/nutrition-db/search', (req, res) => {
 // --- DIET & MEAL TRACKING ---
 app.get('/api/meals', (req, res) => {
   const db = readDB();
+  const userId = getAuthUserId(req, db);
+  const userProfile = getUserProfile(db, userId);
   const date = req.query.date || new Date().toISOString().split('T')[0];
-  const mealsForDate = db.meals.filter(m => m.date === date);
+  const mealsForDate = (db.meals || []).filter(m => (!m.userId || m.userId === userId) && m.date === date);
 
   // Daily totals
   const totals = mealsForDate.reduce((acc, m) => {
@@ -268,16 +377,17 @@ app.get('/api/meals', (req, res) => {
     meals: mealsForDate,
     totals,
     targets: {
-      calories: db.profile.dailyTargetCalories,
-      protein: db.profile.dailyTargetProtein,
-      carbs: db.profile.dailyTargetCarbs,
-      fat: db.profile.dailyTargetFat
+      calories: userProfile.dailyTargetCalories,
+      protein: userProfile.dailyTargetProtein,
+      carbs: userProfile.dailyTargetCarbs,
+      fat: userProfile.dailyTargetFat
     }
   });
 });
 
 app.post('/api/meals', (req, res) => {
   const db = readDB();
+  const userId = getAuthUserId(req, db);
   const { date, mealType, name, foods, notes } = req.body;
 
   if (!foods || !Array.isArray(foods) || foods.length === 0) {
@@ -291,6 +401,7 @@ app.post('/api/meals', (req, res) => {
 
   const newMeal = {
     id: `meal-${Date.now()}`,
+    userId,
     date: date || new Date().toISOString().split('T')[0],
     mealType: mealType || 'snack', // breakfast, lunch, dinner, snack
     name: name || `${mealType.charAt(0).toUpperCase() + mealType.slice(1)} Meal`,
@@ -303,6 +414,7 @@ app.post('/api/meals', (req, res) => {
     loggedAt: new Date().toISOString()
   };
 
+  db.meals = db.meals || [];
   db.meals.unshift(newMeal);
   writeDB(db);
 
@@ -311,9 +423,10 @@ app.post('/api/meals', (req, res) => {
 
 app.delete('/api/meals/:id', (req, res) => {
   const db = readDB();
+  const userId = getAuthUserId(req, db);
   const id = req.params.id;
-  const initialLen = db.meals.length;
-  db.meals = db.meals.filter(m => m.id !== id);
+  const initialLen = (db.meals || []).length;
+  db.meals = (db.meals || []).filter(m => !(m.id === id && (!m.userId || m.userId === userId)));
 
   if (db.meals.length === initialLen) {
     return res.status(404).json({ error: 'Meal not found' });
@@ -376,7 +489,7 @@ app.post('/api/ai/analyze-meal-photo', upload.single('photo'), async (req, res) 
 });
 
 // --- UNIVERSAL FULL-WEBSITE AI VOICE COMMAND ENGINE ---
-async function executeUniversalVoice(text, date = new Date().toISOString().split('T')[0]) {
+async function executeUniversalVoice(text, date = new Date().toISOString().split('T')[0], userId = 'default_guest') {
   const db = readDB();
   const clean = text.toLowerCase().trim();
 
@@ -409,11 +522,11 @@ async function executeUniversalVoice(text, date = new Date().toISOString().split
       }
 
       db.waterLogs = db.waterLogs || [];
-      let waterEntry = db.waterLogs.find(w => w.date === date);
+      let waterEntry = db.waterLogs.find(w => (!w.userId || w.userId === userId) && w.date === date);
       if (waterEntry) {
         waterEntry.amountMl = Math.max(0, waterEntry.amountMl + amountMl);
       } else {
-        waterEntry = { date, amountMl };
+        waterEntry = { date, userId, amountMl };
         db.waterLogs.push(waterEntry);
       }
       writeDB(db);
@@ -434,13 +547,14 @@ async function executeUniversalVoice(text, date = new Date().toISOString().split
       if (weightMatch) {
         const numWeight = parseFloat(weightMatch[1]);
         if (numWeight >= 30 && numWeight <= 300) {
-          db.profile.weightKg = numWeight;
+          const userProfile = getUserProfile(db, userId);
+          userProfile.weightKg = numWeight;
           db.weightLogs = db.weightLogs || [];
-          const existing = db.weightLogs.find(w => w.date === date);
+          const existing = db.weightLogs.find(w => (!w.userId || w.userId === userId) && w.date === date);
           if (existing) {
             existing.weightKg = numWeight;
           } else {
-            db.weightLogs.push({ date, weightKg: numWeight });
+            db.weightLogs.push({ date, userId, weightKg: numWeight });
           }
           writeDB(db);
 
@@ -462,7 +576,7 @@ async function executeUniversalVoice(text, date = new Date().toISOString().split
         const steps = parseInt(stepsMatch[1].replace(/,/g, ''));
         if (steps > 0 && steps < 100000) {
           db.fastrackLogs = db.fastrackLogs || [];
-          let log = db.fastrackLogs.find(l => l.date === date);
+          let log = db.fastrackLogs.find(l => (!l.userId || l.userId === userId) && l.date === date);
           const activeCal = Math.round(steps * 0.04);
           if (log) {
             log.steps = steps;
@@ -470,6 +584,7 @@ async function executeUniversalVoice(text, date = new Date().toISOString().split
           } else {
             log = {
               date,
+              userId,
               deviceName: 'Fastrack Smartwatch',
               steps,
               activeCalories: activeCal,
@@ -521,6 +636,7 @@ async function executeUniversalVoice(text, date = new Date().toISOString().split
 
       const newWorkout = {
         id: `workout-${Date.now()}`,
+        userId,
         date,
         title: `${exerciseName} Session`,
         splitType: 'Strength',
@@ -555,10 +671,11 @@ async function executeUniversalVoice(text, date = new Date().toISOString().split
     const isQuestion = clean.startsWith('how') || clean.startsWith('what') || clean.startsWith('can i') || clean.startsWith('why') || clean.startsWith('tell me') || clean.startsWith('give me') || clean.endsWith('?');
     if (isQuestion && !clean.includes('ate') && !clean.includes('had')) {
       aiService.setApiKey(db.settings?.geminiApiKey || process.env.GEMINI_API_KEY || '');
-      const todayMeals = (db.meals || []).filter(m => m.date === date);
+      const userProfile = getUserProfile(db, userId);
+      const todayMeals = (db.meals || []).filter(m => (!m.userId || m.userId === userId) && m.date === date);
       const consumedCalories = todayMeals.reduce((s, m) => s + (m.totalCalories || 0), 0);
       const consumedProtein = Number(todayMeals.reduce((s, m) => s + (m.totalProtein || 0), 0).toFixed(1));
-      const fastrackLog = (db.fastrackLogs || []).find(l => l.date === date);
+      const fastrackLog = (db.fastrackLogs || []).find(l => (!l.userId || l.userId === userId) && l.date === date);
 
       const coachStats = {
         consumedCalories,
@@ -567,7 +684,8 @@ async function executeUniversalVoice(text, date = new Date().toISOString().split
         activeCaloriesBurned: fastrackLog?.activeCalories || 0
       };
 
-      const { reply } = await aiService.askCoachChat(text, db.chatHistory || [], db.profile, coachStats);
+      const userChat = (db.chatHistory || []).filter(c => !c.userId || c.userId === userId);
+      const { reply } = await aiService.askCoachChat(text, userChat, userProfile, coachStats);
 
       return {
         success: true,
@@ -579,7 +697,6 @@ async function executeUniversalVoice(text, date = new Date().toISOString().split
     }
 
     // 6. DEFAULT INTENT: DIET & MEAL LOGGING (SOUTH INDIAN & GLOBAL)
-    // Determine meal type (breakfast, lunch, dinner, snack)
     let mealType = 'lunch';
     if (clean.includes('breakfast') || clean.includes('morning')) mealType = 'breakfast';
     else if (clean.includes('lunch') || clean.includes('afternoon')) mealType = 'lunch';
@@ -598,6 +715,7 @@ async function executeUniversalVoice(text, date = new Date().toISOString().split
 
     const newMeal = {
       id: `meal-${Date.now()}`,
+      userId,
       date,
       mealType,
       name: analysis.mealName || text.slice(0, 35),
@@ -614,8 +732,6 @@ async function executeUniversalVoice(text, date = new Date().toISOString().split
     db.meals.unshift(newMeal);
     writeDB(db);
 
-    const itemsSummary = (newMeal.foods || []).map(f => `${f.quantity} ${f.name}`).join(', ');
-
     return {
       success: true,
       section: 'diet',
@@ -629,11 +745,13 @@ async function executeUniversalVoice(text, date = new Date().toISOString().split
 // POST endpoint for text-based universal voice
 app.post('/api/ai/universal-voice', async (req, res) => {
   try {
+    const db = readDB();
+    const userId = getAuthUserId(req, db);
     const { text, date = new Date().toISOString().split('T')[0] } = req.body;
     if (!text || typeof text !== 'string' || !text.trim()) {
       return res.status(400).json({ error: 'Voice speech text is required' });
     }
-    const result = await executeUniversalVoice(text, date);
+    const result = await executeUniversalVoice(text, date, userId);
     res.json(result);
   } catch (err) {
     console.error('Universal voice processing error:', err);
@@ -647,9 +765,20 @@ app.post('/api/ai/universal-voice-audio', upload.single('audio'), async (req, re
     if (!req.file || !req.file.buffer) {
       return res.status(400).json({ error: 'No audio recording file provided' });
     }
-    const date = req.body.date || new Date().toISOString().split('T')[0];
     const db = readDB();
-    aiService.setApiKey(db.settings?.geminiApiKey || process.env.GEMINI_API_KEY || '');
+    const userId = getAuthUserId(req, db);
+    const date = req.body.date || new Date().toISOString().split('T')[0];
+    const apiKey = db.settings?.geminiApiKey || process.env.GEMINI_API_KEY || '';
+
+    if (!apiKey) {
+      return res.status(400).json({
+        error: 'Gemini API Key Required',
+        needsApiKey: true,
+        details: 'To transcribe direct voice recordings, please add your free Gemini API key in Settings, or use instant browser speech / text input.'
+      });
+    }
+
+    aiService.setApiKey(apiKey);
 
     const mimeType = req.file.mimetype || 'audio/webm';
     const transcribedText = await aiService.transcribeAudio(req.file.buffer, mimeType);
@@ -658,7 +787,7 @@ app.post('/api/ai/universal-voice-audio', upload.single('audio'), async (req, re
       return res.status(400).json({ error: 'Could not detect clear speech in the audio. Please try speaking closer to the microphone.' });
     }
 
-    const voiceResult = await executeUniversalVoice(transcribedText, date);
+    const voiceResult = await executeUniversalVoice(transcribedText, date, userId);
     res.json({
       ...voiceResult,
       transcribedText
@@ -702,8 +831,9 @@ app.post('/api/ai/generate-meal-plan', async (req, res) => {
 // --- WORKOUT TRACKING & AI PLAN ANALYZER ---
 app.get('/api/workouts', (req, res) => {
   const db = readDB();
+  const userId = getAuthUserId(req, db);
   const date = req.query.date;
-  let workouts = db.workouts || [];
+  let workouts = (db.workouts || []).filter(w => !w.userId || w.userId === userId);
   if (date) {
     workouts = workouts.filter(w => w.date === date);
   }
@@ -712,10 +842,12 @@ app.get('/api/workouts', (req, res) => {
 
 app.post('/api/workouts', (req, res) => {
   const db = readDB();
+  const userId = getAuthUserId(req, db);
   const { date, title, splitType, exercises, durationMin, caloriesBurned, notes } = req.body;
 
   const newWorkout = {
     id: `workout-${Date.now()}`,
+    userId,
     date: date || new Date().toISOString().split('T')[0],
     title: title || 'Workout Session',
     splitType: splitType || 'Strength',
@@ -726,6 +858,7 @@ app.post('/api/workouts', (req, res) => {
     loggedAt: new Date().toISOString()
   };
 
+  db.workouts = db.workouts || [];
   db.workouts.unshift(newWorkout);
   writeDB(db);
 
@@ -734,8 +867,9 @@ app.post('/api/workouts', (req, res) => {
 
 app.delete('/api/workouts/:id', (req, res) => {
   const db = readDB();
+  const userId = getAuthUserId(req, db);
   const id = req.params.id;
-  db.workouts = (db.workouts || []).filter(w => w.id !== id);
+  db.workouts = (db.workouts || []).filter(w => !(w.id === id && (!w.userId || w.userId === userId)));
   writeDB(db);
   res.json({ success: true, message: 'Workout deleted' });
 });
@@ -743,7 +877,8 @@ app.delete('/api/workouts/:id', (req, res) => {
 // Calculate Personal Records (PR) & Last Session Weights per Exercise
 app.get('/api/workouts/prs', (req, res) => {
   const db = readDB();
-  const workouts = db.workouts || [];
+  const userId = getAuthUserId(req, db);
+  const workouts = (db.workouts || []).filter(w => !w.userId || w.userId === userId);
   
   // Sort ascending by date to track history sequentially
   const sorted = [...workouts].sort((a, b) => new Date(a.date) - new Date(b.date));
@@ -857,16 +992,19 @@ app.post('/api/ai/analyze-workout-plan', async (req, res) => {
 // --- FASTRACK SMARTWATCH SYNC & METRICS ---
 app.get('/api/fastrack/summary', (req, res) => {
   const db = readDB();
+  const userId = getAuthUserId(req, db);
+  const userProfile = getUserProfile(db, userId);
   const date = req.query.date || new Date().toISOString().split('T')[0];
   const bmr = FastrackService.calculateBMR(
-    db.profile.weightKg || 70,
-    db.profile.heightCm || 175,
-    db.profile.age || 24,
-    db.profile.gender || 'male'
+    userProfile.weightKg || 70,
+    userProfile.heightCm || 175,
+    userProfile.age || 24,
+    userProfile.gender || 'male'
   );
 
-  const log = (db.fastrackLogs || []).find(l => l.date === date) || {
+  const log = (db.fastrackLogs || []).find(l => (!l.userId || l.userId === userId) && l.date === date) || {
     date,
+    userId,
     deviceName: db.settings?.fastrackDeviceName || 'Fastrack Smartwatch',
     steps: 0,
     activeCalories: 0,
@@ -884,6 +1022,8 @@ app.get('/api/fastrack/summary', (req, res) => {
 
 app.post('/api/fastrack/sync', (req, res) => {
   const db = readDB();
+  const userId = getAuthUserId(req, db);
+  const userProfile = getUserProfile(db, userId);
   const {
     date = new Date().toISOString().split('T')[0],
     steps,
@@ -896,10 +1036,10 @@ app.post('/api/fastrack/sync', (req, res) => {
   } = req.body;
 
   const bmr = FastrackService.calculateBMR(
-    db.profile.weightKg,
-    db.profile.heightCm,
-    db.profile.age,
-    db.profile.gender
+    userProfile.weightKg,
+    userProfile.heightCm,
+    userProfile.age,
+    userProfile.gender
   );
 
   const active = Number(activeCalories) || Math.round((Number(steps) || 0) * 0.04);
@@ -907,6 +1047,7 @@ app.post('/api/fastrack/sync', (req, res) => {
 
   const syncRecord = {
     id: `fastrack-${Date.now()}`,
+    userId,
     date,
     deviceName: deviceName || db.settings?.fastrackDeviceName || 'Fastrack Smartwatch',
     steps: Number(steps) || 0,
@@ -920,9 +1061,9 @@ app.post('/api/fastrack/sync', (req, res) => {
     syncedAt: new Date().toISOString()
   };
 
-  // Replace or add
+  // Replace or add isolated by user and date
   db.fastrackLogs = db.fastrackLogs || [];
-  const existingIdx = db.fastrackLogs.findIndex(l => l.date === date);
+  const existingIdx = db.fastrackLogs.findIndex(l => (!l.userId || l.userId === userId) && l.date === date);
   if (existingIdx >= 0) {
     db.fastrackLogs[existingIdx] = syncRecord;
   } else {
@@ -936,16 +1077,18 @@ app.post('/api/fastrack/sync', (req, res) => {
 // Automatic Watch Sync telemetry endpoint (receives live streaming pulses)
 app.post('/api/fastrack/auto-sync', (req, res) => {
   const db = readDB();
+  const userId = getAuthUserId(req, db);
+  const userProfile = getUserProfile(db, userId);
   const date = req.body.date || new Date().toISOString().split('T')[0];
   
   db.fastrackLogs = db.fastrackLogs || [];
-  let existing = db.fastrackLogs.find(l => l.date === date);
+  let existing = db.fastrackLogs.find(l => (!l.userId || l.userId === userId) && l.date === date);
 
   const bmr = FastrackService.calculateBMR(
-    db.profile.weightKg,
-    db.profile.heightCm,
-    db.profile.age,
-    db.profile.gender
+    userProfile.weightKg,
+    userProfile.heightCm,
+    userProfile.age,
+    userProfile.gender
   );
 
   const steps = req.body.steps !== undefined ? Number(req.body.steps) : (existing?.steps || 0);
@@ -961,6 +1104,7 @@ app.post('/api/fastrack/auto-sync', (req, res) => {
 
   const autoRecord = {
     id: existing?.id || `fastrack-${Date.now()}`,
+    userId,
     date,
     deviceName: req.body.deviceName || existing?.deviceName || 'Fastrack Smartwatch',
     steps,
@@ -979,7 +1123,7 @@ app.post('/api/fastrack/auto-sync', (req, res) => {
     syncedAt: new Date().toISOString()
   };
 
-  const existingIdx = db.fastrackLogs.findIndex(l => l.date === date);
+  const existingIdx = db.fastrackLogs.findIndex(l => (!l.userId || l.userId === userId) && l.date === date);
   if (existingIdx >= 0) {
     db.fastrackLogs[existingIdx] = autoRecord;
   } else {
@@ -993,34 +1137,40 @@ app.post('/api/fastrack/auto-sync', (req, res) => {
 // --- ENERGY BALANCE (DIET + FASTRACK BURN) ---
 app.get('/api/energy-balance', (req, res) => {
   const db = readDB();
+  const userId = getAuthUserId(req, db);
+  const userProfile = getUserProfile(db, userId);
   const date = req.query.date || new Date().toISOString().split('T')[0];
 
-  const meals = (db.meals || []).filter(m => m.date === date);
+  const meals = (db.meals || []).filter(m => (!m.userId || m.userId === userId) && m.date === date);
   const consumedCalories = meals.reduce((sum, m) => sum + (m.totalCalories || 0), 0);
-  const fastrackLog = (db.fastrackLogs || []).find(l => l.date === date);
+  const fastrackLog = (db.fastrackLogs || []).find(l => (!l.userId || l.userId === userId) && l.date === date);
 
-  const balance = FastrackService.calculateEnergyBalance(consumedCalories, fastrackLog, db.profile);
+  const balance = FastrackService.calculateEnergyBalance(consumedCalories, fastrackLog, userProfile);
   res.json({ date, balance });
 });
 
 // --- WATER & WEIGHT LOGGING ---
 app.get('/api/water', (req, res) => {
   const db = readDB();
+  const userId = getAuthUserId(req, db);
+  const userProfile = getUserProfile(db, userId);
   const date = req.query.date || new Date().toISOString().split('T')[0];
-  const entry = (db.waterLogs || []).find(w => w.date === date) || { date, amountMl: 0 };
-  res.json({ date, amountMl: entry.amountMl, targetMl: db.profile.dailyTargetWater || 3000 });
+  const entry = (db.waterLogs || []).find(w => (!w.userId || w.userId === userId) && w.date === date) || { date, amountMl: 0 };
+  res.json({ date, amountMl: entry.amountMl, targetMl: userProfile.dailyTargetWater || 3000 });
 });
 
 app.post('/api/water/log', (req, res) => {
   const db = readDB();
+  const userId = getAuthUserId(req, db);
   const { date = new Date().toISOString().split('T')[0], amountMl = 250 } = req.body;
 
   db.waterLogs = db.waterLogs || [];
-  const existing = db.waterLogs.find(w => w.date === date);
+  const existing = db.waterLogs.find(w => (!w.userId || w.userId === userId) && w.date === date);
   if (existing) {
     existing.amountMl = Math.max(0, existing.amountMl + Number(amountMl));
+    existing.userId = userId;
   } else {
-    db.waterLogs.push({ date, amountMl: Math.max(0, Number(amountMl)) });
+    db.waterLogs.push({ userId, date, amountMl: Math.max(0, Number(amountMl)) });
   }
 
   writeDB(db);
@@ -1029,34 +1179,45 @@ app.post('/api/water/log', (req, res) => {
 
 app.get('/api/weight', (req, res) => {
   const db = readDB();
-  res.json({ weightLogs: db.weightLogs || [], currentWeight: db.profile.weightKg });
+  const userId = getAuthUserId(req, db);
+  const userProfile = getUserProfile(db, userId);
+  const userWeightLogs = (db.weightLogs || []).filter(w => !w.userId || w.userId === userId);
+  res.json({ weightLogs: userWeightLogs, currentWeight: userProfile.weightKg });
 });
 
 app.post('/api/weight/log', (req, res) => {
   const db = readDB();
+  const userId = getAuthUserId(req, db);
+  const userProfile = getUserProfile(db, userId);
   const { date = new Date().toISOString().split('T')[0], weightKg } = req.body;
   if (!weightKg) return res.status(400).json({ error: 'weightKg is required' });
 
   const numWeight = parseFloat(weightKg);
+  userProfile.weightKg = numWeight;
+  if (userId && db.profiles && db.profiles[userId]) {
+    db.profiles[userId].weightKg = numWeight;
+  }
   db.profile.weightKg = numWeight;
 
   db.weightLogs = db.weightLogs || [];
-  const existing = db.weightLogs.find(w => w.date === date);
+  const existing = db.weightLogs.find(w => (!w.userId || w.userId === userId) && w.date === date);
   if (existing) {
     existing.weightKg = numWeight;
+    existing.userId = userId;
   } else {
-    db.weightLogs.push({ date, weightKg: numWeight });
+    db.weightLogs.push({ userId, date, weightKg: numWeight });
   }
 
   writeDB(db);
-  res.json({ success: true, currentWeight: numWeight });
+  res.json({ success: true, currentWeight: numWeight, profile: userProfile });
 });
 
 // --- INTERACTIVE 7-DAY & 30-DAY TREND ANALYTICS ---
 app.get('/api/analytics/trends', (req, res) => {
   const db = readDB();
+  const userId = getAuthUserId(req, db);
+  const profile = getUserProfile(db, userId);
   const daysCount = parseInt(req.query.days) || 7;
-  const profile = db.profile || {};
   
   const targetCalories = Number(profile.dailyTargetCalories) || 2100;
   const targetProtein = Number(profile.dailyTargetProtein) || 140;
@@ -1073,29 +1234,29 @@ app.get('/api/analytics/trends', (req, res) => {
     const dayLabel = d.toLocaleDateString('en-US', { weekday: 'short' });
     const shortDate = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
-    // Meals on this date
-    const dayMeals = (db.meals || []).filter(m => m.date === dateStr);
+    // Meals on this date (isolated by userId)
+    const dayMeals = (db.meals || []).filter(m => (!m.userId || m.userId === userId) && m.date === dateStr);
     const calories = dayMeals.reduce((s, m) => s + (m.totalCalories || 0), 0);
     const protein = Number(dayMeals.reduce((s, m) => s + (m.totalProtein || 0), 0).toFixed(1));
     const carbs = Number(dayMeals.reduce((s, m) => s + (m.totalCarbs || 0), 0).toFixed(1));
     const fat = Number(dayMeals.reduce((s, m) => s + (m.totalFat || 0), 0).toFixed(1));
 
     // Fastrack log
-    const watchLog = (db.fastrackLogs || []).find(l => l.date === dateStr);
+    const watchLog = (db.fastrackLogs || []).find(l => (!l.userId || l.userId === userId) && l.date === dateStr);
     const steps = watchLog?.steps || 0;
     const activeBurn = watchLog?.activeCalories || 0;
     const totalBurn = Math.round(bmr + activeBurn);
 
     // Water log
-    const waterEntry = (db.waterLogs || []).find(w => w.date === dateStr);
+    const waterEntry = (db.waterLogs || []).find(w => (!w.userId || w.userId === userId) && w.date === dateStr);
     const waterMl = waterEntry?.amountMl || 0;
 
     // Weight log
-    const weightEntry = (db.weightLogs || []).find(w => w.date === dateStr);
+    const weightEntry = (db.weightLogs || []).find(w => (!w.userId || w.userId === userId) && w.date === dateStr);
     const weightKg = weightEntry?.weightKg || null;
 
     // Workouts
-    const dayWorkouts = (db.workouts || []).filter(w => w.date === dateStr);
+    const dayWorkouts = (db.workouts || []).filter(w => (!w.userId || w.userId === userId) && w.date === dateStr);
 
     dailyTrend.push({
       date: dateStr,
@@ -1155,11 +1316,15 @@ app.get('/api/analytics/trends', (req, res) => {
 // --- BEFORE / AFTER BODY PROGRESS PHOTO VAULT ---
 app.get('/api/progress/photos', (req, res) => {
   const db = readDB();
-  res.json({ success: true, photos: db.photoVault || [] });
+  const userId = getAuthUserId(req, db);
+  const photos = (db.photoVault || []).filter(p => !p.userId || p.userId === userId);
+  res.json({ success: true, photos });
 });
 
 app.post('/api/progress/photos', (req, res) => {
   const db = readDB();
+  const userId = getAuthUserId(req, db);
+  const userProfile = getUserProfile(db, userId);
   const { date = new Date().toISOString().split('T')[0], type = 'checkin', photoUrl, weightKg, pose = 'front', notes = '' } = req.body;
 
   if (!photoUrl) {
@@ -1168,11 +1333,12 @@ app.post('/api/progress/photos', (req, res) => {
 
   const newPhoto = {
     id: `photo-${Date.now()}`,
+    userId,
     date,
     type, // 'before' | 'after' | 'checkin'
     pose, // 'front' | 'side' | 'back'
     photoUrl,
-    weightKg: weightKg ? parseFloat(weightKg) : (db.profile?.weightKg || null),
+    weightKg: weightKg ? parseFloat(weightKg) : (userProfile.weightKg || null),
     notes,
     createdAt: new Date().toISOString()
   };
@@ -1186,21 +1352,56 @@ app.post('/api/progress/photos', (req, res) => {
 
 app.delete('/api/progress/photos/:id', (req, res) => {
   const db = readDB();
+  const userId = getAuthUserId(req, db);
   const id = req.params.id;
-  db.photoVault = (db.photoVault || []).filter(p => p.id !== id);
+  db.photoVault = (db.photoVault || []).filter(p => p.id !== id || (p.userId && p.userId !== userId));
   writeDB(db);
   res.json({ success: true, message: 'Photo deleted' });
+});
+
+// --- AI DYNAMIC WORKOUT SPLIT GENERATOR ---
+app.post('/api/workouts/generate-ai-split', async (req, res) => {
+  try {
+    const db = readDB();
+    const userId = getAuthUserId(req, db);
+    const userProfile = getUserProfile(db, userId);
+    const {
+      splitType = 'PPL',
+      daysCount = 4,
+      goal = userProfile.goal || 'recomp',
+      experienceLevel = 'intermediate',
+      focusAreas = userProfile.focusAreas || []
+    } = req.body;
+
+    aiService.setApiKey(db.settings?.geminiApiKey || process.env.GEMINI_API_KEY || '');
+    const plan = await aiService.generateWorkoutPlan({
+      splitType,
+      goal,
+      daysCount: Number(daysCount) || 4,
+      experienceLevel,
+      focusAreas,
+      userProfile
+    });
+
+    res.json({ success: true, plan });
+  } catch (err) {
+    console.error('AI workout split generation error:', err);
+    res.status(500).json({ error: 'Failed to generate workout split', details: err.message });
+  }
 });
 
 // --- AI FITNESS COACH CHAT ---
 app.get('/api/coach/history', (req, res) => {
   const db = readDB();
-  res.json({ chatHistory: db.chatHistory || [] });
+  const userId = getAuthUserId(req, db);
+  const userChat = (db.chatHistory || []).filter(c => !c.userId || c.userId === userId);
+  res.json({ chatHistory: userChat });
 });
 
 app.delete('/api/coach/history', (req, res) => {
   const db = readDB();
-  db.chatHistory = [];
+  const userId = getAuthUserId(req, db);
+  db.chatHistory = (db.chatHistory || []).filter(c => c.userId && c.userId !== userId);
   writeDB(db);
   res.json({ success: true, message: 'Chat history cleared' });
 });
@@ -1211,16 +1412,18 @@ app.post('/api/coach/chat', async (req, res) => {
     if (!message) return res.status(400).json({ error: 'Message is required' });
 
     const db = readDB();
+    const userId = getAuthUserId(req, db);
+    const userProfile = getUserProfile(db, userId);
     const today = new Date().toISOString().split('T')[0];
 
-    // Build today's live stats
-    const todayMeals = (db.meals || []).filter(m => m.date === today);
+    // Build today's live stats for this user
+    const todayMeals = (db.meals || []).filter(m => (!m.userId || m.userId === userId) && m.date === today);
     const consumedCalories = todayMeals.reduce((s, m) => s + (m.totalCalories || 0), 0);
     const consumedProtein = Number(todayMeals.reduce((s, m) => s + (m.totalProtein || 0), 0).toFixed(1));
     const consumedCarbs = Number(todayMeals.reduce((s, m) => s + (m.totalCarbs || 0), 0).toFixed(1));
     const consumedFat = Number(todayMeals.reduce((s, m) => s + (m.totalFat || 0), 0).toFixed(1));
-    const waterEntry = (db.waterLogs || []).find(w => w.date === today);
-    const fastrackLog = (db.fastrackLogs || []).find(l => l.date === today);
+    const waterEntry = (db.waterLogs || []).find(w => (!w.userId || w.userId === userId) && w.date === today);
+    const fastrackLog = (db.fastrackLogs || []).find(l => (!l.userId || l.userId === userId) && l.date === today);
 
     const todayStats = {
       consumedCalories,
@@ -1236,6 +1439,7 @@ app.post('/api/coach/chat', async (req, res) => {
     // User message
     const userMsg = {
       id: `msg-${Date.now()}`,
+      userId,
       sender: 'user',
       text: message,
       timestamp: new Date().toISOString()
@@ -1245,10 +1449,12 @@ app.post('/api/coach/chat', async (req, res) => {
     db.chatHistory.push(userMsg);
 
     aiService.setApiKey(db.settings?.geminiApiKey || process.env.GEMINI_API_KEY || '');
-    const { reply, source } = await aiService.askCoachChat(message, db.chatHistory, db.profile, todayStats);
+    const userHistory = db.chatHistory.filter(c => !c.userId || c.userId === userId);
+    const { reply, source } = await aiService.askCoachChat(message, userHistory, userProfile, todayStats);
 
     const assistantMsg = {
       id: `msg-${Date.now() + 1}`,
+      userId,
       sender: 'assistant',
       text: reply,
       source,

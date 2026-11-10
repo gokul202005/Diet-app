@@ -4,6 +4,7 @@ import {
   Search, 
   Sparkles, 
   Camera, 
+  Upload,
   Mic,
   MicOff,
   Radio,
@@ -835,17 +836,31 @@ export default function DietTracker({ selectedDate, profile }) {
               </div>
             ) : (
               <div>
-                <Camera className="w-10 h-10 text-slate-600 mx-auto mb-2" />
-                <label className="cursor-pointer inline-flex items-center space-x-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl transition-all">
-                  <span>Select Food Photo</span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handlePhotoChange}
-                    className="hidden"
-                  />
-                </label>
-                <p className="text-[11px] text-slate-500 mt-2">JPEG, PNG, WebP up to 10MB</p>
+                <Camera className="w-10 h-10 text-emerald-400 mx-auto mb-2.5 animate-pulse" />
+                <div className="flex flex-wrap items-center justify-center gap-2.5">
+                  <label className="cursor-pointer inline-flex items-center space-x-2 px-3.5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black rounded-xl transition-all shadow-md shadow-emerald-500/20 active:scale-95">
+                    <Camera className="w-4 h-4" />
+                    <span>Snap with Camera</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      onChange={handlePhotoChange}
+                      className="hidden"
+                    />
+                  </label>
+                  <label className="cursor-pointer inline-flex items-center space-x-2 px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl transition-all border border-slate-700 active:scale-95">
+                    <Upload className="w-4 h-4 text-slate-400" />
+                    <span>Upload from Gallery</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handlePhotoChange}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-2">Take a live photo of your meal plate or select an image</p>
               </div>
             )}
           </div>

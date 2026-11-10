@@ -8,6 +8,7 @@ import {
   Utensils, 
   Watch, 
   Camera, 
+  Upload,
   Shield, 
   Calendar, 
   Plus, 
@@ -24,15 +25,23 @@ import {
 } from 'lucide-react';
 import { api } from '../api';
 
-export default function ProgressAnalytics({ profile, selectedDate, onNavigateToDiet, onNavigateToWorkouts }) {
+export default function ProgressAnalytics({ profile, selectedDate, onProfileUpdate, onNavigateToDiet, onNavigateToWorkouts }) {
   const [timeRange, setTimeRange] = useState(7); // 7 or 30 days
   const [trendsData, setTrendsData] = useState(null);
   const [photos, setPhotos] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Weight entry state
+  const [displayWeight, setDisplayWeight] = useState(profile?.weightKg || '');
   const [newWeight, setNewWeight] = useState(profile?.weightKg || '');
   const [isLoggingWeight, setIsLoggingWeight] = useState(false);
+
+  useEffect(() => {
+    if (profile?.weightKg) {
+      setDisplayWeight(profile.weightKg);
+      if (!newWeight) setNewWeight(profile.weightKg);
+    }
+  }, [profile?.weightKg]);
 
   // Photo Vault state
   const [isAddingPhoto, setIsAddingPhoto] = useState(false);
@@ -82,11 +91,16 @@ export default function ProgressAnalytics({ profile, selectedDate, onNavigateToD
   const handleSaveWeight = async (e) => {
     e.preventDefault();
     if (!newWeight || isNaN(newWeight)) return;
+    const num = parseFloat(newWeight);
     setIsLoggingWeight(true);
     try {
-      const res = await api.logWeight(newWeight, selectedDate);
+      const res = await api.logWeight(num, selectedDate);
       if (res.success) {
-        loadTrendsAndPhotos();
+        setDisplayWeight(num);
+        if (onProfileUpdate) {
+          onProfileUpdate({ ...(profile || {}), weightKg: num });
+        }
+        await loadTrendsAndPhotos();
       }
     } catch (err) {
       alert('Failed to save weight: ' + err.message);
@@ -246,10 +260,10 @@ export default function ProgressAnalytics({ profile, selectedDate, onNavigateToD
               <Scale className="w-3.5 h-3.5 text-teal-400" />
             </div>
             <div className="text-xl font-black text-white mt-1">
-              {profile?.weightKg || '--'} <span className="text-xs font-normal text-slate-500">kg</span>
+              {displayWeight || profile?.weightKg || '--'} <span className="text-xs font-normal text-slate-500">kg</span>
             </div>
             <div className="text-[10px] text-emerald-400 mt-0.5 capitalize">
-              Goal: {profile?.goal ? profile.goal.replace(/_/g, ' ') : 'Cutting'}
+              Goal: {profile?.goal ? profile.goal.replace(/_/g, ' ') : 'Recomp'}
             </div>
           </div>
 
@@ -525,12 +539,33 @@ export default function ProgressAnalytics({ profile, selectedDate, onNavigateToD
                   </button>
                 </div>
               ) : (
-                <label className="cursor-pointer block py-4">
-                  <Camera className="w-8 h-8 text-slate-500 mx-auto mb-2" />
-                  <span className="text-xs text-slate-300 font-bold block">Click to select photo or snap from camera</span>
-                  <span className="text-[10px] text-slate-500 block mt-1">Stored locally in your app profile (PNG/JPEG)</span>
-                  <input type="file" accept="image/*" onChange={handlePhotoUpload} className="hidden" />
-                </label>
+                <div className="py-4">
+                  <Camera className="w-10 h-10 text-emerald-400 mx-auto mb-2.5 animate-pulse" />
+                  <div className="flex flex-wrap items-center justify-center gap-2.5">
+                    <label className="cursor-pointer inline-flex items-center space-x-2 px-3.5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black rounded-xl transition-all shadow-md shadow-emerald-500/20 active:scale-95">
+                      <Camera className="w-4 h-4" />
+                      <span>Snap with Camera</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        onChange={handlePhotoUpload}
+                        className="hidden"
+                      />
+                    </label>
+                    <label className="cursor-pointer inline-flex items-center space-x-2 px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl transition-all border border-slate-700 active:scale-95">
+                      <Upload className="w-4 h-4 text-slate-400" />
+                      <span>Choose from Gallery</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handlePhotoUpload}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                  <span className="text-[10px] text-slate-500 block mt-2">Take a live progress photo or upload from phone storage</span>
+                </div>
               )}
             </div>
 

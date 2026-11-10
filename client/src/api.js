@@ -22,13 +22,28 @@ const BASE_URL = getBaseUrl();
 
 // Safe Fetch Wrapper: Handles HTML/502/cold-start gracefully without crashing on res.json()
 async function safeFetch(url, options = {}) {
+  let authUserId = '';
+  if (typeof window !== 'undefined') {
+    try {
+      const stored = localStorage.getItem('agy_current_user');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed && parsed.id) authUserId = parsed.id;
+      }
+    } catch {}
+  }
+
+  const customHeaders = options.headers || {};
+  const headers = {
+    'Accept': 'application/json',
+    ...(authUserId ? { 'x-user-id': authUserId } : {}),
+    ...customHeaders
+  };
+
   try {
     const res = await fetch(url, {
       ...options,
-      headers: {
-        'Accept': 'application/json',
-        ...(options.headers || {})
-      }
+      headers
     });
 
     const contentType = res.headers.get('content-type') || '';
@@ -82,30 +97,45 @@ export const api = {
 
   // Authentication & Cloud Sync
   signup: async (userData) => {
-    return safeFetch(`${BASE_URL}/auth/signup`, {
+    const res = await safeFetch(`${BASE_URL}/auth/signup`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(userData)
     });
+    if (res.user && typeof window !== 'undefined') {
+      localStorage.setItem('agy_current_user', JSON.stringify(res.user));
+    }
+    return res;
   },
   login: async (credentials) => {
-    return safeFetch(`${BASE_URL}/auth/login`, {
+    const res = await safeFetch(`${BASE_URL}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(credentials)
     });
+    if (res.user && typeof window !== 'undefined') {
+      localStorage.setItem('agy_current_user', JSON.stringify(res.user));
+    }
+    return res;
   },
   googleAuth: async (googleData) => {
-    return safeFetch(`${BASE_URL}/auth/google`, {
+    const res = await safeFetch(`${BASE_URL}/auth/google`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(googleData)
     });
+    if (res.user && typeof window !== 'undefined') {
+      localStorage.setItem('agy_current_user', JSON.stringify(res.user));
+    }
+    return res;
   },
   getCurrentUser: async () => {
     return safeFetch(`${BASE_URL}/auth/me`);
   },
   logout: async () => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('agy_current_user');
+    }
     return safeFetch(`${BASE_URL}/auth/logout`, { method: 'POST' });
   },
 
@@ -220,6 +250,13 @@ export const api = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ planText })
+    });
+  },
+  generateAiWorkoutSplit: async (params) => {
+    return safeFetch(`${BASE_URL}/workouts/generate-ai-split`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params)
     });
   },
 

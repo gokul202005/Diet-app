@@ -17,7 +17,14 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [profile, setProfile] = useState(null);
-  const [currentUser, setCurrentUser] = useState(null);
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const stored = localStorage.getItem('agy_current_user');
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isVoiceOpen, setIsVoiceOpen] = useState(false);
@@ -34,10 +41,13 @@ export default function App() {
         ]);
 
         if (profileData) setProfile(profileData);
-        if (authData?.user) setCurrentUser(authData.user);
+        if (authData?.user) {
+          setCurrentUser(authData.user);
+          localStorage.setItem('agy_current_user', JSON.stringify(authData.user));
+        }
 
         // Automatically trigger onboarding wizard if user profile has not been configured yet
-        if (!profileData || !profileData.isConfigured || !profileData.name) {
+        if (!profileData || !profileData.isConfigured || !profileData.heightCm || !profileData.weightKg) {
           setIsOnboardingOpen(true);
         }
       } catch (err) {
@@ -54,9 +64,15 @@ export default function App() {
     setProfile(updatedProfile);
   };
 
-  const handleAuthSuccess = (user) => {
+  const handleAuthSuccess = async (user) => {
     setCurrentUser(user);
-    if (!profile || !profile.isConfigured || !profile.name) {
+    try {
+      const p = await api.getProfile();
+      if (p) setProfile(p);
+      if (!p || !p.isConfigured || !p.heightCm || !p.weightKg) {
+        setIsOnboardingOpen(true);
+      }
+    } catch {
       setIsOnboardingOpen(true);
     }
   };
@@ -107,8 +123,8 @@ export default function App() {
         onLogout={handleLogout}
       />
 
-      {/* Main App Content Body */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+      {/* Main App Content Body (Mobile Safe-Padding for Floating Dock) */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-28 xl:pb-12">
         {activeTab === 'dashboard' && (
           <Dashboard
             key={`dashboard-${selectedDate}-${refreshKey}`}
@@ -153,6 +169,7 @@ export default function App() {
             key={`progress-${refreshKey}`}
             profile={profile}
             selectedDate={selectedDate}
+            onProfileUpdate={handleProfileSaved}
             onNavigateToDiet={() => setActiveTab('diet')}
             onNavigateToWorkouts={() => setActiveTab('workouts')}
           />
@@ -189,6 +206,7 @@ export default function App() {
         isOpen={isOnboardingOpen}
         onClose={() => setIsOnboardingOpen(false)}
         currentProfile={profile}
+        currentUser={currentUser}
         onProfileSaved={handleProfileSaved}
       />
 
