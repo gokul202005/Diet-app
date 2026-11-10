@@ -119,6 +119,7 @@ export default function App() {
             onNavigateToFastrack={() => setActiveTab('fastrack')}
             onNavigateToProgress={() => setActiveTab('progress')}
             onOpenCoach={() => setActiveTab('coach')}
+            onOpenProfile={() => setIsOnboardingOpen(true)}
           />
         )}
 
