@@ -15,7 +15,9 @@ import {
   MessageSquare,
   Volume2,
   Radio,
-  Key
+  Key,
+  Edit2,
+  RotateCcw
 } from 'lucide-react';
 import { api } from '../api';
 
@@ -23,11 +25,15 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
   const [internalIsOpen, setInternalIsOpen] = useState(false);
   const isOpen = externalIsOpen !== undefined ? externalIsOpen : internalIsOpen;
 
+  // Assistant State: 'idle' | 'listening' | 'preview' | 'success'
+  const [stateMode, setStateMode] = useState('idle');
   const [isRecording, setIsRecording] = useState(false);
   const [transcript, setTranscript] = useState('');
+  const [editableSpeech, setEditableSpeech] = useState('');
   const [manualText, setManualText] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingStatus, setProcessingStatus] = useState('');
+  const [previewData, setPreviewData] = useState(null);
   const [result, setResult] = useState(null);
   const [errorMsg, setErrorMsg] = useState('');
   const [needsApiKey, setNeedsApiKey] = useState(false);
@@ -100,7 +106,9 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
   const startRecording = async () => {
     setErrorMsg('');
     setResult(null);
+    setPreviewData(null);
     setTranscript('');
+    setEditableSpeech('');
     recognizedTextRef.current = '';
     audioChunksRef.current = [];
 
@@ -164,18 +172,19 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
         }
       };
 
-      recorder.start(100); // 100ms chunks
+      recorder.start(100);
       setIsRecording(true);
+      setStateMode('listening');
       playBeep(700, 0.12);
 
-      // 4. In parallel, run Web SpeechRecognition if available for instantaneous live subtitles
+      // 4. In parallel, run Web SpeechRecognition for instantaneous live subtitles
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (SpeechRecognition) {
         try {
           const recognition = new SpeechRecognition();
           recognition.continuous = true;
           recognition.interimResults = true;
-          recognition.lang = 'en-IN'; // Indian English: catches South Indian dishes & fitness terms accurately
+          recognition.lang = 'en-IN'; // Indian English / Global fitness terms
 
           recognition.onresult = (event) => {
             let current = '';
@@ -189,20 +198,20 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
           };
 
           recognition.onerror = (e) => {
-            // Non-fatal because MediaRecorder is actively capturing the audio file
             console.log('WebSpeech fallback note:', e.error);
           };
 
           recognitionRef.current = recognition;
           recognition.start();
         } catch (e) {
-          console.warn('SpeechRecognition startup skipped, relying on direct audio recording:', e);
+          console.warn('SpeechRecognition startup skipped:', e);
         }
       }
 
     } catch (err) {
       console.error('Microphone error:', err);
       setIsRecording(false);
+      setStateMode('idle');
       cleanupAudio();
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
         setErrorMsg('Microphone permission was denied. Please allow microphone access in your browser or phone settings.');
@@ -212,7 +221,7 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
     }
   };
 
-  // Stop recording and process either via transcript or multimodal audio
+  // Stop recording and parse speech into Human-in-the-Loop verification preview
   const stopRecordingAndProcess = () => {
     if (!mediaRecorderRef.current || !isRecording) return;
     setIsRecording(false);
@@ -221,20 +230,21 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
     const recorder = mediaRecorderRef.current;
     
     recorder.onstop = async () => {
-      // Create audio blob
       const mime = recorder.mimeType || 'audio/webm';
       const audioBlob = new Blob(audioChunksRef.current, { type: mime });
       cleanupAudio();
 
       const recognizedSpeech = recognizedTextRef.current.trim() || transcript.trim();
 
-      // If speech recognition got the text, send directly
       if (recognizedSpeech) {
-        await executeVoiceCommand(recognizedSpeech);
+        // Transcribed via SpeechRecognition -> Preview for user review
+        setEditableSpeech(recognizedSpeech);
+        await parseIntentForPreview(recognizedSpeech);
       } else if (audioBlob.size > 1000) {
-        // Send recorded audio to backend for Gemini Multimodal Transcription & Logging
+        // Send audio to backend for transcription
         await executeVoiceAudio(audioBlob);
       } else {
+        setStateMode('idle');
         setErrorMsg('No speech detected. Please speak closer to your microphone or click an example below.');
       }
     };
@@ -250,21 +260,27 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
     }
   };
 
-  // Execute Text Command
-  const executeVoiceCommand = async (text) => {
+  // Step 1 -> Step 2: Parse intent and generate structured verification card
+  const parseIntentForPreview = async (text) => {
     const cleanText = text.trim();
     if (!cleanText) return;
 
     setIsProcessing(true);
-    setProcessingStatus('Analyzing speech with AI...');
+    setProcessingStatus('Analyzing speech & categorizing...');
     setErrorMsg('');
-    setResult(null);
 
     try {
-      const res = await api.universalVoiceCommand(cleanText, selectedDate);
-      handleSuccessResult(res, cleanText);
+      const res = await api.parseVoiceIntent(cleanText, selectedDate);
+      if (res.success) {
+        setPreviewData(res);
+        setStateMode('preview');
+      } else {
+        setErrorMsg(res.error || 'Could not understand command. Please try again.');
+        setStateMode('idle');
+      }
     } catch (err) {
-      setErrorMsg('Connection error: ' + err.message);
+      setErrorMsg('Parsing error: ' + err.message);
+      setStateMode('idle');
     } finally {
       setIsProcessing(false);
       setProcessingStatus('');
@@ -274,29 +290,138 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
   // Execute Audio File directly (Gemini Multimodal)
   const executeVoiceAudio = async (audioBlob) => {
     setIsProcessing(true);
-    setProcessingStatus('Uploading audio to Gemini AI Transcriber...');
+    setProcessingStatus('Uploading audio to Gemini AI...');
     setErrorMsg('');
-    setResult(null);
 
     try {
       const res = await api.universalVoiceAudio(audioBlob, selectedDate);
-      if (res.needsApiKey || (res.error && res.error.toLowerCase().includes('key'))) {
+      if (res.needsApiKey) {
         setNeedsApiKey(true);
         setErrorMsg(res.details || res.error || 'Gemini API key is required for voice audio transcription.');
+        setStateMode('idle');
         return;
       }
-      if (res.transcribedText) {
+      if (res.success && res.transcribedText) {
         setTranscript(res.transcribedText);
+        setEditableSpeech(res.transcribedText);
+        if (res.preview) {
+          setPreviewData(res.preview);
+          setStateMode('preview');
+        } else {
+          await parseIntentForPreview(res.transcribedText);
+        }
+      } else {
+        setErrorMsg(res.error || 'Could not process audio recording.');
+        setStateMode('idle');
       }
-      handleSuccessResult(res, res.transcribedText || 'Voice recording');
     } catch (err) {
       setErrorMsg('Voice processing error: ' + err.message);
-      if (err.message && err.message.toLowerCase().includes('key')) {
-        setNeedsApiKey(true);
-      }
+      setStateMode('idle');
     } finally {
       setIsProcessing(false);
       setProcessingStatus('');
+    }
+  };
+
+  // Step 2 -> Step 3: User verifies and confirms the action into Diary
+  const handleConfirmAndCommit = async () => {
+    if (!previewData) return;
+
+    setIsProcessing(true);
+    setProcessingStatus('Saving to your diary...');
+    setErrorMsg('');
+
+    try {
+      const res = await api.universalVoiceCommand({
+        confirmedIntent: previewData.intent,
+        payload: previewData.parsedData,
+        text: editableSpeech || previewData.originalText,
+        date: selectedDate
+      }, selectedDate);
+
+      if (res.success) {
+        setResult(res);
+        setStateMode('success');
+        playBeep(1040, 0.25);
+        if (typeof onActionCompleted === 'function') {
+          onActionCompleted(res);
+        }
+        setTimeout(() => {
+          handleClose();
+        }, 2800);
+      } else {
+        setErrorMsg(res.error || 'Failed to log to diary.');
+      }
+    } catch (err) {
+      setErrorMsg('Connection error: ' + err.message);
+    } finally {
+      setIsProcessing(false);
+      setProcessingStatus('');
+    }
+  };
+
+  // Switch Category Intent Manually in Preview
+  const handleSwitchCategory = async (newCategory) => {
+    if (!previewData) return;
+    const text = editableSpeech || previewData.originalText;
+
+    if (newCategory === 'water') {
+      setPreviewData({
+        ...previewData,
+        intent: 'water',
+        badgeText: 'Hydration',
+        badgeColor: 'blue',
+        summaryTitle: 'Water Hydration',
+        previewDetails: '+500 ml (0.50 L)',
+        parsedData: { amountMl: 500 }
+      });
+    } else if (newCategory === 'workout') {
+      setPreviewData({
+        ...previewData,
+        intent: 'workout',
+        badgeText: 'Strength Workout',
+        badgeColor: 'amber',
+        summaryTitle: 'Strength Workout Session',
+        previewDetails: '3 sets × 10 reps @ 50 kg',
+        parsedData: {
+          exerciseName: 'Strength Workout Session',
+          setsCount: 3,
+          repsCount: 10,
+          weightKg: 50,
+          durationMin: 35,
+          caloriesBurned: 125
+        }
+      });
+    } else if (newCategory === 'weight') {
+      const match = text.match(/(\d+(?:\.\d+)?)/);
+      const wt = match ? parseFloat(match[1]) : 75;
+      setPreviewData({
+        ...previewData,
+        intent: 'weight',
+        badgeText: 'Body Weight',
+        badgeColor: 'teal',
+        summaryTitle: 'Morning Scale Weight',
+        previewDetails: `${wt} kg`,
+        parsedData: { weightKg: wt }
+      });
+    } else if (newCategory === 'meal') {
+      setPreviewData({
+        ...previewData,
+        intent: 'meal',
+        badgeText: 'LUNCH',
+        badgeColor: 'emerald',
+        summaryTitle: text.slice(0, 30),
+        previewDetails: '350 kcal • 20g Protein • 35g Carbs • 10g Fat',
+        parsedData: {
+          mealType: 'lunch',
+          name: text.slice(0, 35),
+          foods: [{ name: text.slice(0, 30), quantity: '1 portion', calories: 350, protein: 20, carbs: 35, fat: 10 }],
+          totalCalories: 350,
+          totalProtein: 20,
+          totalCarbs: 35,
+          totalFat: 10
+        }
+      });
     }
   };
 
@@ -312,48 +437,36 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
     }
   };
 
-  const handleSuccessResult = (res, utteredText) => {
-    if (res.success) {
-      setResult(res);
-      playBeep(1040, 0.25);
-      if (typeof onActionCompleted === 'function') {
-        onActionCompleted(res);
-      }
-      // Auto-close modal after 3.2 seconds
-      setTimeout(() => {
-        if (externalOnClose) externalOnClose();
-        else setInternalIsOpen(false);
-      }, 3200);
-    } else {
-      setErrorMsg(res.error || 'Could not understand command. Please try again.');
-    }
-  };
-
-  // Handle Opening Modal
   const handleOpen = () => {
     if (externalOnOpen) externalOnOpen();
     else setInternalIsOpen(true);
+    setStateMode('idle');
     setResult(null);
+    setPreviewData(null);
     setErrorMsg('');
     setTranscript('');
+    setEditableSpeech('');
     setManualText('');
   };
 
-  // Handle Closing Modal
   const handleClose = () => {
     if (isRecording) {
       cleanupAudio();
       setIsRecording(false);
     }
+    setStateMode('idle');
     if (externalOnClose) externalOnClose();
     else setInternalIsOpen(false);
     setResult(null);
+    setPreviewData(null);
   };
 
   const getSectionIcon = (section) => {
     switch (section) {
-      case 'diet': return <Utensils className="w-5 h-5 text-emerald-400" />;
+      case 'diet': 
+      case 'meal': return <Utensils className="w-5 h-5 text-emerald-400" />;
       case 'water': return <Droplets className="w-5 h-5 text-blue-400" />;
+      case 'workout':
       case 'workouts': return <Dumbbell className="w-5 h-5 text-amber-400" />;
       case 'weight': return <Scale className="w-5 h-5 text-teal-400" />;
       case 'fastrack': return <Watch className="w-5 h-5 text-cyan-400" />;
@@ -381,7 +494,7 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-150">
           <div 
-            className="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-150"
+            className="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -392,7 +505,9 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
                 </div>
                 <div>
                   <h3 className="text-sm font-black text-white">Universal AI Voice Assistant</h3>
-                  <p className="text-[10px] text-slate-400">Speak naturally to log meals, water, workouts, or scale weight</p>
+                  <p className="text-[10px] text-slate-400">
+                    {stateMode === 'preview' ? 'Step 2 of 2: Review & Confirm your log' : 'Speak naturally to log meals, water, workouts, or weight'}
+                  </p>
                 </div>
               </div>
 
@@ -404,205 +519,351 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
               </button>
             </div>
 
-            {/* Central Microphone, Audio Visualizer & Control */}
-            <div className="bg-slate-950 border border-slate-800 rounded-2xl p-6 text-center space-y-4">
-              <div className="relative inline-block my-1">
-                {isRecording && (
-                  <div className="absolute inset-0 rounded-full bg-rose-500/30 animate-ping scale-150 pointer-events-none" />
-                )}
-                <button
-                  type="button"
-                  onClick={isRecording ? stopRecordingAndProcess : startRecording}
-                  disabled={isProcessing}
-                  className={`relative z-10 w-24 h-24 rounded-full flex flex-col items-center justify-center transition-all shadow-2xl cursor-pointer mx-auto ${
-                    isRecording
-                      ? 'bg-rose-500 text-white shadow-rose-500/50 scale-105 animate-pulse'
-                      : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-500/30'
-                  } ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                  {isRecording ? (
-                    <>
-                      <MicOff className="w-8 h-8" />
-                      <span className="text-[10px] font-black uppercase mt-1">Tap to Stop</span>
-                    </>
-                  ) : (
-                    <>
-                      <Mic className="w-8 h-8" />
-                      <span className="text-[10px] font-black uppercase mt-1">Tap to Speak</span>
-                    </>
-                  )}
-                </button>
+            {/* ERROR BANNER */}
+            {errorMsg && (
+              <div className="bg-rose-500/10 border border-rose-500/30 text-rose-300 p-3 rounded-xl text-xs flex items-center space-x-2 text-left">
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+                <span>{errorMsg}</span>
               </div>
+            )}
 
-              {/* Live Audio Visualizer Wave Bars */}
-              {isRecording ? (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-center space-x-1.5 h-8">
-                    {[0.6, 1.2, 0.9, 1.5, 0.8, 1.3, 0.5].map((multiplier, i) => {
-                      const barHeight = Math.max(6, Math.min(32, Math.round((audioVolume * multiplier) * 0.4)));
-                      return (
-                        <div
-                          key={i}
-                          style={{ height: `${barHeight}px` }}
-                          className="w-1.5 bg-gradient-to-t from-rose-500 to-amber-400 rounded-full transition-all duration-75"
-                        />
-                      );
-                    })}
-                  </div>
-                  <div className="flex items-center justify-center space-x-2 text-rose-400 text-xs font-bold animate-pulse">
-                    <Radio className="w-3.5 h-3.5" />
-                    <span>Listening... Speak now and tap Stop when done</span>
-                  </div>
+            {/* NEEDS API KEY HELPER */}
+            {needsApiKey && (
+              <div className="bg-amber-500/10 border border-amber-500/30 p-3.5 rounded-xl text-left space-y-2.5 animate-in fade-in">
+                <div className="flex items-center space-x-2 text-amber-300 text-xs font-bold">
+                  <Key className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span>Gemini API Key for Direct Audio Upload</span>
                 </div>
-              ) : isProcessing ? (
-                <div className="flex items-center justify-center space-x-2 text-emerald-400 text-xs font-bold py-2">
-                  <div className="w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
-                  <span>{processingStatus || 'Processing with Gemini AI...'}</span>
+                <p className="text-[11px] text-slate-300 leading-relaxed">
+                  Enter your free Gemini API key from Google AI Studio to process direct audio files, or tap the microphone to use browser speech recognition:
+                </p>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="password"
+                    value={apiKeyInput}
+                    onChange={(e) => setApiKeyInput(e.target.value)}
+                    placeholder="AIzaSy..."
+                    className="flex-1 bg-slate-900 border border-slate-700 focus:border-amber-400 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSaveApiKey}
+                    className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-lg transition-all shadow-sm cursor-pointer shrink-0"
+                  >
+                    Save Key
+                  </button>
                 </div>
-              ) : (
-                <div className="space-y-1">
-                  <div className="text-xs font-bold text-white">
-                    Tap the microphone button to start recording
-                  </div>
-                  <div className="text-[11px] text-slate-400">
-                    Auto-categorizes meals, water, gym workouts, and scale weight
-                  </div>
-                </div>
-              )}
+              </div>
+            )}
 
-              {/* Live Recognized Speech Subtitle */}
-              {transcript && (
-                <div className="bg-slate-900 border border-emerald-500/40 rounded-xl p-3.5 text-left space-y-2">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Recognized Speech:</span>
-                  <p className="text-xs font-bold text-emerald-300 italic bg-slate-950 p-2.5 rounded-lg border border-slate-800">
-                    &ldquo;{transcript}&rdquo;
-                  </p>
-                  {!isRecording && !isProcessing && !result && (
-                    <button
-                      onClick={() => executeVoiceCommand(transcript)}
-                      className="w-full py-2 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black rounded-xl text-xs flex items-center justify-center space-x-1.5 transition-all shadow-md cursor-pointer"
-                    >
-                      <Sparkles className="w-3.5 h-3.5" />
-                      <span>Confirm & Add Now</span>
-                    </button>
+            {/* ========================================================================= */}
+            {/* VIEW 1: RECORDING & LISTENING VIEW (stateMode === 'idle' | 'listening') */}
+            {/* ========================================================================= */}
+            {(stateMode === 'idle' || stateMode === 'listening') && (
+              <div className="bg-slate-950 border border-slate-800 rounded-2xl p-6 text-center space-y-4">
+                <div className="relative inline-block my-1">
+                  {isRecording && (
+                    <div className="absolute inset-0 rounded-full bg-rose-500/30 animate-ping scale-150 pointer-events-none" />
                   )}
+                  <button
+                    type="button"
+                    onClick={isRecording ? stopRecordingAndProcess : startRecording}
+                    disabled={isProcessing}
+                    className={`relative z-10 w-24 h-24 rounded-full flex flex-col items-center justify-center transition-all shadow-2xl cursor-pointer mx-auto ${
+                      isRecording
+                        ? 'bg-rose-500 text-white shadow-rose-500/50 scale-105 animate-pulse'
+                        : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-500/30'
+                    } ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    {isRecording ? (
+                      <>
+                        <MicOff className="w-8 h-8" />
+                        <span className="text-[10px] font-black uppercase mt-1">Tap to Stop</span>
+                      </>
+                    ) : (
+                      <>
+                        <Mic className="w-8 h-8" />
+                        <span className="text-[10px] font-black uppercase mt-1">Tap to Speak</span>
+                      </>
+                    )}
+                  </button>
                 </div>
-              )}
 
-              {/* Needs Gemini API Key Action Card */}
-              {needsApiKey && (
-                <div className="bg-amber-500/10 border border-amber-500/30 p-3.5 rounded-xl text-left space-y-2.5 animate-in fade-in">
-                  <div className="flex items-center space-x-2 text-amber-300 text-xs font-bold">
-                    <Key className="w-4 h-4 text-amber-400 shrink-0" />
-                    <span>Gemini API Key Needed for Audio Transcription</span>
+                {/* Audio Waveform */}
+                {isRecording ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-center space-x-1.5 h-8">
+                      {[0.6, 1.2, 0.9, 1.5, 0.8, 1.3, 0.5].map((multiplier, i) => {
+                        const barHeight = Math.max(6, Math.min(32, Math.round((audioVolume * multiplier) * 0.4)));
+                        return (
+                          <div
+                            key={i}
+                            style={{ height: `${barHeight}px` }}
+                            className="w-1.5 bg-gradient-to-t from-rose-500 to-amber-400 rounded-full transition-all duration-75"
+                          />
+                        );
+                      })}
+                    </div>
+                    <div className="flex items-center justify-center space-x-2 text-rose-400 text-xs font-bold animate-pulse">
+                      <Radio className="w-3.5 h-3.5" />
+                      <span>Listening... Speak naturally, then tap to stop</span>
+                    </div>
                   </div>
-                  <p className="text-[11px] text-slate-300 leading-relaxed">
-                    Enter your Gemini API key from Google AI Studio to process direct audio recordings, or speak clearly to use instant speech recognition:
-                  </p>
+                ) : isProcessing ? (
+                  <div className="flex items-center justify-center space-x-2 text-emerald-400 text-xs font-bold py-2">
+                    <div className="w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+                    <span>{processingStatus || 'Analyzing your speech...'}</span>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    <div className="text-xs font-bold text-white">
+                      Tap the microphone button to start recording
+                    </div>
+                    <div className="text-[11px] text-slate-400">
+                      Auto-categorizes meals, water, gym workouts, and scale weight
+                    </div>
+                  </div>
+                )}
+
+                {/* Live Speech Subtitle Stream */}
+                {transcript && (
+                  <div className="bg-slate-900 border border-emerald-500/40 rounded-xl p-3 text-left space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Hearing:</span>
+                    <p className="text-xs font-bold text-emerald-300 italic bg-slate-950 p-2.5 rounded-lg border border-slate-800">
+                      &ldquo;{transcript}&rdquo;
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ========================================================================= */}
+            {/* VIEW 2: HUMAN-IN-THE-LOOP VERIFICATION SCREEN (stateMode === 'preview')   */}
+            {/* ========================================================================= */}
+            {stateMode === 'preview' && previewData && (
+              <div className="space-y-4 animate-in fade-in zoom-in-95 duration-150">
+                {/* 1. Speech Transcription with Inline Edit Option */}
+                <div className="bg-slate-950 border border-slate-800 rounded-2xl p-3.5 space-y-2 text-left">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] uppercase font-black text-slate-400 tracking-wider">
+                      What I Heard (Tap to edit if misheard):
+                    </span>
+                    <Edit2 className="w-3 h-3 text-emerald-400" />
+                  </div>
                   <div className="flex items-center space-x-2">
                     <input
-                      type="password"
-                      value={apiKeyInput}
-                      onChange={(e) => setApiKeyInput(e.target.value)}
-                      placeholder="AIzaSy..."
-                      className="flex-1 bg-slate-900 border border-slate-700 focus:border-amber-400 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none"
+                      type="text"
+                      value={editableSpeech}
+                      onChange={(e) => setEditableSpeech(e.target.value)}
+                      className="flex-1 bg-slate-900 border border-slate-700 focus:border-emerald-500 rounded-xl px-3 py-2 text-xs text-white font-bold focus:outline-none"
                     />
                     <button
                       type="button"
-                      onClick={handleSaveApiKey}
-                      className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-lg transition-all shadow-sm cursor-pointer shrink-0"
+                      onClick={() => parseIntentForPreview(editableSpeech)}
+                      disabled={isProcessing}
+                      className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 rounded-xl transition-all cursor-pointer shrink-0 border border-slate-700"
                     >
-                      Save Key
+                      Re-parse
                     </button>
                   </div>
                 </div>
-              )}
 
-              {/* Error Message */}
-              {errorMsg && (
-                <div className="bg-rose-500/10 border border-rose-500/30 text-rose-300 p-3 rounded-xl text-xs flex items-center space-x-2 text-left">
-                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
-                  <span>{errorMsg}</span>
-                </div>
-              )}
-
-              {/* Success Result Confirmation */}
-              {result && (
-                <div className="bg-emerald-500/15 border border-emerald-500/40 p-4 rounded-xl text-left space-y-2 animate-in fade-in">
-                  <div className="flex items-center space-x-2">
-                    <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-                    <span className="text-xs font-black text-white uppercase tracking-wider">
-                      Successfully Logged!
-                    </span>
-                  </div>
-                  <div className="bg-slate-900/90 p-3 rounded-lg border border-slate-800 flex items-start space-x-3">
-                    <div className="p-2 bg-slate-950 rounded-lg border border-slate-800 shrink-0">
-                      {getSectionIcon(result.section)}
-                    </div>
-                    <div className="flex-1">
-                      <div className="text-xs font-bold text-emerald-300">{result.feedback}</div>
-                      <div className="text-[10px] text-slate-400 mt-0.5 capitalize">Target Section: {result.section}</div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Manual Typewriter Input (Fail-safe for any browser) */}
-            <form 
-              onSubmit={(e) => { e.preventDefault(); executeVoiceCommand(manualText); }}
-              className="flex items-center space-x-2"
-            >
-              <input
-                type="text"
-                value={manualText}
-                onChange={(e) => setManualText(e.target.value)}
-                placeholder="Or type what you did (e.g. 'I drank 500ml water' or '3 idlis 2 eggs')..."
-                className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
-              />
-              <button
-                type="submit"
-                disabled={!manualText.trim() || isProcessing}
-                className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 text-slate-950 font-black rounded-xl text-xs flex items-center justify-center space-x-1 transition-all cursor-pointer shadow-md"
-              >
-                <span>Add</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-            </form>
-
-            {/* Quick 1-Tap Example Utterances for All Sections */}
-            <div className="space-y-2">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                1-Tap quick examples:
-              </span>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-left">
-                {[
-                  { text: '3 idlis with sambar and 2 boiled eggs', section: 'Diet', icon: Utensils, color: 'text-emerald-400' },
-                  { text: 'I drank 500 ml water', section: 'Water', icon: Droplets, color: 'text-blue-400' },
-                  { text: 'Barbell bench press 3 sets 10 reps 60kg', section: 'Workout', icon: Dumbbell, color: 'text-amber-400' },
-                  { text: 'My scale weight is 110.5 kg', section: 'Weight', icon: Scale, color: 'text-teal-400' }
-                ].map((item, idx) => {
-                  const Icon = item.icon;
-                  return (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => {
-                        setTranscript(item.text);
-                        executeVoiceCommand(item.text);
-                      }}
-                      className="p-2 bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-emerald-500/40 rounded-xl flex items-center space-x-2 text-xs text-slate-300 transition-all text-left cursor-pointer"
-                    >
-                      <Icon className={`w-3.5 h-3.5 shrink-0 ${item.color}`} />
-                      <div className="truncate flex-1">
-                        <span className="text-[10px] font-bold text-slate-500 block leading-tight">{item.section}</span>
-                        <span className="text-[11px] font-semibold text-slate-200 truncate block">&ldquo;{item.text}&rdquo;</span>
+                {/* 2. Structured AI Intent Card */}
+                <div className="bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 border-2 border-emerald-500/40 rounded-2xl p-4 text-left space-y-3 shadow-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <div className="p-2 rounded-xl bg-slate-800 border border-slate-700">
+                        {getSectionIcon(previewData.intent)}
                       </div>
-                    </button>
-                  );
-                })}
+                      <div>
+                        <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md ${
+                          previewData.intent === 'meal' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
+                          previewData.intent === 'workout' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
+                          previewData.intent === 'water' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' :
+                          'bg-teal-500/20 text-teal-400 border border-teal-500/30'
+                        }`}>
+                          {previewData.badgeText || previewData.intent}
+                        </span>
+                        <h4 className="text-sm font-black text-white mt-1">
+                          {previewData.summaryTitle}
+                        </h4>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Numbers & Breakdown Display */}
+                  <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-3">
+                    <p className="text-xs font-bold text-emerald-300">
+                      {previewData.previewDetails}
+                    </p>
+                    {previewData.intent === 'meal' && previewData.parsedData?.foods && (
+                      <div className="mt-2 pt-2 border-t border-slate-800/80 space-y-1">
+                        {previewData.parsedData.foods.map((food, fidx) => (
+                          <div key={fidx} className="flex items-center justify-between text-[11px] text-slate-400">
+                            <span>• {food.name} ({food.quantity})</span>
+                            <span className="font-semibold text-slate-300">{food.calories} kcal | {food.protein}g P</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Category Switcher Pills */}
+                  <div className="space-y-1.5 pt-1 border-t border-slate-800/60">
+                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                      Wrong Category? Switch to:
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[
+                        { id: 'meal', label: '🍽️ Food / Meal' },
+                        { id: 'workout', label: '💪 Gym Workout' },
+                        { id: 'water', label: '💧 Water' },
+                        { id: 'weight', label: '⚖️ Body Weight' }
+                      ].map((cat) => (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          onClick={() => handleSwitchCategory(cat.id)}
+                          className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-all cursor-pointer ${
+                            previewData.intent === cat.id
+                              ? 'bg-emerald-500 text-slate-950 font-black'
+                              : 'bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700/60'
+                          }`}
+                        >
+                          {cat.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Action Buttons: Confirm & Commit vs Try Again */}
+                <div className="grid grid-cols-2 gap-2.5 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStateMode('idle');
+                      setPreviewData(null);
+                      setTranscript('');
+                      setEditableSpeech('');
+                    }}
+                    disabled={isProcessing}
+                    className="py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl flex items-center justify-center space-x-1.5 transition-all border border-slate-700 cursor-pointer"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Try Again</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleConfirmAndCommit}
+                    disabled={isProcessing}
+                    className="py-2.5 bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 text-xs font-black rounded-xl flex items-center justify-center space-x-1.5 transition-all shadow-lg shadow-emerald-500/20 cursor-pointer"
+                  >
+                    {isProcessing ? (
+                      <div className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <>
+                        <CheckCircle2 className="w-4 h-4" />
+                        <span>Confirm & Log</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* ========================================================================= */}
+            {/* VIEW 3: SUCCESS CONFIRMATION (stateMode === 'success')                    */}
+            {/* ========================================================================= */}
+            {stateMode === 'success' && result && (
+              <div className="bg-emerald-500/15 border border-emerald-500/40 p-5 rounded-2xl text-left space-y-3 animate-in fade-in zoom-in-95">
+                <div className="flex items-center space-x-2">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                  <span className="text-xs font-black text-white uppercase tracking-wider">
+                    Successfully Logged to Diary!
+                  </span>
+                </div>
+                <div className="bg-slate-900/90 p-3.5 rounded-xl border border-slate-800 flex items-start space-x-3">
+                  <div className="p-2 bg-slate-950 rounded-xl border border-slate-800 shrink-0">
+                    {getSectionIcon(result.section)}
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-xs font-bold text-emerald-300">{result.feedback}</div>
+                    <div className="text-[10px] text-slate-400 mt-1 capitalize">Target Section: {result.section}</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ========================================================================= */}
+            {/* MANUAL TYPEWRITER INPUT (Always accessible at bottom)                    */}
+            {/* ========================================================================= */}
+            {stateMode !== 'preview' && stateMode !== 'success' && (
+              <>
+                <form 
+                  onSubmit={(e) => { 
+                    e.preventDefault(); 
+                    if (manualText.trim()) {
+                      setEditableSpeech(manualText.trim());
+                      parseIntentForPreview(manualText.trim());
+                    }
+                  }}
+                  className="flex items-center space-x-2"
+                >
+                  <input
+                    type="text"
+                    value={manualText}
+                    onChange={(e) => setManualText(e.target.value)}
+                    placeholder="Or type what you did (e.g. 'I drank 500ml water' or '3 idlis 2 eggs')..."
+                    className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!manualText.trim() || isProcessing}
+                    className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 text-slate-950 font-black rounded-xl text-xs flex items-center justify-center space-x-1 transition-all cursor-pointer shadow-md"
+                  >
+                    <span>Preview</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </form>
+
+                {/* Quick 1-Tap Example Utterances */}
+                <div className="space-y-2">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block text-left">
+                    1-Tap quick examples:
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-left">
+                    {[
+                      { text: '3 idlis with sambar and 2 boiled eggs', section: 'Diet', icon: Utensils, color: 'text-emerald-400' },
+                      { text: 'I drank 500 ml water', section: 'Water', icon: Droplets, color: 'text-blue-400' },
+                      { text: 'Barbell bench press 3 sets 10 reps 60kg', section: 'Workout', icon: Dumbbell, color: 'text-amber-400' },
+                      { text: 'My scale weight is 110.5 kg', section: 'Weight', icon: Scale, color: 'text-teal-400' }
+                    ].map((item, idx) => {
+                      const Icon = item.icon;
+                      return (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => {
+                            setTranscript(item.text);
+                            setEditableSpeech(item.text);
+                            parseIntentForPreview(item.text);
+                          }}
+                          className="p-2 bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-emerald-500/40 rounded-xl flex items-center space-x-2 text-xs text-slate-300 transition-all text-left cursor-pointer"
+                        >
+                          <Icon className={`w-3.5 h-3.5 shrink-0 ${item.color}`} />
+                          <div className="truncate flex-1">
+                            <span className="text-[10px] font-bold text-slate-500 block leading-tight">{item.section}</span>
+                            <span className="text-[11px] font-semibold text-slate-200 truncate block">&ldquo;{item.text}&rdquo;</span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </>
+            )}
 
           </div>
         </div>

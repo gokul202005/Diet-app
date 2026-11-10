@@ -489,245 +489,225 @@ app.post('/api/ai/analyze-meal-photo', upload.single('photo'), async (req, res) 
 });
 
 // --- UNIVERSAL FULL-WEBSITE AI VOICE COMMAND ENGINE ---
-async function executeUniversalVoice(text, date = new Date().toISOString().split('T')[0], userId = 'default_guest') {
+async function parseUniversalVoiceIntent(text, date = new Date().toISOString().split('T')[0], userId = 'default_guest') {
   const db = readDB();
   const clean = text.toLowerCase().trim();
 
-    // 1. INTENT: WATER HYDRATION
-    if (clean.includes('water') || clean.includes('drank') || clean.includes('thanni') || clean.includes('hydration') || (clean.includes('glass') && !clean.includes('idli')) || (clean.includes('bottle') && !clean.includes('gourd'))) {
-      let amountMl = 250; // default 1 glass
+  // 1. INTENT: COACH QUESTIONS
+  const isQuestion = clean.startsWith('how') || clean.startsWith('what') || clean.startsWith('can i') || 
+                     clean.startsWith('why') || clean.startsWith('tell me') || clean.startsWith('give me') || 
+                     clean.startsWith('should i') || clean.endsWith('?');
+  const hasFoodAction = clean.includes('ate') || clean.includes('had') || clean.includes('eaten') || clean.includes('drank');
+  if (isQuestion && !hasFoodAction) {
+    return {
+      intent: 'coach',
+      summaryTitle: 'Ask AI Coach',
+      previewDetails: text,
+      badgeText: 'AI Coach Question',
+      badgeColor: 'sky',
+      originalText: text,
+      parsedData: { question: text }
+    };
+  }
 
-      // Check for numeric patterns
-      const mlMatch = clean.match(/(\d+)\s*(?:ml|milliliter|millilitres)/i);
-      const literMatch = clean.match(/(\d+(?:\.\d+)?)\s*(?:l|liter|liters|litre|litres)\b/i);
-      const glassMatch = clean.match(/(\d+)\s*(?:glass|glasses)/i);
-      const bottleMatch = clean.match(/(\d+)\s*(?:bottle|bottles)/i);
+  // 2. INTENT: GYM WORKOUT & BIOMECHANICS PROGRESSION
+  const gymKeywords = [
+    'bench', 'squat', 'deadlift', 'press', 'curl', 'dumbbell', 'barbell', 'sets', 'reps',
+    'workout', 'pushups', 'push-ups', 'pullups', 'pull-ups', 'flyes', 'pulldown', 'lunges',
+    'tricep', 'bicep', 'shoulder', 'chest', 'leg', 'rows', 'incline', 'plank', 'dip', 'dips',
+    'lateral raise', 'overhead press', 'ohp', 'hip thrust', 'leg press', 'abs'
+  ];
+  const hasSetRepPattern = /\b\d+\s*(?:sets|reps|x)\b/i.test(clean) || /\b\d+\s*sets?\s*(?:of\s*)?\d+\s*reps?\b/i.test(clean);
+  const isWorkout = gymKeywords.some(kw => clean.includes(kw)) || hasSetRepPattern;
 
-      if (mlMatch) {
-        amountMl = parseInt(mlMatch[1]);
-      } else if (literMatch) {
-        amountMl = Math.round(parseFloat(literMatch[1]) * 1000);
-      } else if (clean.includes('half a liter') || clean.includes('half liter') || clean.includes('half litre')) {
-        amountMl = 500;
-      } else if (glassMatch) {
-        amountMl = parseInt(glassMatch[1]) * 250;
-      } else if (bottleMatch) {
-        amountMl = parseInt(bottleMatch[1]) * 500;
-      } else if (clean.includes('two glasses') || clean.includes('2 glasses')) {
-        amountMl = 500;
-      } else if (clean.includes('three glasses') || clean.includes('3 glasses')) {
-        amountMl = 750;
-      } else if (clean.includes('one bottle') || clean.includes('a bottle')) {
-        amountMl = 500;
-      }
+  if (isWorkout) {
+    let exerciseName = 'Barbell Flat Bench Press';
+    if (clean.includes('incline') && (clean.includes('dumbbell') || clean.includes('press'))) exerciseName = 'Incline Dumbbell Press';
+    else if (clean.includes('incline') && clean.includes('bench')) exerciseName = 'Incline Barbell Bench Press';
+    else if (clean.includes('bench')) exerciseName = 'Barbell Flat Bench Press';
+    else if (clean.includes('squat')) exerciseName = 'Barbell Back Squat';
+    else if (clean.includes('deadlift')) exerciseName = 'Conventional Barbell Deadlift';
+    else if (clean.includes('overhead') || clean.includes('ohp') || clean.includes('shoulder press')) exerciseName = 'Standing Overhead Barbell Press (OHP)';
+    else if (clean.includes('bicep') || (clean.includes('curl') && !clean.includes('leg'))) exerciseName = 'Dumbbell / Barbell Bicep Curls';
+    else if (clean.includes('leg curl')) exerciseName = 'Seated Hamstring Leg Curls';
+    else if (clean.includes('tricep') || clean.includes('pushdown')) exerciseName = 'Tricep Cable Rope Pushdown';
+    else if (clean.includes('lat') || clean.includes('pulldown')) exerciseName = 'Wide-Grip Lat Pulldown';
+    else if (clean.includes('leg press')) exerciseName = 'Leg Press (45-Degree Sled)';
+    else if (clean.includes('pushup') || clean.includes('push up')) exerciseName = 'Standard Push-ups';
+    else if (clean.includes('pullup') || clean.includes('pull up') || clean.includes('chin up')) exerciseName = 'Pull-ups / Chin-ups';
+    else if (clean.includes('lateral raise')) exerciseName = 'Dumbbell Lateral Raises';
+    else if (clean.includes('row')) exerciseName = 'Bent-Over Barbell Rows';
+    else if (clean.includes('lunge')) exerciseName = 'Walking Dumbbell Lunges';
 
-      db.waterLogs = db.waterLogs || [];
-      let waterEntry = db.waterLogs.find(w => (!w.userId || w.userId === userId) && w.date === date);
-      if (waterEntry) {
-        waterEntry.amountMl = Math.max(0, waterEntry.amountMl + amountMl);
-      } else {
-        waterEntry = { date, userId, amountMl };
-        db.waterLogs.push(waterEntry);
-      }
-      writeDB(db);
+    const setsMatch = clean.match(/(\d+)\s*sets?/i);
+    const repsMatch = clean.match(/(\d+)\s*reps?/i);
+    const weightMatch = clean.match(/(\d+(?:\.\d+)?)\s*(?:kg|kilos|kgs)\b/i);
 
-      return {
-        success: true,
-        section: 'water',
-        action: 'log_water',
-        amountMl,
-        totalMl: waterEntry.amountMl,
-        feedback: `Logged +${amountMl} ml of water! Today's Total: ${waterEntry.amountMl} ml`
-      };
-    }
+    const setsCount = setsMatch ? parseInt(setsMatch[1]) : 3;
+    const repsCount = repsMatch ? parseInt(repsMatch[1]) : 10;
+    const weightKg = weightMatch ? parseFloat(weightMatch[1]) : 50;
 
-    // 2. INTENT: SCALE WEIGHT
-    if (clean.includes('weight') || clean.includes('weighed') || clean.includes('scale') || clean.includes('kilos') || clean.match(/\b\d+(\.\d+)?\s*(?:kg|kgs)\b/)) {
-      const weightMatch = clean.match(/(\d+(?:\.\d+)?)\s*(?:kg|kgs|kilos)?/);
-      if (weightMatch) {
-        const numWeight = parseFloat(weightMatch[1]);
-        if (numWeight >= 30 && numWeight <= 300) {
-          const userProfile = getUserProfile(db, userId);
-          userProfile.weightKg = numWeight;
-          db.weightLogs = db.weightLogs || [];
-          const existing = db.weightLogs.find(w => (!w.userId || w.userId === userId) && w.date === date);
-          if (existing) {
-            existing.weightKg = numWeight;
-          } else {
-            db.weightLogs.push({ date, userId, weightKg: numWeight });
-          }
-          writeDB(db);
-
-          return {
-            success: true,
-            section: 'weight',
-            action: 'log_weight',
-            weightKg: numWeight,
-            feedback: `Recorded your scale weight: ${numWeight} kg!`
-          };
-        }
-      }
-    }
-
-    // 3. INTENT: FASTRACK STEPS & ACTIVITY
-    if ((clean.includes('step') || clean.includes('steps') || clean.includes('walked')) && !clean.includes('bench')) {
-      const stepsMatch = clean.match(/(\d+[\d,]*)\s*(?:steps)?/);
-      if (stepsMatch) {
-        const steps = parseInt(stepsMatch[1].replace(/,/g, ''));
-        if (steps > 0 && steps < 100000) {
-          db.fastrackLogs = db.fastrackLogs || [];
-          let log = db.fastrackLogs.find(l => (!l.userId || l.userId === userId) && l.date === date);
-          const activeCal = Math.round(steps * 0.04);
-          if (log) {
-            log.steps = steps;
-            log.activeCalories = activeCal;
-          } else {
-            log = {
-              date,
-              userId,
-              deviceName: 'Fastrack Smartwatch',
-              steps,
-              activeCalories: activeCal,
-              batteryLevel: 85,
-              syncedAt: new Date().toISOString()
-            };
-            db.fastrackLogs.unshift(log);
-          }
-          writeDB(db);
-
-          return {
-            success: true,
-            section: 'fastrack',
-            action: 'log_steps',
-            steps,
-            feedback: `Logged ${steps.toLocaleString()} steps (+${activeCal} active kcal) to Fastrack!`
-          };
-        }
-      }
-    }
-
-    // 4. INTENT: WORKOUT / GYM PROGRESSION LOGGING
-    const gymKeywords = ['bench', 'squat', 'deadlift', 'press', 'curl', 'dumbbell', 'barbell', 'sets', 'reps', 'workout', 'pushups', 'pullups', 'flyes', 'pulldown', 'lunges', 'tricep', 'bicep', 'shoulder', 'chest', 'leg'];
-    const isWorkout = gymKeywords.some(kw => clean.includes(kw));
-
-    if (isWorkout) {
-      // Determine exercise name
-      let exerciseName = 'Barbell Flat Bench Press';
-      if (clean.includes('bench') && clean.includes('incline')) exerciseName = 'Incline Dumbbell Press';
-      else if (clean.includes('bench')) exerciseName = 'Barbell Flat Bench Press';
-      else if (clean.includes('squat')) exerciseName = 'Barbell Back Squat';
-      else if (clean.includes('deadlift')) exerciseName = 'Conventional Barbell Deadlift';
-      else if (clean.includes('overhead') || clean.includes('ohp') || clean.includes('shoulder press')) exerciseName = 'Standing Overhead Barbell Press (OHP)';
-      else if (clean.includes('curl') || clean.includes('bicep')) exerciseName = 'Barbell Bicep Curl';
-      else if (clean.includes('tricep') || clean.includes('pushdown')) exerciseName = 'Tricep Cable Rope Pushdown';
-      else if (clean.includes('lat') || clean.includes('pulldown')) exerciseName = 'Wide-Grip Lat Pulldown';
-      else if (clean.includes('leg press')) exerciseName = 'Leg Press (45-Degree Sled)';
-      else if (clean.includes('pushup') || clean.includes('push up')) exerciseName = 'Standard Push-ups';
-      else if (clean.includes('pullup') || clean.includes('pull up')) exerciseName = 'Pull-ups / Chin-ups';
-
-      // Determine sets, reps, weight
-      const setsMatch = clean.match(/(\d+)\s*sets?/i);
-      const repsMatch = clean.match(/(\d+)\s*reps?/i);
-      const weightMatch = clean.match(/(\d+(?:\.\d+)?)\s*(?:kg|kilos|kgs)\b/i);
-
-      const setsCount = setsMatch ? parseInt(setsMatch[1]) : 3;
-      const repsCount = repsMatch ? parseInt(repsMatch[1]) : 10;
-      const weightKg = weightMatch ? parseFloat(weightMatch[1]) : 50;
-
-      const newWorkout = {
-        id: `workout-${Date.now()}`,
-        userId,
-        date,
-        title: `${exerciseName} Session`,
-        splitType: 'Strength',
-        exercises: [{
-          name: exerciseName,
-          sets: Array.from({ length: setsCount }, () => ({
-            reps: repsCount,
-            weight: weightKg,
-            done: true
-          }))
-        }],
+    return {
+      intent: 'workout',
+      summaryTitle: exerciseName,
+      previewDetails: `${setsCount} sets × ${repsCount} reps @ ${weightKg} kg`,
+      badgeText: 'Strength Workout',
+      badgeColor: 'amber',
+      originalText: text,
+      parsedData: {
+        exerciseName,
+        setsCount,
+        repsCount,
+        weightKg,
         durationMin: 35,
-        caloriesBurned: Math.round(setsCount * repsCount * 1.5 + 80),
-        notes: `Logged via Universal Voice Assistant: "${text}"`,
-        loggedAt: new Date().toISOString()
-      };
+        caloriesBurned: Math.round(setsCount * repsCount * 1.5 + 80)
+      }
+    };
+  }
 
-      db.workouts = db.workouts || [];
-      db.workouts.unshift(newWorkout);
-      writeDB(db);
+  // 3. INTENT: SCALE BODY WEIGHT (Strict check: personal weight only, never food portions or gym weights)
+  const hasBodyWeightPhrase = clean.includes('scale weight') || clean.includes('my weight') || 
+                              clean.includes('weighed myself') || clean.includes('body weight') || 
+                              clean.includes('scale says') || clean.includes('weighed in at') || 
+                              clean.includes('morning weight');
+  const foodKeywords = ['chicken', 'paneer', 'rice', 'meat', 'egg', 'fish', 'mutton', 'dal', 'roti', 'dosa', 'idli', 'gram', 'grams', ' gm ', ' g '];
+  const isFoodText = foodKeywords.some(fk => clean.includes(fk));
 
-      return {
-        success: true,
-        section: 'workouts',
-        action: 'log_workout',
-        workout: newWorkout,
-        feedback: `Logged workout: ${exerciseName} (${setsCount} sets × ${repsCount} reps @ ${weightKg} kg)!`
-      };
+  if (hasBodyWeightPhrase || ((clean.includes('weight') || clean.includes('weighed') || clean.includes('scale')) && !isFoodText && !isWorkout)) {
+    const weightMatch = clean.match(/(\d+(?:\.\d+)?)\s*(?:kg|kgs|kilos)?/);
+    if (weightMatch) {
+      const numWeight = parseFloat(weightMatch[1]);
+      if (numWeight >= 30 && numWeight <= 300) {
+        return {
+          intent: 'weight',
+          summaryTitle: 'Morning Scale Weight',
+          previewDetails: `${numWeight} kg`,
+          badgeText: 'Body Weight',
+          badgeColor: 'teal',
+          originalText: text,
+          parsedData: {
+            weightKg: numWeight
+          }
+        };
+      }
     }
+  }
 
-    // 5. INTENT: COACH QUESTIONS
-    const isQuestion = clean.startsWith('how') || clean.startsWith('what') || clean.startsWith('can i') || clean.startsWith('why') || clean.startsWith('tell me') || clean.startsWith('give me') || clean.endsWith('?');
-    if (isQuestion && !clean.includes('ate') && !clean.includes('had')) {
-      aiService.setApiKey(db.settings?.geminiApiKey || process.env.GEMINI_API_KEY || '');
-      const userProfile = getUserProfile(db, userId);
-      const todayMeals = (db.meals || []).filter(m => (!m.userId || m.userId === userId) && m.date === date);
-      const consumedCalories = todayMeals.reduce((s, m) => s + (m.totalCalories || 0), 0);
-      const consumedProtein = Number(todayMeals.reduce((s, m) => s + (m.totalProtein || 0), 0).toFixed(1));
-      const fastrackLog = (db.fastrackLogs || []).find(l => (!l.userId || l.userId === userId) && l.date === date);
+  // 4. INTENT: WATER HYDRATION (Pure water only, no caloric drinks)
+  const caloricDrinks = ['shake', 'protein', 'milk', 'tea', 'chai', 'coffee', 'juice', 'smoothie', 'lassi', 'curd', 'buttermilk', 'coke', 'soda'];
+  const hasCaloricDrink = caloricDrinks.some(cd => clean.includes(cd));
+  const hasWaterWord = clean.includes('water') || clean.includes('thanni') || clean.includes('hydration') || 
+                       (clean.includes('glass') && !clean.includes('idli') && !clean.includes('dosa')) || 
+                       (clean.includes('bottle') && !clean.includes('gourd'));
 
-      const coachStats = {
-        consumedCalories,
-        consumedProtein,
-        steps: fastrackLog?.steps || 0,
-        activeCaloriesBurned: fastrackLog?.activeCalories || 0
-      };
+  if (hasWaterWord && !hasCaloricDrink) {
+    let amountMl = 250;
+    const mlMatch = clean.match(/(\d+)\s*(?:ml|milliliter|millilitres)/i);
+    const literMatch = clean.match(/(\d+(?:\.\d+)?)\s*(?:l|liter|liters|litre|litres)\b/i);
+    const glassMatch = clean.match(/(\d+)\s*(?:glass|glasses)/i);
+    const bottleMatch = clean.match(/(\d+)\s*(?:bottle|bottles)/i);
 
-      const userChat = (db.chatHistory || []).filter(c => !c.userId || c.userId === userId);
-      const { reply } = await aiService.askCoachChat(text, userChat, userProfile, coachStats);
+    if (mlMatch) amountMl = parseInt(mlMatch[1]);
+    else if (literMatch) amountMl = Math.round(parseFloat(literMatch[1]) * 1000);
+    else if (clean.includes('half a liter') || clean.includes('half liter')) amountMl = 500;
+    else if (glassMatch) amountMl = parseInt(glassMatch[1]) * 250;
+    else if (bottleMatch) amountMl = parseInt(bottleMatch[1]) * 500;
+    else if (clean.includes('two glasses') || clean.includes('2 glasses')) amountMl = 500;
+    else if (clean.includes('three glasses') || clean.includes('3 glasses')) amountMl = 750;
+    else if (clean.includes('one bottle') || clean.includes('a bottle')) amountMl = 500;
 
-      return {
-        success: true,
-        section: 'coach',
-        action: 'coach_reply',
-        reply,
-        feedback: reply
-      };
+    return {
+      intent: 'water',
+      summaryTitle: 'Water Hydration',
+      previewDetails: `+${amountMl} ml (${(amountMl / 1000).toFixed(2)} L)`,
+      badgeText: 'Hydration',
+      badgeColor: 'blue',
+      originalText: text,
+      parsedData: {
+        amountMl
+      }
+    };
+  }
+
+  // 5. INTENT: FASTRACK STEPS
+  if ((clean.includes('step') || clean.includes('steps') || clean.includes('walked')) && !clean.includes('bench')) {
+    const stepsMatch = clean.match(/(\d+[\d,]*)\s*(?:steps)?/);
+    if (stepsMatch) {
+      const steps = parseInt(stepsMatch[1].replace(/,/g, ''));
+      if (steps > 0 && steps < 100000) {
+        const activeCalories = Math.round(steps * 0.04);
+        return {
+          intent: 'fastrack',
+          summaryTitle: 'Fastrack Steps Log',
+          previewDetails: `${steps.toLocaleString()} steps (+${activeCalories} active kcal)`,
+          badgeText: 'Smartwatch Activity',
+          badgeColor: 'emerald',
+          originalText: text,
+          parsedData: {
+            steps,
+            activeCalories
+          }
+        };
+      }
     }
+  }
 
-    // 6. DEFAULT INTENT: DIET & MEAL LOGGING (SOUTH INDIAN & GLOBAL)
-    let mealType = 'lunch';
-    if (clean.includes('breakfast') || clean.includes('morning')) mealType = 'breakfast';
-    else if (clean.includes('lunch') || clean.includes('afternoon')) mealType = 'lunch';
-    else if (clean.includes('dinner') || clean.includes('night')) mealType = 'dinner';
-    else if (clean.includes('snack') || clean.includes('tea') || clean.includes('evening')) mealType = 'snack';
-    else {
-      const currentHour = new Date().getHours();
-      if (currentHour < 11) mealType = 'breakfast';
-      else if (currentHour < 15) mealType = 'lunch';
-      else if (currentHour < 19) mealType = 'snack';
-      else mealType = 'dinner';
-    }
+  // 6. DEFAULT INTENT: DIET & MEAL (Food, Caloric Drinks, South Indian & Global items)
+  let mealType = 'lunch';
+  if (clean.includes('breakfast') || clean.includes('morning')) mealType = 'breakfast';
+  else if (clean.includes('lunch') || clean.includes('afternoon')) mealType = 'lunch';
+  else if (clean.includes('dinner') || clean.includes('night')) mealType = 'dinner';
+  else if (clean.includes('snack') || clean.includes('tea') || clean.includes('evening') || clean.includes('shake')) mealType = 'snack';
+  else {
+    const currentHour = new Date().getHours();
+    if (currentHour < 11) mealType = 'breakfast';
+    else if (currentHour < 15) mealType = 'lunch';
+    else if (currentHour < 19) mealType = 'snack';
+    else mealType = 'dinner';
+  }
 
-    aiService.setApiKey(db.settings?.geminiApiKey || process.env.GEMINI_API_KEY || '');
-    const analysis = await aiService.analyzeMealText(text);
+  aiService.setApiKey(db.settings?.geminiApiKey || process.env.GEMINI_API_KEY || '');
+  const analysis = await aiService.analyzeMealText(text);
 
-    const newMeal = {
-      id: `meal-${Date.now()}`,
-      userId,
-      date,
+  return {
+    intent: 'meal',
+    summaryTitle: analysis.mealName || text.slice(0, 35),
+    previewDetails: `${analysis.totalCalories || 250} kcal • ${analysis.totalProtein || 15}g P • ${analysis.totalCarbs || 30}g C • ${analysis.totalFat || 8}g F`,
+    badgeText: mealType.toUpperCase(),
+    badgeColor: 'emerald',
+    originalText: text,
+    parsedData: {
       mealType,
       name: analysis.mealName || text.slice(0, 35),
       foods: analysis.items || [],
       totalCalories: analysis.totalCalories || 250,
       totalProtein: analysis.totalProtein || 15,
       totalCarbs: analysis.totalCarbs || 30,
-      totalFat: analysis.totalFat || 8,
+      totalFat: analysis.totalFat || 8
+    }
+  };
+}
+
+// Commit verified voice intent to Database
+async function commitUniversalVoice(intent, payload, originalText = '', date = new Date().toISOString().split('T')[0], userId = 'default_guest') {
+  const db = readDB();
+
+  // Commit MEAL
+  if (intent === 'meal') {
+    const newMeal = {
+      id: `meal-${Date.now()}`,
+      userId,
+      date,
+      mealType: payload.mealType || 'lunch',
+      name: payload.name || originalText.slice(0, 35),
+      foods: payload.foods || [],
+      totalCalories: payload.totalCalories || 250,
+      totalProtein: payload.totalProtein || 15,
+      totalCarbs: payload.totalCarbs || 30,
+      totalFat: payload.totalFat || 8,
       notes: `Logged via Universal Voice Assistant on ${date}`,
       loggedAt: new Date().toISOString()
     };
-
     db.meals = db.meals || [];
     db.meals.unshift(newMeal);
     writeDB(db);
@@ -737,17 +717,188 @@ async function executeUniversalVoice(text, date = new Date().toISOString().split
       section: 'diet',
       action: 'log_meal',
       meal: newMeal,
-      feedback: `Logged to ${mealType.toUpperCase()}: ${newMeal.name} (+${newMeal.totalCalories} kcal, ${newMeal.totalProtein}g protein)!`
+      feedback: `Logged to ${newMeal.mealType.toUpperCase()}: ${newMeal.name} (+${newMeal.totalCalories} kcal, ${newMeal.totalProtein}g protein)!`
+    };
+  }
+
+  // Commit WORKOUT
+  if (intent === 'workout') {
+    const newWorkout = {
+      id: `workout-${Date.now()}`,
+      userId,
+      date,
+      title: `${payload.exerciseName} Session`,
+      splitType: 'Strength',
+      exercises: [{
+        name: payload.exerciseName,
+        sets: Array.from({ length: payload.setsCount || 3 }, () => ({
+          reps: payload.repsCount || 10,
+          weight: payload.weightKg || 50,
+          done: true
+        }))
+      }],
+      durationMin: payload.durationMin || 35,
+      caloriesBurned: payload.caloriesBurned || 125,
+      notes: `Logged via Universal Voice Assistant: "${originalText}"`,
+      loggedAt: new Date().toISOString()
+    };
+    db.workouts = db.workouts || [];
+    db.workouts.unshift(newWorkout);
+    writeDB(db);
+
+    return {
+      success: true,
+      section: 'workouts',
+      action: 'log_workout',
+      workout: newWorkout,
+      feedback: `Logged workout: ${payload.exerciseName} (${payload.setsCount} sets × ${payload.repsCount} reps @ ${payload.weightKg} kg)!`
+    };
+  }
+
+  // Commit WATER
+  if (intent === 'water') {
+    const amountMl = payload.amountMl || 250;
+    db.waterLogs = db.waterLogs || [];
+    let waterEntry = db.waterLogs.find(w => (!w.userId || w.userId === userId) && w.date === date);
+    if (waterEntry) {
+      waterEntry.amountMl = Math.max(0, waterEntry.amountMl + amountMl);
+    } else {
+      waterEntry = { date, userId, amountMl };
+      db.waterLogs.push(waterEntry);
+    }
+    writeDB(db);
+
+    return {
+      success: true,
+      section: 'water',
+      action: 'log_water',
+      amountMl,
+      totalMl: waterEntry.amountMl,
+      feedback: `Logged +${amountMl} ml of water! Today's Total: ${waterEntry.amountMl} ml`
+    };
+  }
+
+  // Commit SCALE WEIGHT
+  if (intent === 'weight') {
+    const numWeight = payload.weightKg;
+    const userProfile = getUserProfile(db, userId);
+    userProfile.weightKg = numWeight;
+    db.weightLogs = db.weightLogs || [];
+    const existing = db.weightLogs.find(w => (!w.userId || w.userId === userId) && w.date === date);
+    if (existing) {
+      existing.weightKg = numWeight;
+    } else {
+      db.weightLogs.push({ date, userId, weightKg: numWeight });
+    }
+    writeDB(db);
+
+    return {
+      success: true,
+      section: 'weight',
+      action: 'log_weight',
+      weightKg: numWeight,
+      feedback: `Recorded your scale weight: ${numWeight} kg!`
+    };
+  }
+
+  // Commit FASTRACK STEPS
+  if (intent === 'fastrack') {
+    const steps = payload.steps || 5000;
+    const activeCalories = payload.activeCalories || Math.round(steps * 0.04);
+    db.fastrackLogs = db.fastrackLogs || [];
+    let log = db.fastrackLogs.find(l => (!l.userId || l.userId === userId) && l.date === date);
+    if (log) {
+      log.steps = steps;
+      log.activeCalories = activeCalories;
+    } else {
+      log = {
+        date,
+        userId,
+        deviceName: 'Fastrack Smartwatch',
+        steps,
+        activeCalories,
+        batteryLevel: 85,
+        syncedAt: new Date().toISOString()
+      };
+      db.fastrackLogs.unshift(log);
+    }
+    writeDB(db);
+
+    return {
+      success: true,
+      section: 'fastrack',
+      action: 'log_steps',
+      steps,
+      feedback: `Logged ${steps.toLocaleString()} steps (+${activeCalories} active kcal) to Fastrack!`
+    };
+  }
+
+  // Commit COACH QUESTION
+  if (intent === 'coach') {
+    aiService.setApiKey(db.settings?.geminiApiKey || process.env.GEMINI_API_KEY || '');
+    const userProfile = getUserProfile(db, userId);
+    const todayMeals = (db.meals || []).filter(m => (!m.userId || m.userId === userId) && m.date === date);
+    const consumedCalories = todayMeals.reduce((s, m) => s + (m.totalCalories || 0), 0);
+    const consumedProtein = Number(todayMeals.reduce((s, m) => s + (m.totalProtein || 0), 0).toFixed(1));
+    const fastrackLog = (db.fastrackLogs || []).find(l => (!l.userId || l.userId === userId) && l.date === date);
+
+    const coachStats = {
+      consumedCalories,
+      consumedProtein,
+      steps: fastrackLog?.steps || 0,
+      activeCaloriesBurned: fastrackLog?.activeCalories || 0
     };
 
+    const userChat = (db.chatHistory || []).filter(c => !c.userId || c.userId === userId);
+    const { reply } = await aiService.askCoachChat(originalText || payload.question, userChat, userProfile, coachStats);
+
+    return {
+      success: true,
+      section: 'coach',
+      action: 'coach_reply',
+      reply,
+      feedback: reply
+    };
+  }
+
+  throw new Error(`Unknown intent type: ${intent}`);
 }
 
-// POST endpoint for text-based universal voice
-app.post('/api/ai/universal-voice', async (req, res) => {
+async function executeUniversalVoice(text, date = new Date().toISOString().split('T')[0], userId = 'default_guest') {
+  const parsed = await parseUniversalVoiceIntent(text, date, userId);
+  return await commitUniversalVoice(parsed.intent, parsed.parsedData, text, date, userId);
+}
+
+// POST endpoint for previewing voice intent before saving
+app.post('/api/ai/parse-voice-intent', async (req, res) => {
   try {
     const db = readDB();
     const userId = getAuthUserId(req, db);
     const { text, date = new Date().toISOString().split('T')[0] } = req.body;
+    if (!text || typeof text !== 'string' || !text.trim()) {
+      return res.status(400).json({ error: 'Voice speech text is required' });
+    }
+    const preview = await parseUniversalVoiceIntent(text, date, userId);
+    res.json({ success: true, ...preview });
+  } catch (err) {
+    console.error('Parse voice intent error:', err);
+    res.status(500).json({ error: 'Failed to parse voice intent', details: err.message });
+  }
+});
+
+// POST endpoint for executing universal voice (direct or confirmed)
+app.post('/api/ai/universal-voice', async (req, res) => {
+  try {
+    const db = readDB();
+    const userId = getAuthUserId(req, db);
+    const { text, confirmedIntent, payload, date = new Date().toISOString().split('T')[0] } = req.body;
+    
+    // If client verified intent in Step 2:
+    if (confirmedIntent && payload) {
+      const result = await commitUniversalVoice(confirmedIntent, payload, text || '', date, userId);
+      return res.json(result);
+    }
+
     if (!text || typeof text !== 'string' || !text.trim()) {
       return res.status(400).json({ error: 'Voice speech text is required' });
     }
@@ -771,26 +922,39 @@ app.post('/api/ai/universal-voice-audio', upload.single('audio'), async (req, re
     const apiKey = db.settings?.geminiApiKey || process.env.GEMINI_API_KEY || '';
 
     if (!apiKey) {
-      return res.status(400).json({
-        error: 'Gemini API Key Required',
+      return res.json({
+        success: false,
         needsApiKey: true,
-        details: 'To transcribe direct voice recordings, please add your free Gemini API key in Settings, or use instant browser speech / text input.'
+        error: 'Gemini API Key Required',
+        details: 'To transcribe direct voice audio files, please add your free Gemini API key in Settings, or use instant browser speech / text input.'
       });
     }
 
     aiService.setApiKey(apiKey);
 
     const mimeType = req.file.mimetype || 'audio/webm';
-    const transcribedText = await aiService.transcribeAudio(req.file.buffer, mimeType);
+    let transcribedText = '';
+    try {
+      transcribedText = await aiService.transcribeAudio(req.file.buffer, mimeType);
+    } catch (transcribeErr) {
+      console.warn('Audio transcription error:', transcribeErr.message);
+      return res.json({
+        success: false,
+        needsApiKey: true,
+        error: 'Gemini Transcription: ' + transcribeErr.message,
+        details: 'Could not transcribe with this Gemini API key. Ensure your key is valid in Google AI Studio, or tap the microphone to use browser speech recognition.'
+      });
+    }
 
     if (!transcribedText) {
       return res.status(400).json({ error: 'Could not detect clear speech in the audio. Please try speaking closer to the microphone.' });
     }
 
-    const voiceResult = await executeUniversalVoice(transcribedText, date, userId);
+    const preview = await parseUniversalVoiceIntent(transcribedText, date, userId);
     res.json({
-      ...voiceResult,
-      transcribedText
+      success: true,
+      transcribedText,
+      preview
     });
   } catch (err) {
     console.error('Voice audio upload error:', err);

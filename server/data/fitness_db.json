@@ -53,21 +53,21 @@
       ]
     },
     "user-1794309303113": {
-      "isConfigured": false,
+      "isConfigured": true,
       "name": "gokul krishna",
       "age": "",
       "gender": "male",
       "heightCm": "",
-      "weightKg": "",
+      "weightKg": 111,
       "goal": "recomp",
       "activityLevel": "moderately_active",
-      "dailyTargetCalories": 2100,
+      "dailyTargetCalories": 2502,
       "dailyTargetProtein": 140,
-      "dailyTargetCarbs": 220,
-      "dailyTargetFat": 60,
-      "dailyTargetWater": 3000,
+      "dailyTargetCarbs": 328,
+      "dailyTargetFat": 70,
+      "dailyTargetWater": 2700,
       "dailyTargetSteps": 10000,
-      "recalculateTargets": true,
+      "recalculateTargets": false,
       "dietaryTags": [
         "🍗 Non-Veg"
       ],
@@ -82,17 +82,17 @@
   "profile": {
     "isConfigured": true,
     "name": "gokul krishna",
-    "age": "21",
+    "age": "",
     "gender": "male",
-    "heightCm": "235",
-    "weightKg": 110,
+    "heightCm": "",
+    "weightKg": "",
     "goal": "recomp",
     "activityLevel": "moderately_active",
-    "dailyTargetCalories": 3592,
-    "dailyTargetProtein": 233,
-    "dailyTargetCarbs": 440,
-    "dailyTargetFat": 100,
-    "dailyTargetWater": 4200,
+    "dailyTargetCalories": 2502,
+    "dailyTargetProtein": 140,
+    "dailyTargetCarbs": 328,
+    "dailyTargetFat": 70,
+    "dailyTargetWater": 2700,
     "dailyTargetSteps": 10000,
     "recalculateTargets": false,
     "dietaryTags": [
@@ -102,12 +102,45 @@
       "🛡️ Full Body Balance"
     ],
     "goals": [
-      "recomp",
-      "cutting"
+      "recomp"
     ]
   },
   "meals": [],
-  "workouts": [],
+  "workouts": [
+    {
+      "id": "workout-1794316079783",
+      "userId": "user-1794309303113",
+      "date": "2026-11-10",
+      "title": "Barbell Flat Bench Press Session",
+      "splitType": "Strength",
+      "exercises": [
+        {
+          "name": "Barbell Flat Bench Press",
+          "sets": [
+            {
+              "reps": 10,
+              "weight": 60,
+              "done": true
+            },
+            {
+              "reps": 10,
+              "weight": 60,
+              "done": true
+            },
+            {
+              "reps": 10,
+              "weight": 60,
+              "done": true
+            }
+          ]
+        }
+      ],
+      "durationMin": 30,
+      "caloriesBurned": 130,
+      "notes": "Logged via Universal Voice Assistant: \"\"",
+      "loggedAt": "2026-11-10T13:07:59.784Z"
+    }
+  ],
   "workoutPlans": [
     {
       "id": "default-ppl",
@@ -223,11 +256,17 @@
     }
   ],
   "fastrackLogs": [],
-  "waterLogs": [],
+  "waterLogs": [
+    {
+      "date": "2026-11-10",
+      "userId": "user-1794309303113",
+      "amountMl": 500
+    }
+  ],
   "weightLogs": [
     {
       "date": "2026-11-10",
-      "weightKg": 110
+      "weightKg": 111
     }
   ],
   "photoVault": [],

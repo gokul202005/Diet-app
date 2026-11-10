@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import ConfirmModal from './ConfirmModal';
+import LiveCameraModal from './LiveCameraModal';
+import { openNativeCamera, isNativePlatform } from '../utils/cameraService';
 import { 
   Search, 
   Sparkles, 
@@ -95,6 +97,35 @@ export default function DietTracker({ selectedDate, profile }) {
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState(null);
   const [isPhotoScanning, setIsPhotoScanning] = useState(false);
   const [photoAiPreview, setPhotoAiPreview] = useState(null);
+  const [isLiveCameraOpen, setIsLiveCameraOpen] = useState(false);
+
+  const handleCameraCapture = async (dataUrl) => {
+    setPhotoPreviewUrl(dataUrl);
+    try {
+      const res = await fetch(dataUrl);
+      const blob = await res.blob();
+      const file = new File([blob], 'meal-camera-snap.jpg', { type: 'image/jpeg' });
+      setPhotoFile(file);
+      setPhotoAiPreview(null);
+    } catch (e) {
+      console.error('Failed to convert camera snapshot:', e);
+    }
+  };
+
+  const handleSnapCamera = async () => {
+    if (isNativePlatform()) {
+      try {
+        const dataUrl = await openNativeCamera();
+        if (dataUrl) {
+          handleCameraCapture(dataUrl);
+        }
+      } catch (err) {
+        alert('Camera Error: ' + (err.message || 'Could not access device camera'));
+      }
+    } else {
+      setIsLiveCameraOpen(true);
+    }
+  };
 
   // Zero-Token Voice Logging state (Browser Speech Recognition)
   const [isListening, setIsListening] = useState(false);
@@ -838,17 +869,14 @@ export default function DietTracker({ selectedDate, profile }) {
               <div>
                 <Camera className="w-10 h-10 text-emerald-400 mx-auto mb-2.5 animate-pulse" />
                 <div className="flex flex-wrap items-center justify-center gap-2.5">
-                  <label className="cursor-pointer inline-flex items-center space-x-2 px-3.5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black rounded-xl transition-all shadow-md shadow-emerald-500/20 active:scale-95">
+                  <button
+                    type="button"
+                    onClick={handleSnapCamera}
+                    className="cursor-pointer inline-flex items-center space-x-2 px-3.5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black rounded-xl transition-all shadow-md shadow-emerald-500/20 active:scale-95"
+                  >
                     <Camera className="w-4 h-4" />
                     <span>Snap with Camera</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      onChange={handlePhotoChange}
-                      className="hidden"
-                    />
-                  </label>
+                  </button>
                   <label className="cursor-pointer inline-flex items-center space-x-2 px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl transition-all border border-slate-700 active:scale-95">
                     <Upload className="w-4 h-4 text-slate-400" />
                     <span>Upload from Gallery</span>
@@ -1024,6 +1052,14 @@ export default function DietTracker({ selectedDate, profile }) {
         confirmText="Yes, Remove Meal"
         cancelText="Cancel"
         danger={true}
+      />
+
+      {/* Live Web/Desktop Camera Viewfinder Modal */}
+      <LiveCameraModal
+        isOpen={isLiveCameraOpen}
+        onClose={() => setIsLiveCameraOpen(false)}
+        onCapture={handleCameraCapture}
+        title="Snap Food Plate Photo"
       />
 
     </div>

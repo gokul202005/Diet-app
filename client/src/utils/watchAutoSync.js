@@ -1,6 +1,7 @@
 // Automated Fastrack Smartwatch Auto-Sync Engine
 // Supports Native Android BLE (@capacitor-community/bluetooth-le) + Web Bluetooth GATT
 
+import { Capacitor } from '@capacitor/core';
 import { BleClient, numberToUUID } from '@capacitor-community/bluetooth-le';
 
 class WatchAutoSyncManager {
@@ -29,8 +30,11 @@ class WatchAutoSyncManager {
 
   // Check if running on Android / iOS native Capacitor container
   isNativeCapacitor() {
-    return typeof window !== 'undefined' && 
-           Boolean(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+    try {
+      return Boolean(Capacitor.isNativePlatform && Capacitor.isNativePlatform());
+    } catch (e) {
+      return false;
+    }
   }
 
   // Connect to Watch via Native Android BLE or Web Bluetooth

@@ -28,7 +28,7 @@ function extractJSON(text) {
 export class AIService {
   constructor(apiKey = process.env.GEMINI_API_KEY) {
     this.apiKey = apiKey;
-    this.modelName = 'gemini-flash-lite-latest';
+    this.modelName = 'gemini-1.5-flash';
   }
 
   setApiKey(key) {
@@ -47,12 +47,11 @@ export class AIService {
     if (!genAI) return null;
 
     const candidateModels = [
-      this.modelName || 'gemini-2.5-flash',
-      'gemini-2.5-flash',
+      this.modelName || 'gemini-1.5-flash',
+      'gemini-1.5-flash',
       'gemini-2.0-flash',
-      'gemini-flash-lite-latest',
-      'gemini-3-flash-preview',
-      'gemini-3.1-flash-lite-preview'
+      'gemini-1.5-pro',
+      'gemini-2.0-flash-lite'
     ];
     const uniqueCandidates = [...new Set(candidateModels)];
 

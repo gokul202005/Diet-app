@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import ConfirmModal from './ConfirmModal';
+import LiveCameraModal from './LiveCameraModal';
+import { openNativeCamera, isNativePlatform } from '../utils/cameraService';
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -45,12 +47,26 @@ export default function ProgressAnalytics({ profile, selectedDate, onProfileUpda
 
   // Photo Vault state
   const [isAddingPhoto, setIsAddingPhoto] = useState(false);
+  const [isLiveCameraOpen, setIsLiveCameraOpen] = useState(false);
   const [photoFile, setPhotoFile] = useState(null);
   const [photoPreview, setPhotoPreview] = useState('');
   const [photoPose, setPhotoPose] = useState('front');
   const [photoType, setPhotoType] = useState('checkin');
   const [photoNotes, setPhotoNotes] = useState('');
   const [sliderPosition, setSliderPosition] = useState(50); // For Before/After slider
+
+  const handleSnapCamera = async () => {
+    if (isNativePlatform()) {
+      try {
+        const dataUrl = await openNativeCamera();
+        if (dataUrl) setPhotoPreview(dataUrl);
+      } catch (err) {
+        alert('Camera Error: ' + (err.message || 'Could not access camera'));
+      }
+    } else {
+      setIsLiveCameraOpen(true);
+    }
+  };
 
   // Comparison selections
   const [beforePhotoId, setBeforePhotoId] = useState(null);
@@ -97,6 +113,14 @@ export default function ProgressAnalytics({ profile, selectedDate, onProfileUpda
       const res = await api.logWeight(num, selectedDate);
       if (res.success) {
         setDisplayWeight(num);
+        setNewWeight(num);
+        setTrendsData(prev => prev ? {
+          ...prev,
+          summary: {
+            ...(prev.summary || {}),
+            currentWeight: num
+          }
+        } : prev);
         if (onProfileUpdate) {
           onProfileUpdate({ ...(profile || {}), weightKg: num });
         }
@@ -542,17 +566,14 @@ export default function ProgressAnalytics({ profile, selectedDate, onProfileUpda
                 <div className="py-4">
                   <Camera className="w-10 h-10 text-emerald-400 mx-auto mb-2.5 animate-pulse" />
                   <div className="flex flex-wrap items-center justify-center gap-2.5">
-                    <label className="cursor-pointer inline-flex items-center space-x-2 px-3.5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black rounded-xl transition-all shadow-md shadow-emerald-500/20 active:scale-95">
+                    <button
+                      type="button"
+                      onClick={handleSnapCamera}
+                      className="cursor-pointer inline-flex items-center space-x-2 px-3.5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black rounded-xl transition-all shadow-md shadow-emerald-500/20 active:scale-95"
+                    >
                       <Camera className="w-4 h-4" />
                       <span>Snap with Camera</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        capture="environment"
-                        onChange={handlePhotoUpload}
-                        className="hidden"
-                      />
-                    </label>
+                    </button>
                     <label className="cursor-pointer inline-flex items-center space-x-2 px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl transition-all border border-slate-700 active:scale-95">
                       <Upload className="w-4 h-4 text-slate-400" />
                       <span>Choose from Gallery</span>
@@ -724,6 +745,14 @@ export default function ProgressAnalytics({ profile, selectedDate, onProfileUpda
         confirmText="Yes, Delete Photo"
         cancelText="Cancel"
         danger={true}
+      />
+
+      {/* Live Web/Desktop Viewfinder Camera Modal */}
+      <LiveCameraModal
+        isOpen={isLiveCameraOpen}
+        onClose={() => setIsLiveCameraOpen(false)}
+        onCapture={(dataUrl) => setPhotoPreview(dataUrl)}
+        title="Snap Progress Photo"
       />
 
     </div>

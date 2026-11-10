@@ -1,5 +1,7 @@
 // Central API Client for Diet & Fitness Tracker (Web & Capacitor Android)
 
+import { Capacitor } from '@capacitor/core';
+
 export const RENDER_BACKEND = 'https://diet-app-backend-udje.onrender.com';
 
 // Dynamically determine the best API endpoint
@@ -10,9 +12,11 @@ const getBaseUrl = () => {
       return '/api';
     }
     // 2. If running inside Capacitor Native Android App:
-    if (window.Capacitor && window.Capacitor.isNativePlatform()) {
-      return `${RENDER_BACKEND}/api`;
-    }
+    try {
+      if (Capacitor.isNativePlatform && Capacitor.isNativePlatform()) {
+        return `${RENDER_BACKEND}/api`;
+      }
+    } catch (e) {}
   }
   // 3. Fallback to live Render backend for external callers:
   return `${RENDER_BACKEND}/api`;
@@ -210,11 +214,21 @@ export const api = {
   },
 
   // Universal Full-Website Voice Command Engine
-  universalVoiceCommand: async (text, date) => {
-    return safeFetch(`${BASE_URL}/ai/universal-voice`, {
+  parseVoiceIntent: async (text, date) => {
+    return safeFetch(`${BASE_URL}/ai/parse-voice-intent`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text, date })
+    });
+  },
+  universalVoiceCommand: async (param, date) => {
+    const body = typeof param === 'string' 
+      ? { text: param, date } 
+      : { ...param, date: date || param.date };
+    return safeFetch(`${BASE_URL}/ai/universal-voice`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
     });
   },
   universalVoiceAudio: async (audioBlob, date) => {
