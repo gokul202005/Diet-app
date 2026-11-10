@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, User, Target, Flame, Heart, Scale, Activity, ArrowRight, Check } from 'lucide-react';
+import { Sparkles, User, Target, Flame, Heart, Scale, Activity, ArrowRight, Check, X } from 'lucide-react';
 import { api } from '../api';
 
 export default function OnboardingModal({ isOpen, onClose, currentProfile, currentUser, onProfileSaved }) {
@@ -116,12 +116,34 @@ export default function OnboardingModal({ isOpen, onClose, currentProfile, curre
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+    <div 
+      onClick={(e) => {
+        if (e.target === e.currentTarget && currentProfile?.isConfigured && onClose) {
+          onClose();
+        }
+      }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto"
+    >
+      <div 
+        onClick={(e) => e.stopPropagation()}
+        className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200"
+      >
         
         {/* Header */}
         <div className="bg-gradient-to-r from-emerald-600 to-teal-700 p-6 text-white relative">
-          <div className="flex items-center space-x-3 mb-2">
+          {/* Close button (allows closing if profile is already configured or to dismiss misclick) */}
+          {Boolean(currentProfile?.isConfigured || onClose) && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="absolute top-4 right-4 p-2 rounded-full bg-black/20 hover:bg-black/40 text-white transition-all cursor-pointer shadow-sm active:scale-95"
+              title="Close Setup Wizard"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
+
+          <div className="flex items-center space-x-3 mb-2 pr-10">
             <div className="p-2.5 bg-white/10 rounded-2xl backdrop-blur-sm">
               <Sparkles className="w-6 h-6 text-emerald-200" />
             </div>
@@ -518,9 +540,17 @@ export default function OnboardingModal({ isOpen, onClose, currentProfile, curre
             <button
               type="button"
               onClick={() => setStep(step - 1)}
-              className="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-slate-200 transition-colors"
+              className="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
             >
               Back
+            </button>
+          ) : currentProfile?.isConfigured ? (
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+            >
+              Cancel
             </button>
           ) : (
             <div />
