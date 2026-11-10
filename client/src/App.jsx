@@ -44,6 +44,9 @@ export default function App() {
         if (authData?.user) {
           setCurrentUser(authData.user);
           localStorage.setItem('agy_current_user', JSON.stringify(authData.user));
+        } else {
+          setCurrentUser(null);
+          localStorage.removeItem('agy_current_user');
         }
 
         // Only trigger onboarding setup wizard if user is brand new and has never configured or dismissed

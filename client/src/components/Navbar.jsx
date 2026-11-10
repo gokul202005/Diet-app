@@ -230,11 +230,11 @@ export default function Navbar({
         </div>
       </header>
 
-      {/* 2. EPIC FLOATING NATIVE MOBILE DOCK (NATIVE APP FEEL) */}
-      <div className="xl:hidden fixed bottom-3 inset-x-3 sm:inset-x-8 max-w-md mx-auto z-40 pointer-events-none">
-        <div className="pointer-events-auto bg-slate-900/90 backdrop-blur-2xl border border-slate-700/60 rounded-3xl p-1.5 shadow-2xl shadow-black/80 flex items-center justify-between">
+      {/* 2. EPIC FLOATING NATIVE MOBILE DOCK (PERFECTLY CENTERED SPEAKER) */}
+      <div className="xl:hidden fixed bottom-3 inset-x-2 sm:inset-x-8 max-w-lg mx-auto z-40 pointer-events-none">
+        <div className="pointer-events-auto bg-slate-900/95 backdrop-blur-2xl border border-slate-700/60 rounded-3xl p-1.5 shadow-2xl shadow-black/80 flex items-center justify-between">
           
-          {/* Tab 1: Dashboard */}
+          {/* Tab 1: Home / Dashboard */}
           <button
             onClick={() => setActiveTab('dashboard')}
             className={`flex-1 py-1.5 flex flex-col items-center justify-center rounded-2xl transition-all cursor-pointer ${
@@ -244,7 +244,7 @@ export default function Navbar({
             }`}
           >
             <Flame className="w-4 h-4" />
-            <span className="text-[9px] mt-0.5 leading-none">Home</span>
+            <span className="text-[8px] sm:text-[9px] mt-0.5 leading-none">Home</span>
           </button>
 
           {/* Tab 2: Diet */}
@@ -257,19 +257,8 @@ export default function Navbar({
             }`}
           >
             <Utensils className="w-4 h-4" />
-            <span className="text-[9px] mt-0.5 leading-none">Diet</span>
+            <span className="text-[8px] sm:text-[9px] mt-0.5 leading-none">Diet</span>
           </button>
-
-          {/* CENTER HERO: FLOATING GLOWING AI ACTION BUTTON */}
-          <div className="px-1 -mt-5">
-            <button
-              onClick={onOpenVoice || (() => window.dispatchEvent(new CustomEvent('open-universal-voice')))}
-              className="w-12 h-12 rounded-full bg-gradient-to-tr from-emerald-500 to-teal-400 text-slate-950 flex items-center justify-center shadow-lg shadow-emerald-500/40 active:scale-90 transition-all border-2 border-slate-900 cursor-pointer"
-              title="Universal AI Voice Log"
-            >
-              <Mic className="w-6 h-6 animate-pulse text-slate-950 font-black" />
-            </button>
-          </div>
 
           {/* Tab 3: Workouts */}
           <button
@@ -281,8 +270,19 @@ export default function Navbar({
             }`}
           >
             <Dumbbell className="w-4 h-4" />
-            <span className="text-[9px] mt-0.5 leading-none">Workouts</span>
+            <span className="text-[8px] sm:text-[9px] mt-0.5 leading-none">Gym</span>
           </button>
+
+          {/* CENTER SPEAKER HERO: 100% IN THE DEAD MIDDLE (3 items left, 3 items right) */}
+          <div className="px-1.5 -mt-6 shrink-0">
+            <button
+              onClick={onOpenVoice || (() => window.dispatchEvent(new CustomEvent('open-universal-voice')))}
+              className="w-12 h-12 rounded-full bg-gradient-to-tr from-emerald-500 to-teal-400 text-slate-950 flex items-center justify-center shadow-xl shadow-emerald-500/40 active:scale-90 transition-all border-2 border-slate-900 cursor-pointer hover:scale-105"
+              title="Universal AI Voice Speaker"
+            >
+              <Mic className="w-6 h-6 animate-pulse text-slate-950 font-black" />
+            </button>
+          </div>
 
           {/* Tab 4: Vault & Trends */}
           <button
@@ -294,23 +294,52 @@ export default function Navbar({
             }`}
           >
             <TrendingUp className="w-4 h-4" />
-            <span className="text-[9px] mt-0.5 leading-none">Vault</span>
+            <span className="text-[8px] sm:text-[9px] mt-0.5 leading-none">Vault</span>
           </button>
 
-          {/* Tab 5: More (Coach & Watch) */}
+          {/* Tab 5: Meal Plan */}
           <button
-            onClick={() => setActiveTab(activeTab === 'coach' ? 'fastrack' : 'coach')}
+            onClick={() => setActiveTab('planner')}
             className={`flex-1 py-1.5 flex flex-col items-center justify-center rounded-2xl transition-all cursor-pointer ${
-              activeTab === 'coach' || activeTab === 'fastrack' || activeTab === 'planner'
+              activeTab === 'planner'
+                ? 'bg-emerald-500/15 text-emerald-400 font-black'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Sparkles className="w-4 h-4" />
+            <span className="text-[8px] sm:text-[9px] mt-0.5 leading-none">Plan</span>
+          </button>
+
+          {/* Tab 6: Dedicated AI Coach Bot (Separated from Watch) */}
+          <button
+            onClick={() => setActiveTab('coach')}
+            className={`flex-1 py-1.5 flex flex-col items-center justify-center rounded-2xl transition-all cursor-pointer ${
+              activeTab === 'coach'
                 ? 'bg-emerald-500/15 text-emerald-400 font-black'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             <Bot className="w-4 h-4" />
-            <span className="text-[9px] mt-0.5 leading-none">{activeTab === 'coach' ? 'Coach' : activeTab === 'fastrack' ? 'Watch' : 'More'}</span>
+            <span className="text-[8px] sm:text-[9px] mt-0.5 leading-none">Coach</span>
           </button>
 
         </div>
+      </div>
+
+      {/* 3. FLOATING FASTRACK SMARTWATCH ACCESS ICON (MOBILE ONLY) */}
+      <div className="xl:hidden fixed bottom-20 right-3.5 z-40">
+        <button
+          onClick={() => setActiveTab('fastrack')}
+          className={`flex items-center space-x-1.5 px-3 py-2 rounded-2xl backdrop-blur-xl border shadow-xl active:scale-95 transition-all cursor-pointer ${
+            activeTab === 'fastrack'
+              ? 'bg-cyan-500 text-slate-950 border-cyan-400 font-black shadow-cyan-500/40'
+              : 'bg-slate-900/90 text-cyan-400 border-cyan-500/40 hover:bg-slate-800 shadow-black/60'
+          }`}
+          title="Fastrack Smartwatch BLE & Telemetry"
+        >
+          <Watch className="w-4 h-4 animate-pulse" />
+          <span className="text-[10px] font-bold tracking-wide">Watch</span>
+        </button>
       </div>
     </>
   );

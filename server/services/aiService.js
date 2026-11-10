@@ -93,14 +93,18 @@ export class AIService {
       throw new Error('Gemini API key is required for audio transcription');
     }
     const base64Data = audioBuffer.toString('base64');
-    const prompt = `Listen to this fitness enthusiast's voice audio recording. They are speaking about South Indian food, gym exercises, scale weight, or water intake in Indian English or Tamil English.
-Transcribe what they said word-for-word into English text (e.g. "I ate 3 idlis with sambar and 2 boiled eggs", "drank 500ml water", "flat bench press 3 sets 10 reps 60kg", "my weight is 110 kg").
-Return ONLY the transcribed sentence as plain text without quotation marks, bullet points, or markdown formatting.`;
+    let cleanMime = (mimeType || 'audio/webm').split(';')[0].trim();
+    if (!cleanMime.startsWith('audio/')) cleanMime = 'audio/webm';
+
+    const prompt = `Listen to this fitness enthusiast's voice audio recording. They may be speaking in Indian English, Tamil (e.g. "3 idli saapten", "500 ml thanni kudichen", "110 kg iruken"), Hindi (e.g. "3 roti khaya", "paani piya"), or standard English.
+Transcribe what they said into a clear English fitness sentence (e.g. "I ate 3 idlis with sambar and 2 boiled eggs", "drank 500ml water", "flat bench press 3 sets 10 reps 60kg", "my weight is 110 kg").
+If the audio contains short or quiet speech, transcribe whatever words you can detect.
+Return ONLY the transcribed sentence as plain text without quotation marks, bullet points, markdown formatting, or introductory commentary.`;
 
     const { result } = await this.callModel([
       {
         inlineData: {
-          mimeType: mimeType || 'audio/webm',
+          mimeType: cleanMime,
           data: base64Data
         }
       },

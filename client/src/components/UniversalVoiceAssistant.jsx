@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   Mic, 
   MicOff, 
@@ -164,7 +165,34 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
     await parseIntentForPreview(normalized);
   };
 
-  // Start Real-Time Google / Gemini Style Live Speech Recognition
+  // Setup Web Audio Analyser for live visual feedback
+  const setupAudioVisualizer = (stream) => {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      audioCtxRef.current = ctx;
+      const src = ctx.createMediaStreamSource(stream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 64;
+      src.connect(analyser);
+      analyserRef.current = analyser;
+
+      const dataArray = new Uint8Array(analyser.frequencyBinCount);
+      const updateVolume = () => {
+        if (!isRecordingRef.current) return;
+        analyser.getByteFrequencyData(dataArray);
+        let sum = 0;
+        for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+        const avg = sum / dataArray.length;
+        setAudioVolume(Math.min(100, Math.round((avg / 128) * 100)));
+        animFrameRef.current = requestAnimationFrame(updateVolume);
+      };
+      animFrameRef.current = requestAnimationFrame(updateVolume);
+    } catch (e) {}
+  };
+
+  // Start Real-Time Google / Gemini Style Live Speech Recognition + Dual Audio Recorder
   const startRecording = async () => {
     setErrorMsg('');
     setResult(null);
@@ -176,9 +204,50 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
     recognizedTextRef.current = '';
     audioChunksRef.current = [];
 
-    const SpeechRecognition = typeof window !== 'undefined' ? (window.SpeechRecognition || window.webkitSpeechRecognition) : null;
+    // 1. Acquire microphone stream for both audio fallback & volume visualizer
+    let stream = null;
+    try {
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaStreamRef.current = stream;
+        setupAudioVisualizer(stream);
 
-    // PRIMARY MODE: Google / Chromium Web Speech API (Instant word-by-word streaming)
+        // Start background MediaRecorder from t=0 so no syllable is ever lost
+        let mimeType = 'audio/webm';
+        if (typeof MediaRecorder !== 'undefined') {
+          if (!MediaRecorder.isTypeSupported('audio/webm')) {
+            if (MediaRecorder.isTypeSupported('audio/mp4')) mimeType = 'audio/mp4';
+            else if (MediaRecorder.isTypeSupported('audio/ogg')) mimeType = 'audio/ogg';
+            else mimeType = '';
+          }
+        }
+        const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+        mediaRecorderRef.current = recorder;
+        recorder.ondataavailable = (e) => {
+          if (e.data && e.data.size > 0) {
+            audioChunksRef.current.push(e.data);
+          }
+        };
+        recorder.start(100);
+      }
+    } catch (micErr) {
+      console.warn('Microphone stream warning:', micErr.message);
+      if (micErr.name === 'NotAllowedError' || micErr.name === 'PermissionDeniedError') {
+        setErrorMsg('Microphone access was denied. Please allow microphone permissions in your browser or phone settings.');
+        setIsRecording(false);
+        isRecordingRef.current = false;
+        setStateMode('idle');
+        return;
+      }
+    }
+
+    setIsRecording(true);
+    isRecordingRef.current = true;
+    setStateMode('listening');
+    playBeep(700, 0.12);
+
+    // 2. Real-time Web Speech Recognition (Google / Gemini style instant word streaming)
+    const SpeechRecognition = typeof window !== 'undefined' ? (window.SpeechRecognition || window.webkitSpeechRecognition) : null;
     if (SpeechRecognition) {
       try {
         if (recognitionRef.current) {
@@ -187,133 +256,62 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
         }
 
         const recognition = new SpeechRecognition();
-        recognition.continuous = true;
+        // Use continuous: false to eliminate Chromium's notorious WebSocket network disconnection bugs
+        recognition.continuous = false;
         recognition.interimResults = true;
         recognition.lang = speechLang || 'en-IN';
         recognition.maxAlternatives = 1;
 
-        recognition.onstart = () => {
-          setIsRecording(true);
-          isRecordingRef.current = true;
-          setStateMode('listening');
-          playBeep(700, 0.12);
-        };
+        let sessionAccumulated = '';
 
-        // Real-time word-by-word streaming updates like Google / Gemini
         recognition.onresult = (event) => {
-          let final = '';
-          let interim = '';
+          let currentFinal = '';
+          let currentInterim = '';
           for (let i = 0; i < event.results.length; ++i) {
             const item = event.results[i];
             if (item.isFinal) {
-              final += item[0].transcript + ' ';
+              currentFinal += item[0].transcript + ' ';
             } else {
-              interim += item[0].transcript;
+              currentInterim += item[0].transcript;
             }
           }
-          const fullText = (final + interim).trim();
-          setLiveFinalText(final);
-          setLiveInterimText(interim);
-          setTranscript(fullText);
-          recognizedTextRef.current = fullText;
+
+          if (currentFinal) {
+            sessionAccumulated = (sessionAccumulated + ' ' + currentFinal).replace(/\s+/g, ' ').trim();
+          }
+
+          const fullDisplay = (sessionAccumulated + ' ' + currentInterim).trim();
+          setLiveFinalText(sessionAccumulated);
+          setLiveInterimText(currentInterim);
+          setTranscript(fullDisplay);
+          recognizedTextRef.current = fullDisplay;
         };
 
         recognition.onerror = (event) => {
-          console.warn('SpeechRecognition event error:', event.error);
+          console.warn('WebSpeech event notice:', event.error);
           if (event.error === 'not-allowed') {
             setErrorMsg('Microphone access was denied. Please allow microphone permission in your browser address bar.');
+            cleanupAudio();
             setIsRecording(false);
             isRecordingRef.current = false;
             setStateMode('idle');
-          } else if (event.error === 'network') {
-            console.log('WebSpeech network error, auto-fallback to direct audio recording...');
-            try {
-              recognition.stop();
-            } catch (e) {}
-            // Seamlessly fall back to direct audio recording without crashing
-            startMediaRecorderFallback();
           }
+          // On network or no-speech error, do not crash! MediaRecorder is actively recording audio.
         };
 
         recognition.onend = () => {
-          // If stopped while recording was active, process captured speech
+          // If the user is still speaking and hasn't clicked stop, restart seamlessly for next sentence
           if (isRecordingRef.current) {
-            const speech = recognizedTextRef.current.trim();
-            if (speech) {
-              isRecordingRef.current = false;
-              setIsRecording(false);
-              finishSpeechAndPreview(speech);
-            } else {
-              // Restart recognition if user didn't stop it and silence occurred
-              try {
-                recognition.start();
-              } catch (e) {
-                setIsRecording(false);
-                isRecordingRef.current = false;
-                setStateMode('idle');
-              }
-            }
+            try {
+              recognition.start();
+            } catch (e) {}
           }
         };
 
         recognitionRef.current = recognition;
         recognition.start();
-        return;
       } catch (err) {
-        console.warn('WebSpeech direct start failed, falling back to MediaRecorder:', err);
-      }
-    }
-
-    // Direct MediaRecorder Fallback
-    await startMediaRecorderFallback();
-  };
-
-  const startMediaRecorderFallback = async () => {
-    try {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        setErrorMsg('Microphone access is not supported by this browser. You can type what you did below!');
-        setIsRecording(false);
-        isRecordingRef.current = false;
-        setStateMode('idle');
-        return;
-      }
-
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaStreamRef.current = stream;
-
-      let mimeType = 'audio/webm';
-      if (typeof MediaRecorder !== 'undefined') {
-        if (!MediaRecorder.isTypeSupported('audio/webm')) {
-          if (MediaRecorder.isTypeSupported('audio/mp4')) mimeType = 'audio/mp4';
-          else if (MediaRecorder.isTypeSupported('audio/ogg')) mimeType = 'audio/ogg';
-          else mimeType = '';
-        }
-      }
-
-      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
-      mediaRecorderRef.current = recorder;
-
-      recorder.ondataavailable = (e) => {
-        if (e.data && e.data.size > 0) {
-          audioChunksRef.current.push(e.data);
-        }
-      };
-
-      recorder.start(100);
-      setIsRecording(true);
-      isRecordingRef.current = true;
-      setStateMode('listening');
-      playBeep(700, 0.12);
-    } catch (err) {
-      console.error('Fallback microphone error:', err);
-      setIsRecording(false);
-      isRecordingRef.current = false;
-      setStateMode('idle');
-      cleanupAudio();
-      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-        setErrorMsg('Microphone permission was denied. Please allow microphone access in your browser or phone settings.');
-      } else {
-        setErrorMsg('Could not access microphone: ' + (err.message || 'Unknown device error'));
+        console.warn('WebSpeech start notice (will use direct audio recorder):', err.message);
       }
     }
   };
@@ -330,13 +328,14 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
 
     const liveCaptured = recognizedTextRef.current.trim() || transcript.trim() || (liveFinalText + ' ' + liveInterimText).trim();
 
-    if (liveCaptured) {
+    // If client Web Speech captured clear words, proceed immediately without waiting for audio upload!
+    if (liveCaptured && liveCaptured.length > 2) {
       finishSpeechAndPreview(liveCaptured);
       cleanupAudio();
       return;
     }
 
-    // Fallback: If using MediaRecorder
+    // Direct Audio Fallback: Process the background MediaRecorder audio through Gemini
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       const recorder = mediaRecorderRef.current;
       recorder.onstop = async () => {
@@ -344,11 +343,11 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
         const audioBlob = new Blob(audioChunksRef.current, { type: mime });
         cleanupAudio();
 
-        if (audioBlob.size > 1000) {
+        if (audioBlob.size > 1500) {
           await executeVoiceAudio(audioBlob);
         } else {
           setStateMode('idle');
-          setErrorMsg('No speech detected. Please speak closer to your microphone or click an example below.');
+          setErrorMsg('Could not detect clear speech in the audio. Please try speaking closer to the microphone, or click an example below.');
         }
       };
 
@@ -358,7 +357,7 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
 
     cleanupAudio();
     setStateMode('idle');
-    setErrorMsg('No speech detected. Please tap the microphone and speak your meal or workout.');
+    setErrorMsg('Could not detect clear speech. Please tap the microphone and speak closer, or tap an example below.');
   };
 
   // Step 1 -> Step 2: Parse intent and generate structured verification card
@@ -597,11 +596,15 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
         </button>
       </div>
 
-      {/* 2. UNIVERSAL VOICE COMMAND MODAL */}
-      {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-150">
+      {/* 2. UNIVERSAL VOICE COMMAND MODAL (PORTAL TO BODY TO PREVENT ANY OVERFLOW CLIPPING) */}
+      {isOpen && typeof document !== 'undefined' && createPortal(
+        <div 
+          onClick={handleClose}
+          className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md overflow-y-auto animate-in fade-in duration-150"
+          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, width: '100vw', height: '100vh' }}
+        >
           <div 
-            className="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150"
+            className="relative w-full max-w-lg my-auto bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -1065,7 +1068,8 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
             )}
 
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

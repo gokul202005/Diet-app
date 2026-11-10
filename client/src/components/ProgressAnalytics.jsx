@@ -12,6 +12,7 @@ import {
   Camera, 
   Upload,
   Shield, 
+  Cloud,
   Calendar, 
   Plus, 
   Trash2, 
@@ -606,12 +607,12 @@ export default function ProgressAnalytics({ profile, selectedDate, onProfileUpda
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
           <div>
             <div className="flex items-center space-x-2 text-xs font-bold uppercase tracking-wider text-emerald-400">
-              <Shield className="w-4 h-4" />
-              <span>Secure Local-Only Physique Vault</span>
+              <Cloud className="w-4 h-4" />
+              <span>Cloud-Synced Physique Vault (Fully Online)</span>
             </div>
-            <h2 className="text-xl font-black text-white mt-0.5">Physical Body Recomposition Comparison</h2>
+            <h2 className="text-xl font-black text-white mt-0.5">Physical Body Recomposition Timeline</h2>
             <p className="text-xs text-slate-400 mt-1">
-              Side-by-side and interactive split slider to evaluate muscle tone, posture, and body recomposition month-over-month.
+              All daily check-in sessions are saved permanently online in your cloud account. View your complete transformation timeline across all devices.
             </p>
           </div>
 
@@ -923,10 +924,10 @@ export default function ProgressAnalytics({ profile, selectedDate, onProfileUpda
         {/* PHOTO VAULT ALBUM & COMPARISON SECTION */}
         {photos.length === 0 ? (
           <div className="text-center py-10 bg-slate-950/60 rounded-2xl border border-dashed border-slate-800 space-y-2">
-            <Shield className="w-8 h-8 text-slate-600 mx-auto mb-1" />
-            <h4 className="text-sm font-bold text-slate-300">Your Progress Vault is Empty</h4>
+            <Cloud className="w-8 h-8 text-slate-600 mx-auto mb-1" />
+            <h4 className="text-sm font-bold text-slate-300">Your Online Progress Vault is Ready</h4>
             <p className="text-xs text-slate-500 max-w-sm mx-auto">
-              Snap a baseline front and side photo today to visually record your fat loss and muscle building journey over time.
+              Snap a baseline front and side photo today to start your permanent online body recomposition album.
             </p>
             <button
               onClick={() => setIsAddingPhoto(true)}
@@ -1063,7 +1064,7 @@ export default function ProgressAnalytics({ profile, selectedDate, onProfileUpda
                       className="aspect-[3/4] max-h-80 w-full rounded-xl overflow-hidden bg-slate-900 flex items-center justify-center cursor-pointer group relative"
                     >
                       <img 
-                        src={selectedBeforePhoto?.photoUrl} 
+                        src={api.resolvePhotoUrl(selectedBeforePhoto?.photoUrl)} 
                         alt="Before Progress" 
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
                       />
@@ -1091,7 +1092,7 @@ export default function ProgressAnalytics({ profile, selectedDate, onProfileUpda
                       className="aspect-[3/4] max-h-80 w-full rounded-xl overflow-hidden bg-slate-900 flex items-center justify-center cursor-pointer group relative"
                     >
                       <img 
-                        src={selectedAfterPhoto?.photoUrl} 
+                        src={api.resolvePhotoUrl(selectedAfterPhoto?.photoUrl)} 
                         alt="After Progress" 
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
                       />
@@ -1178,7 +1179,7 @@ export default function ProgressAnalytics({ profile, selectedDate, onProfileUpda
                               className="group relative bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 hover:border-emerald-500/50 aspect-[3/4] cursor-pointer shadow-lg transition-all"
                             >
                               <img 
-                                src={p.photoUrl} 
+                                src={api.resolvePhotoUrl(p.photoUrl)} 
                                 alt={`${session.date} - ${p.pose}`}
                                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
                               />
@@ -1280,7 +1281,7 @@ export default function ProgressAnalytics({ profile, selectedDate, onProfileUpda
             {/* Photo View */}
             <div className="flex-1 bg-black flex items-center justify-center p-2 overflow-hidden min-h-[300px]">
               <img 
-                src={selectedZoomPhoto.photoUrl} 
+                src={api.resolvePhotoUrl(selectedZoomPhoto.photoUrl)} 
                 alt="Enlarged Progress View" 
                 className="max-h-[65vh] w-auto max-w-full object-contain rounded-xl"
               />

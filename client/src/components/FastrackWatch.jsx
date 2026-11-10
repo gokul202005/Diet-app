@@ -136,7 +136,11 @@ export default function FastrackWatch({ selectedDate, profile }) {
         // User closed the Bluetooth picker without pairing
       } else {
         if (typeof window !== 'undefined' && window.showToast) {
-          window.showToast(`${msg}. Ensure phone Bluetooth is turned ON and your Fastrack watch is awake nearby.`, 'warning', 'Bluetooth Pairing');
+          if (msg.includes('not implemented')) {
+            window.showToast('Native BLE plugin requires updating to the latest APK build. In the meantime, use 1-Tap Watch Display Sync below to sync your real watch steps & heart rate directly!', 'warning', 'BLE Build Notice');
+          } else {
+            window.showToast(`${msg}. Ensure phone Bluetooth is turned ON and your Fastrack watch is awake nearby.`, 'warning', 'Bluetooth Pairing');
+          }
         }
       }
     } finally {

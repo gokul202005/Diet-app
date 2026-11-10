@@ -10,6 +10,7 @@ import { AIService } from './services/aiService.js';
 import { FastrackService } from './services/fastrackService.js';
 import { searchFoodDatabase } from './data/foodDatabase.js';
 import { calculateNutritionTargets } from './services/profileCalculator.js';
+import { uploadImageToOnlineStorage, deleteImageFromOnlineStorage } from './services/cloudStorage.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -29,6 +30,13 @@ const upload = multer({
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+// Serve local uploads folder for private physique vault photos
+const VAULT_UPLOADS_DIR = path.join(__dirname, 'uploads', 'vault');
+if (!fs.existsSync(VAULT_UPLOADS_DIR)) {
+  fs.mkdirSync(VAULT_UPLOADS_DIR, { recursive: true });
+}
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Initialize AI Service
 const dbInitial = readDB();
@@ -317,6 +325,45 @@ app.post('/api/auth/logout', (req, res) => {
   db.currentUser = null;
   writeDB(db);
   res.json({ success: true, message: 'Logged out successfully' });
+});
+
+// Admin / User Request: Reset all users and accounts to start fresh
+app.post('/api/auth/reset-all', (req, res) => {
+  const cleanDb = {
+    users: [],
+    currentUser: null,
+    profiles: {},
+    profile: {
+      isConfigured: false,
+      name: '',
+      age: null,
+      gender: 'male',
+      heightCm: null,
+      weightKg: null,
+      targetWeightKg: null,
+      goal: 'recomposition',
+      activityLevel: 'moderately_active',
+      dietPreference: 'south_indian_mixed',
+      dailyTargetCalories: 2100,
+      dailyTargetProtein: 140,
+      dailyTargetCarbs: 220,
+      dailyTargetFat: 60,
+      dailyTargetWater: 3000,
+      dailyTargetSteps: 10000
+    },
+    meals: [],
+    workouts: [],
+    workoutPlans: [],
+    fastrackLogs: [],
+    waterLogs: [],
+    weightLogs: [],
+    photoVault: [],
+    chatHistory: [],
+    savedMealPlan: null,
+    settings: {}
+  };
+  writeDB(cleanDb);
+  res.json({ success: true, message: 'All users and accounts deleted. System reset to fresh clean slate.' });
 });
 
 // --- USER PROFILE & GOALS ---
@@ -1556,7 +1603,7 @@ app.get('/api/analytics/trends', (req, res) => {
   });
 });
 
-// --- BEFORE / AFTER BODY PROGRESS PHOTO VAULT ---
+// --- BEFORE / AFTER BODY PROGRESS PHOTO VAULT (ONLINE CLOUD STORAGE & BACKEND HOSTED) ---
 app.get('/api/progress/photos', (req, res) => {
   const db = readDB();
   const userId = getAuthUserId(req, db);
@@ -1564,78 +1611,103 @@ app.get('/api/progress/photos', (req, res) => {
   res.json({ success: true, photos });
 });
 
-app.post('/api/progress/photos', (req, res) => {
-  const db = readDB();
-  const userId = getAuthUserId(req, db);
-  const userProfile = getUserProfile(db, userId);
-  const { date = new Date().toISOString().split('T')[0], type = 'checkin', photoUrl, weightKg, pose = 'front', notes = '' } = req.body;
+app.post('/api/progress/photos', async (req, res) => {
+  try {
+    const db = readDB();
+    const userId = getAuthUserId(req, db);
+    const userProfile = getUserProfile(db, userId);
+    const { date = new Date().toISOString().split('T')[0], type = 'checkin', photoUrl, weightKg, pose = 'front', notes = '' } = req.body;
 
-  if (!photoUrl) {
-    return res.status(400).json({ error: 'photoUrl is required' });
+    if (!photoUrl) {
+      return res.status(400).json({ error: 'photoUrl is required' });
+    }
+
+    const photoId = `photo-${Date.now()}`;
+    const savedUrl = await uploadImageToOnlineStorage(photoUrl, { userId, date, pose, id: photoId });
+
+    const newPhoto = {
+      id: photoId,
+      userId,
+      date,
+      type, // 'before' | 'after' | 'checkin'
+      pose, // 'front' | 'side' | 'back'
+      photoUrl: savedUrl,
+      weightKg: weightKg ? parseFloat(weightKg) : (userProfile.weightKg || null),
+      notes,
+      createdAt: new Date().toISOString()
+    };
+
+    db.photoVault = db.photoVault || [];
+    db.photoVault.unshift(newPhoto);
+    writeDB(db);
+
+    res.status(201).json({ success: true, photo: newPhoto });
+  } catch (err) {
+    console.error('Error saving single photo to vault:', err);
+    res.status(500).json({ error: 'Failed to save photo to cloud vault', details: err.message });
   }
-
-  const newPhoto = {
-    id: `photo-${Date.now()}`,
-    userId,
-    date,
-    type, // 'before' | 'after' | 'checkin'
-    pose, // 'front' | 'side' | 'back'
-    photoUrl,
-    weightKg: weightKg ? parseFloat(weightKg) : (userProfile.weightKg || null),
-    notes,
-    createdAt: new Date().toISOString()
-  };
-
-  db.photoVault = db.photoVault || [];
-  db.photoVault.unshift(newPhoto);
-  writeDB(db);
-
-  res.status(201).json({ success: true, photo: newPhoto });
 });
 
 // Batch Save a Full Day's Check-in Session (Front, Side, Back poses together)
-app.post('/api/progress/day-checkin', (req, res) => {
-  const db = readDB();
-  const userId = getAuthUserId(req, db);
-  const userProfile = getUserProfile(db, userId);
-  const { 
-    date = new Date().toISOString().split('T')[0], 
-    type = 'checkin', 
-    weightKg, 
-    notes = '', 
-    photos = [] // Array of { pose: 'front'|'side'|'back', photoUrl: '...' }
-  } = req.body;
+// NEVER deletes old days: all days are permanently preserved online in chronological order.
+app.post('/api/progress/day-checkin', async (req, res) => {
+  try {
+    const db = readDB();
+    const userId = getAuthUserId(req, db);
+    const userProfile = getUserProfile(db, userId);
+    const { 
+      date = new Date().toISOString().split('T')[0], 
+      type = 'checkin', 
+      weightKg, 
+      notes = '', 
+      photos = [] // Array of { pose: 'front'|'side'|'back', photoUrl: '...' }
+    } = req.body;
 
-  if (!Array.isArray(photos) || photos.length === 0) {
-    return res.status(400).json({ error: 'At least one photo (front, side, or back) is required for day check-in' });
-  }
-
-  const effectiveWeight = weightKg ? parseFloat(weightKg) : (userProfile.weightKg || null);
-  db.photoVault = db.photoVault || [];
-
-  const savedPhotos = [];
-  const baseTime = Date.now();
-
-  photos.forEach((item, index) => {
-    if (item && item.photoUrl) {
-      const newPhoto = {
-        id: `photo-${baseTime}-${index}`,
-        userId,
-        date,
-        type, // 'before' | 'after' | 'checkin'
-        pose: item.pose || 'front',
-        photoUrl: item.photoUrl,
-        weightKg: effectiveWeight,
-        notes: item.notes || notes || '',
-        createdAt: new Date().toISOString()
-      };
-      db.photoVault.unshift(newPhoto);
-      savedPhotos.push(newPhoto);
+    if (!Array.isArray(photos) || photos.length === 0) {
+      return res.status(400).json({ error: 'At least one photo (front, side, or back) is required for day check-in' });
     }
-  });
 
-  writeDB(db);
-  res.status(201).json({ success: true, savedCount: savedPhotos.length, photos: savedPhotos });
+    const effectiveWeight = weightKg ? parseFloat(weightKg) : (userProfile.weightKg || null);
+    db.photoVault = db.photoVault || [];
+
+    const savedPhotos = [];
+    const baseTime = Date.now();
+
+    for (let index = 0; index < photos.length; index++) {
+      const item = photos[index];
+      if (item && item.photoUrl) {
+        const photoId = `photo-${baseTime}-${index}`;
+        const savedUrl = await uploadImageToOnlineStorage(item.photoUrl, { userId, date, pose: item.pose || 'front', id: photoId });
+
+        // If user is updating the EXACT same pose for the SAME date, clean up the old file & replace
+        const existingIdx = db.photoVault.findIndex(p => p.userId === userId && p.date === date && p.pose === (item.pose || 'front'));
+        if (existingIdx !== -1) {
+          deleteImageFromOnlineStorage(db.photoVault[existingIdx].photoUrl);
+          db.photoVault.splice(existingIdx, 1);
+        }
+
+        const newPhoto = {
+          id: photoId,
+          userId,
+          date,
+          type, // 'before' | 'after' | 'checkin'
+          pose: item.pose || 'front',
+          photoUrl: savedUrl,
+          weightKg: effectiveWeight,
+          notes: item.notes || notes || '',
+          createdAt: new Date().toISOString()
+        };
+        db.photoVault.unshift(newPhoto);
+        savedPhotos.push(newPhoto);
+      }
+    }
+
+    writeDB(db);
+    res.status(201).json({ success: true, savedCount: savedPhotos.length, photos: savedPhotos });
+  } catch (err) {
+    console.error('Error saving day check-in session:', err);
+    res.status(500).json({ error: 'Failed to save day check-in session', details: err.message });
+  }
 });
 
 // Delete an entire day's progress check-in session
@@ -1643,6 +1715,8 @@ app.delete('/api/progress/day/:date', (req, res) => {
   const db = readDB();
   const userId = getAuthUserId(req, db);
   const targetDate = req.params.date;
+  const toDelete = (db.photoVault || []).filter(p => p.date === targetDate && (!p.userId || p.userId === userId));
+  toDelete.forEach(p => deleteImageFromOnlineStorage(p.photoUrl));
   db.photoVault = (db.photoVault || []).filter(p => p.date !== targetDate || (p.userId && p.userId !== userId));
   writeDB(db);
   res.json({ success: true, message: `All check-in photos for ${targetDate} deleted` });
@@ -1652,6 +1726,8 @@ app.delete('/api/progress/photos/:id', (req, res) => {
   const db = readDB();
   const userId = getAuthUserId(req, db);
   const id = req.params.id;
+  const toDelete = (db.photoVault || []).find(p => p.id === id && (!p.userId || p.userId === userId));
+  if (toDelete) deleteImageFromOnlineStorage(toDelete.photoUrl);
   db.photoVault = (db.photoVault || []).filter(p => p.id !== id || (p.userId && p.userId !== userId));
   writeDB(db);
   res.json({ success: true, message: 'Photo deleted' });

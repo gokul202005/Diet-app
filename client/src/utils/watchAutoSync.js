@@ -108,9 +108,14 @@ class WatchAutoSyncManager {
 
         return { success: true, deviceName: devName };
       } catch (err) {
-        console.error('Native BLE connection error:', err);
-        this.notify({ status: 'error', message: err.message });
-        throw err;
+        console.warn('Native BLE connection note:', err.message);
+        // If native BLE throws 'not implemented' or fails, try Web Bluetooth if available
+        if (typeof navigator !== 'undefined' && navigator.bluetooth) {
+          console.log('Attempting Web Bluetooth fallback...');
+        } else {
+          this.notify({ status: 'error', message: err.message });
+          throw err;
+        }
       }
     }
 

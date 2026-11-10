@@ -354,6 +354,18 @@ export const api = {
   },
 
   // Progress Photo Vault
+  resolvePhotoUrl: (url) => {
+    if (!url || typeof url !== 'string') return '';
+    if (url.startsWith('data:') || url.startsWith('http://') || url.startsWith('https://') || url.startsWith('blob:')) {
+      return url;
+    }
+    try {
+      if (typeof window !== 'undefined' && Capacitor.isNativePlatform && Capacitor.isNativePlatform()) {
+        return `${RENDER_BACKEND}${url.startsWith('/') ? '' : '/'}${url}`;
+      }
+    } catch {}
+    return url;
+  },
   getProgressPhotos: async () => {
     return safeFetch(`${BASE_URL}/progress/photos`);
   },
