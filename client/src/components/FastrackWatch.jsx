@@ -120,7 +120,7 @@ export default function FastrackWatch({ selectedDate, profile }) {
     return () => unsubscribe();
   }, [connectedDeviceName, realSteps, fastrackLog, selectedDate]);
 
-  // Pair Web Bluetooth Watch with Real Device
+  // Pair Native Android BLE / Web Bluetooth Watch with Real Device
   const handlePairBleWatch = async () => {
     setIsPairingBle(true);
     try {
@@ -131,7 +131,12 @@ export default function FastrackWatch({ selectedDate, profile }) {
       }
     } catch (err) {
       console.warn('Pairing cancelled or error:', err);
-      alert('Bluetooth Pairing: ' + (err.message || 'Cancelled'));
+      const msg = err.message || '';
+      if (msg.includes('cancel') || msg.includes('User cancelled') || msg.includes('cancelled')) {
+        // User closed the Bluetooth picker
+      } else {
+        alert('Bluetooth Watch Pairing:\n' + msg + '\n\nTip: Ensure phone Bluetooth is turned ON and your Fastrack watch is awake nearby.');
+      }
     } finally {
       setIsPairingBle(false);
     }

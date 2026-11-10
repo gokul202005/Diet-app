@@ -79,7 +79,7 @@ export const api = {
     try {
       const start = performance.now();
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6000);
+      const timeoutId = setTimeout(() => controller.abort(), 12000);
       const res = await fetch(`${BASE_URL}/health`, { signal: controller.signal });
       clearTimeout(timeoutId);
       const latency = Math.round(performance.now() - start);
@@ -89,8 +89,11 @@ export const api = {
         const data = await res.json();
         return { status: 'running', latency, ...data };
       }
-      return { status: 'turning-on', latency, error: 'Server waking up' };
+      return { status: 'turning-on', latency, error: 'Server waking up...' };
     } catch (err) {
+      if (err.name === 'AbortError') {
+        return { status: 'turning-on', latency: null, error: 'Server is waking up (takes ~15-25s)...' };
+      }
       return { status: 'offline', latency: null, error: err.message };
     }
   },
