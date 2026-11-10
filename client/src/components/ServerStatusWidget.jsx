@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   Activity, 
   CheckCircle2, 
@@ -177,11 +178,12 @@ export default function ServerStatusWidget({ variant = 'pill', onOpenModal }) {
         )}
       </button>
 
-      {/* Interactive Server Health Modal */}
-      {isModalOpen && (
+      {/* Interactive Server Health Modal - Rendered via Portal directly to body */}
+      {isModalOpen && typeof document !== 'undefined' && createPortal(
         <div 
           onClick={() => setIsModalOpen(false)}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-xl overflow-y-auto animate-in fade-in duration-150"
+          className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md overflow-y-auto animate-in fade-in duration-150"
+          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, width: '100vw', height: '100vh' }}
         >
           <div 
             className="relative w-full max-w-md my-auto bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150"
@@ -271,7 +273,8 @@ export default function ServerStatusWidget({ variant = 'pill', onOpenModal }) {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

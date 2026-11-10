@@ -486,7 +486,6 @@ app.post('/api/ai/analyze-meal-photo', upload.single('photo'), async (req, res) 
     const db = readDB();
     const userId = getAuthUserId(req, db);
     aiService.setApiKey(getUserApiKey(db, userId));
-    aiService.setApiKey(db.settings?.geminiApiKey || process.env.GEMINI_API_KEY || '');
 
     const analysis = await aiService.analyzeMealPhoto(req.file.buffer, req.file.mimetype);
 
@@ -1019,7 +1018,10 @@ app.post('/api/ai/universal-voice-audio', upload.single('audio'), async (req, re
     }
 
     if (!transcribedText) {
-      return res.status(400).json({ error: 'Could not detect clear speech in the audio. Please try speaking closer to the microphone.' });
+      return res.json({ 
+        success: false, 
+        error: 'Could not detect clear speech in the audio. Please try speaking closer to the microphone or type what you did below.' 
+      });
     }
 
     const preview = await parseUniversalVoiceIntent(transcribedText, date, userId);
@@ -1209,9 +1211,11 @@ app.post('/api/ai/analyze-workout-plan', async (req, res) => {
     }
 
     const db = readDB();
-    aiService.setApiKey(db.settings?.geminiApiKey || process.env.GEMINI_API_KEY || '');
+    const userId = getAuthUserId(req, db);
+    const userProfile = getUserProfile(db, userId);
+    aiService.setApiKey(getUserApiKey(db, userId));
 
-    const analysis = await aiService.analyzeWorkoutPlan(planText, db.profile);
+    const analysis = await aiService.analyzeWorkoutPlan(planText, userProfile);
 
     // Track usage
     if (db.settings?.tokenUsage) {
@@ -1586,6 +1590,61 @@ app.post('/api/progress/photos', (req, res) => {
   writeDB(db);
 
   res.status(201).json({ success: true, photo: newPhoto });
+});
+
+// Batch Save a Full Day's Check-in Session (Front, Side, Back poses together)
+app.post('/api/progress/day-checkin', (req, res) => {
+  const db = readDB();
+  const userId = getAuthUserId(req, db);
+  const userProfile = getUserProfile(db, userId);
+  const { 
+    date = new Date().toISOString().split('T')[0], 
+    type = 'checkin', 
+    weightKg, 
+    notes = '', 
+    photos = [] // Array of { pose: 'front'|'side'|'back', photoUrl: '...' }
+  } = req.body;
+
+  if (!Array.isArray(photos) || photos.length === 0) {
+    return res.status(400).json({ error: 'At least one photo (front, side, or back) is required for day check-in' });
+  }
+
+  const effectiveWeight = weightKg ? parseFloat(weightKg) : (userProfile.weightKg || null);
+  db.photoVault = db.photoVault || [];
+
+  const savedPhotos = [];
+  const baseTime = Date.now();
+
+  photos.forEach((item, index) => {
+    if (item && item.photoUrl) {
+      const newPhoto = {
+        id: `photo-${baseTime}-${index}`,
+        userId,
+        date,
+        type, // 'before' | 'after' | 'checkin'
+        pose: item.pose || 'front',
+        photoUrl: item.photoUrl,
+        weightKg: effectiveWeight,
+        notes: item.notes || notes || '',
+        createdAt: new Date().toISOString()
+      };
+      db.photoVault.unshift(newPhoto);
+      savedPhotos.push(newPhoto);
+    }
+  });
+
+  writeDB(db);
+  res.status(201).json({ success: true, savedCount: savedPhotos.length, photos: savedPhotos });
+});
+
+// Delete an entire day's progress check-in session
+app.delete('/api/progress/day/:date', (req, res) => {
+  const db = readDB();
+  const userId = getAuthUserId(req, db);
+  const targetDate = req.params.date;
+  db.photoVault = (db.photoVault || []).filter(p => p.date !== targetDate || (p.userId && p.userId !== userId));
+  writeDB(db);
+  res.json({ success: true, message: `All check-in photos for ${targetDate} deleted` });
 });
 
 app.delete('/api/progress/photos/:id', (req, res) => {

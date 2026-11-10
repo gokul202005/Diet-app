@@ -47,24 +47,44 @@ export default function ProgressAnalytics({ profile, selectedDate, onProfileUpda
     }
   }, [profile?.weightKg]);
 
-  // Photo Vault state
+  // Day Check-in session state (holds Front, Side, Back poses for a specific day)
   const [isAddingPhoto, setIsAddingPhoto] = useState(false);
   const [isLiveCameraOpen, setIsLiveCameraOpen] = useState(false);
-  const [photoFile, setPhotoFile] = useState(null);
-  const [photoPreview, setPhotoPreview] = useState('');
-  const [photoPose, setPhotoPose] = useState('front');
-  const [photoType, setPhotoType] = useState('checkin');
-  const [photoNotes, setPhotoNotes] = useState('');
+  const [activeSlotForCamera, setActiveSlotForCamera] = useState('front'); // 'front' | 'side' | 'back'
+  const [dayCheckinDate, setDayCheckinDate] = useState(selectedDate);
+  const [dayCheckinType, setDayCheckinType] = useState('checkin'); // 'before' | 'after' | 'checkin'
+  const [dayCheckinWeight, setDayCheckinWeight] = useState(profile?.weightKg || '');
+  const [dayCheckinNotes, setDayCheckinNotes] = useState('');
+  const [dayPhotos, setDayPhotos] = useState({
+    front: null,
+    side: null,
+    back: null
+  });
+  const [isSubmittingDay, setIsSubmittingDay] = useState(false);
+  const [dayToDelete, setDayToDelete] = useState(null);
+
   const [sliderPosition, setSliderPosition] = useState(50); // For Before/After slider
   const [selectedZoomPhoto, setSelectedZoomPhoto] = useState(null);
   const [albumViewMode, setAlbumViewMode] = useState('album'); // 'album' | 'compare'
   const [albumTagFilter, setAlbumTagFilter] = useState('all'); // 'all' | 'before' | 'after' | 'checkin'
 
-  const handleSnapCamera = async () => {
+  // Sync date and weight when props change
+  useEffect(() => {
+    if (selectedDate) setDayCheckinDate(selectedDate);
+  }, [selectedDate]);
+
+  useEffect(() => {
+    if (profile?.weightKg) setDayCheckinWeight(profile.weightKg);
+  }, [profile?.weightKg]);
+
+  const handleSnapCameraForSlot = async (slot) => {
+    setActiveSlotForCamera(slot);
     if (isNativePlatform()) {
       try {
         const dataUrl = await openNativeCamera();
-        if (dataUrl) setPhotoPreview(dataUrl);
+        if (dataUrl) {
+          setDayPhotos(prev => ({ ...prev, [slot]: dataUrl }));
+        }
       } catch (err) {
         if (typeof window !== 'undefined' && window.showToast) {
           window.showToast(err.message || 'Could not access camera', 'error', 'Camera Error');
@@ -73,6 +93,20 @@ export default function ProgressAnalytics({ profile, selectedDate, onProfileUpda
     } else {
       setIsLiveCameraOpen(true);
     }
+  };
+
+  const handleSlotFileUpload = (slot, e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      setDayPhotos(prev => ({ ...prev, [slot]: reader.result }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleClearSlot = (slot) => {
+    setDayPhotos(prev => ({ ...prev, [slot]: null }));
   };
 
   // Comparison selections
@@ -157,33 +191,48 @@ export default function ProgressAnalytics({ profile, selectedDate, onProfileUpda
     reader.readAsDataURL(file);
   };
 
-  // Submit Photo to Vault
-  const handleSavePhoto = async () => {
-    if (!photoPreview) return;
+  // Submit Full Day's Check-in to Vault (Front, Side, Back together)
+  const handleSaveDayCheckin = async () => {
+    const photoList = [];
+    if (dayPhotos.front) photoList.push({ pose: 'front', photoUrl: dayPhotos.front });
+    if (dayPhotos.side) photoList.push({ pose: 'side', photoUrl: dayPhotos.side });
+    if (dayPhotos.back) photoList.push({ pose: 'back', photoUrl: dayPhotos.back });
+
+    if (photoList.length === 0) {
+      if (typeof window !== 'undefined' && window.showToast) {
+        window.showToast('Please snap or choose at least one photo (e.g. Front or Side pose)', 'warning', 'No Photos');
+      }
+      return;
+    }
+
+    setIsSubmittingDay(true);
     try {
       const payload = {
-        date: selectedDate,
-        type: photoType,
-        pose: photoPose,
-        photoUrl: photoPreview,
-        weightKg: profile?.weightKg || null,
-        notes: photoNotes
+        date: dayCheckinDate || selectedDate,
+        type: dayCheckinType,
+        weightKg: dayCheckinWeight ? parseFloat(dayCheckinWeight) : (profile?.weightKg || null),
+        notes: dayCheckinNotes,
+        photos: photoList
       };
-      const res = await api.addProgressPhoto(payload);
+
+      const res = await api.saveDayCheckin(payload);
       if (res.success) {
         setIsAddingPhoto(false);
-        setPhotoPreview('');
-        setPhotoFile(null);
-        setPhotoNotes('');
+        setDayPhotos({ front: null, side: null, back: null });
+        setDayCheckinNotes('');
         if (typeof window !== 'undefined' && window.showToast) {
-          window.showToast('Progress photo saved to your private vault!', 'success', 'Photo Vault');
+          window.showToast(`Saved Day Check-In with ${res.savedCount || photoList.length} photos for ${payload.date}!`, 'success', 'Check-In Saved');
         }
-        loadTrendsAndPhotos();
+        await loadTrendsAndPhotos();
+      } else {
+        throw new Error(res.error || 'Failed to save check-in');
       }
     } catch (err) {
       if (typeof window !== 'undefined' && window.showToast) {
-        window.showToast('Failed to save photo: ' + err.message, 'error', 'Upload Error');
+        window.showToast('Failed to save day check-in: ' + err.message, 'error', 'Check-in Error');
       }
+    } finally {
+      setIsSubmittingDay(false);
     }
   };
 
@@ -199,10 +248,47 @@ export default function ProgressAnalytics({ profile, selectedDate, onProfileUpda
     }
   };
 
+  const handleConfirmDeleteDay = async () => {
+    if (!dayToDelete) return;
+    try {
+      await api.deleteDayCheckin(dayToDelete.date);
+      if (typeof window !== 'undefined' && window.showToast) {
+        window.showToast(`Deleted check-in session for ${dayToDelete.date}`, 'success', 'Session Deleted');
+      }
+      loadTrendsAndPhotos();
+    } catch (err) {
+      console.error('Failed to delete day session:', err);
+    } finally {
+      setDayToDelete(null);
+    }
+  };
+
   const trendList = trendsData?.dailyTrend || [];
   const maxCalories = useMemo(() => Math.max(...trendList.map(d => Math.max(d.calories, d.targetCalories, 2500))), [trendList]);
   const maxProtein = useMemo(() => Math.max(...trendList.map(d => Math.max(d.protein, d.targetProtein, 160))), [trendList]);
   const maxSteps = useMemo(() => Math.max(...trendList.map(d => Math.max(d.steps, 10000))), [trendList]);
+
+  // Group photos by date into cohesive Day Check-In Sessions (Front, Side, Back together)
+  const daySessions = useMemo(() => {
+    const map = {};
+    (photos || []).forEach(p => {
+      const d = p.date || 'Unknown Date';
+      if (!map[d]) {
+        map[d] = {
+          date: d,
+          weightKg: p.weightKg,
+          type: p.type || 'checkin',
+          notes: p.notes || '',
+          photos: []
+        };
+      }
+      map[d].photos.push(p);
+      if (p.weightKg) map[d].weightKg = p.weightKg;
+      if (p.notes && !map[d].notes) map[d].notes = p.notes;
+      if (p.type === 'before' || p.type === 'after') map[d].type = p.type;
+    });
+    return Object.values(map).sort((a, b) => b.date.localeCompare(a.date));
+  }, [photos]);
 
   const selectedBeforePhoto = photos.find(p => p.id === beforePhotoId) || photos[photos.length - 1];
   const selectedAfterPhoto = photos.find(p => p.id === afterPhotoId) || photos[0];
@@ -511,110 +597,299 @@ export default function ProgressAnalytics({ profile, selectedDate, onProfileUpda
           </button>
         </div>
 
-        {/* Upload Form Modal/Card */}
+        {/* Day Check-In Upload Form (Upload Front, Side, Back together for a single day) */}
         {isAddingPhoto && (
-          <div className="bg-slate-950 border border-emerald-500/40 rounded-2xl p-5 space-y-4 animate-in fade-in duration-200">
-            <h3 className="text-sm font-bold text-white flex items-center space-x-2">
-              <Camera className="w-4 h-4 text-emerald-400" />
-              <span>Upload New Physique Check-In</span>
-            </h3>
+          <div className="bg-slate-950 border border-emerald-500/40 rounded-3xl p-5 sm:p-6 space-y-5 animate-in fade-in duration-200 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center space-x-2.5">
+                <div className="p-2 bg-emerald-500/15 text-emerald-400 rounded-xl">
+                  <Calendar className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-white">Record Day Physique Check-In</h3>
+                  <p className="text-[11px] text-slate-400">Capture your Front, Side, and Back poses together for this day</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAddingPhoto(false)}
+                className="text-slate-500 hover:text-slate-300 p-1.5 rounded-lg text-xs"
+              >
+                ✕
+              </button>
+            </div>
 
+            {/* Check-In Meta Info (Date, Tag, Scale Weight) */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label className="block text-[11px] font-bold text-slate-400 mb-1">Tag As:</label>
-                <select
-                  value={photoType}
-                  onChange={(e) => setPhotoType(e.target.value)}
+                <label className="block text-[11px] font-bold text-slate-400 mb-1">Check-in Date:</label>
+                <input
+                  type="date"
+                  value={dayCheckinDate}
+                  onChange={(e) => setDayCheckinDate(e.target.value)}
                   className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-bold"
-                >
-                  <option value="before">Baseline / Before Photo</option>
-                  <option value="after">Latest Progress / After Photo</option>
-                  <option value="checkin">Weekly Check-in</option>
-                </select>
+                />
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-slate-400 mb-1">Pose:</label>
+                <label className="block text-[11px] font-bold text-slate-400 mb-1">Milestone Tag:</label>
                 <select
-                  value={photoPose}
-                  onChange={(e) => setPhotoPose(e.target.value)}
+                  value={dayCheckinType}
+                  onChange={(e) => setDayCheckinType(e.target.value)}
                   className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-bold"
                 >
-                  <option value="front">Front Relaxed / Flexed</option>
-                  <option value="side">Side Profile</option>
-                  <option value="back">Back Lat Spread</option>
+                  <option value="checkin">Weekly Check-in</option>
+                  <option value="before">Baseline / Day 1 Photo</option>
+                  <option value="after">Latest Progress / Milestone</option>
                 </select>
               </div>
 
               <div>
                 <label className="block text-[11px] font-bold text-slate-400 mb-1">Scale Weight (kg):</label>
                 <input
-                  type="text"
-                  defaultValue={profile?.weightKg || ''}
+                  type="number"
+                  step="0.1"
+                  value={dayCheckinWeight}
+                  onChange={(e) => setDayCheckinWeight(e.target.value)}
+                  placeholder="e.g. 111.0"
                   className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-bold"
-                  readOnly
                 />
               </div>
             </div>
 
+            {/* Notes / Reflection for the day */}
             <div>
-              <label className="block text-[11px] font-bold text-slate-400 mb-1">Notes / Reflection:</label>
+              <label className="block text-[11px] font-bold text-slate-400 mb-1">Session Notes / Biomechanical Reflection:</label>
               <input
                 type="text"
-                value={photoNotes}
-                onChange={(e) => setPhotoNotes(e.target.value)}
-                placeholder="e.g. Week 4 cutting, noticing serratus & upper ab definition"
-                className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
+                value={dayCheckinNotes}
+                onChange={(e) => setDayCheckinNotes(e.target.value)}
+                placeholder="e.g. Morning fasted check-in: waist down 2cm, arms looking fuller, posture improved"
+                className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600"
               />
             </div>
 
-            <div className="border border-dashed border-slate-800 rounded-xl p-4 text-center">
-              {photoPreview ? (
-                <div className="space-y-3">
-                  <img src={photoPreview} alt="Preview" className="max-h-56 mx-auto rounded-lg object-contain" />
-                  <button
-                    onClick={() => { setPhotoPreview(''); setPhotoFile(null); }}
-                    className="text-xs text-rose-400 hover:underline"
-                  >
-                    Change Image
-                  </button>
-                </div>
-              ) : (
-                <div className="py-4">
-                  <Camera className="w-10 h-10 text-emerald-400 mx-auto mb-2.5 animate-pulse" />
-                  <div className="flex flex-wrap items-center justify-center gap-2.5">
-                    <button
-                      type="button"
-                      onClick={handleSnapCamera}
-                      className="cursor-pointer inline-flex items-center space-x-2 px-3.5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black rounded-xl transition-all shadow-md shadow-emerald-500/20 active:scale-95"
-                    >
-                      <Camera className="w-4 h-4" />
-                      <span>Snap with Camera</span>
-                    </button>
-                    <label className="cursor-pointer inline-flex items-center space-x-2 px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl transition-all border border-slate-700 active:scale-95">
-                      <Upload className="w-4 h-4 text-slate-400" />
-                      <span>Choose from Gallery</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handlePhotoUpload}
-                        className="hidden"
-                      />
-                    </label>
+            {/* 3 Pose Slots (Front, Side, Back) for this Day */}
+            <div>
+              <label className="block text-[11px] font-bold text-slate-300 mb-2">
+                Pose Photos for this Day (Snap or upload each angle):
+              </label>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                
+                {/* SLOT 1: FRONT POSE */}
+                <div className={`p-3.5 rounded-2xl border transition-all ${
+                  dayPhotos.front 
+                    ? 'bg-slate-900/90 border-emerald-500/50 shadow-md shadow-emerald-500/10' 
+                    : 'bg-slate-900/40 border-slate-800 border-dashed hover:border-slate-700'
+                }`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-black uppercase text-emerald-400 flex items-center space-x-1.5">
+                      <span>Front Pose</span>
+                      {dayPhotos.front && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />}
+                    </span>
+                    {dayPhotos.front && (
+                      <button
+                        type="button"
+                        onClick={() => handleClearSlot('front')}
+                        className="text-[10px] text-rose-400 hover:text-rose-300"
+                      >
+                        Remove
+                      </button>
+                    )}
                   </div>
-                  <span className="text-[10px] text-slate-500 block mt-2">Take a live progress photo or upload from phone storage</span>
+
+                  {dayPhotos.front ? (
+                    <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-black/60 border border-slate-800 group">
+                      <img src={dayPhotos.front} alt="Front Pose" className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center space-x-2">
+                        <button
+                          type="button"
+                          onClick={() => handleSnapCameraForSlot('front')}
+                          className="px-2.5 py-1 bg-emerald-500 text-slate-950 rounded-lg text-[10px] font-bold cursor-pointer"
+                        >
+                          Retake
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="aspect-[3/4] rounded-xl flex flex-col items-center justify-center p-3 text-center space-y-2.5">
+                      <Camera className="w-8 h-8 text-slate-600 animate-pulse" />
+                      <div className="space-y-1.5 w-full">
+                        <button
+                          type="button"
+                          onClick={() => handleSnapCameraForSlot('front')}
+                          className="w-full py-1.5 px-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-[11px] font-black rounded-lg transition-all shadow-sm cursor-pointer flex items-center justify-center space-x-1"
+                        >
+                          <Camera className="w-3 h-3" />
+                          <span>Snap Front</span>
+                        </button>
+                        <label className="w-full py-1.5 px-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-bold rounded-lg transition-all border border-slate-700 cursor-pointer flex items-center justify-center space-x-1 block">
+                          <Upload className="w-3 h-3 text-slate-400" />
+                          <span>From Gallery</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => handleSlotFileUpload('front', e)}
+                            className="hidden"
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
+
+                {/* SLOT 2: SIDE PROFILE */}
+                <div className={`p-3.5 rounded-2xl border transition-all ${
+                  dayPhotos.side 
+                    ? 'bg-slate-900/90 border-emerald-500/50 shadow-md shadow-emerald-500/10' 
+                    : 'bg-slate-900/40 border-slate-800 border-dashed hover:border-slate-700'
+                }`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-black uppercase text-teal-400 flex items-center space-x-1.5">
+                      <span>Side Profile</span>
+                      {dayPhotos.side && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />}
+                    </span>
+                    {dayPhotos.side && (
+                      <button
+                        type="button"
+                        onClick={() => handleClearSlot('side')}
+                        className="text-[10px] text-rose-400 hover:text-rose-300"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+
+                  {dayPhotos.side ? (
+                    <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-black/60 border border-slate-800 group">
+                      <img src={dayPhotos.side} alt="Side Profile" className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center space-x-2">
+                        <button
+                          type="button"
+                          onClick={() => handleSnapCameraForSlot('side')}
+                          className="px-2.5 py-1 bg-emerald-500 text-slate-950 rounded-lg text-[10px] font-bold cursor-pointer"
+                        >
+                          Retake
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="aspect-[3/4] rounded-xl flex flex-col items-center justify-center p-3 text-center space-y-2.5">
+                      <Camera className="w-8 h-8 text-slate-600 animate-pulse" />
+                      <div className="space-y-1.5 w-full">
+                        <button
+                          type="button"
+                          onClick={() => handleSnapCameraForSlot('side')}
+                          className="w-full py-1.5 px-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-[11px] font-black rounded-lg transition-all shadow-sm cursor-pointer flex items-center justify-center space-x-1"
+                        >
+                          <Camera className="w-3 h-3" />
+                          <span>Snap Side</span>
+                        </button>
+                        <label className="w-full py-1.5 px-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-bold rounded-lg transition-all border border-slate-700 cursor-pointer flex items-center justify-center space-x-1 block">
+                          <Upload className="w-3 h-3 text-slate-400" />
+                          <span>From Gallery</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => handleSlotFileUpload('side', e)}
+                            className="hidden"
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* SLOT 3: BACK POSE (OPTIONAL) */}
+                <div className={`p-3.5 rounded-2xl border transition-all ${
+                  dayPhotos.back 
+                    ? 'bg-slate-900/90 border-emerald-500/50 shadow-md shadow-emerald-500/10' 
+                    : 'bg-slate-900/40 border-slate-800 border-dashed hover:border-slate-700'
+                }`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-black uppercase text-sky-400 flex items-center space-x-1.5">
+                      <span>Back Pose (Opt)</span>
+                      {dayPhotos.back && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />}
+                    </span>
+                    {dayPhotos.back && (
+                      <button
+                        type="button"
+                        onClick={() => handleClearSlot('back')}
+                        className="text-[10px] text-rose-400 hover:text-rose-300"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+
+                  {dayPhotos.back ? (
+                    <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-black/60 border border-slate-800 group">
+                      <img src={dayPhotos.back} alt="Back Pose" className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center space-x-2">
+                        <button
+                          type="button"
+                          onClick={() => handleSnapCameraForSlot('back')}
+                          className="px-2.5 py-1 bg-emerald-500 text-slate-950 rounded-lg text-[10px] font-bold cursor-pointer"
+                        >
+                          Retake
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="aspect-[3/4] rounded-xl flex flex-col items-center justify-center p-3 text-center space-y-2.5">
+                      <Camera className="w-8 h-8 text-slate-600 animate-pulse" />
+                      <div className="space-y-1.5 w-full">
+                        <button
+                          type="button"
+                          onClick={() => handleSnapCameraForSlot('back')}
+                          className="w-full py-1.5 px-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-[11px] font-black rounded-lg transition-all shadow-sm cursor-pointer flex items-center justify-center space-x-1"
+                        >
+                          <Camera className="w-3 h-3" />
+                          <span>Snap Back</span>
+                        </button>
+                        <label className="w-full py-1.5 px-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-bold rounded-lg transition-all border border-slate-700 cursor-pointer flex items-center justify-center space-x-1 block">
+                          <Upload className="w-3 h-3 text-slate-400" />
+                          <span>From Gallery</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => handleSlotFileUpload('back', e)}
+                            className="hidden"
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+              </div>
             </div>
 
-            {photoPreview && (
+            {/* Commit Button */}
+            <div className="pt-2 flex items-center space-x-3">
               <button
-                onClick={handleSavePhoto}
-                className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black text-xs rounded-xl transition-all shadow-md shadow-emerald-500/20"
+                type="button"
+                onClick={() => setIsAddingPhoto(false)}
+                className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-bold rounded-xl transition-all border border-slate-800 cursor-pointer"
               >
-                Confirm & Add to Photo Vault
+                Cancel
               </button>
-            )}
+              <button
+                type="button"
+                onClick={handleSaveDayCheckin}
+                disabled={isSubmittingDay || (!dayPhotos.front && !dayPhotos.side && !dayPhotos.back)}
+                className="flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-slate-950 font-black text-xs rounded-xl transition-all shadow-md shadow-emerald-500/20 cursor-pointer flex items-center justify-center space-x-2"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>
+                  {isSubmittingDay 
+                    ? 'Saving Day Check-In...' 
+                    : `Save Day Check-In (${[dayPhotos.front, dayPhotos.side, dayPhotos.back].filter(Boolean).length} Photos)`
+                  }
+                </span>
+              </button>
+            </div>
           </div>
         )}
 
@@ -624,13 +899,13 @@ export default function ProgressAnalytics({ profile, selectedDate, onProfileUpda
             <Shield className="w-8 h-8 text-slate-600 mx-auto mb-1" />
             <h4 className="text-sm font-bold text-slate-300">Your Progress Vault is Empty</h4>
             <p className="text-xs text-slate-500 max-w-sm mx-auto">
-              Snap a baseline front or side photo today to visually record your fat loss and muscle building journey over time.
+              Snap a baseline front and side photo today to visually record your fat loss and muscle building journey over time.
             </p>
             <button
               onClick={() => setIsAddingPhoto(true)}
               className="mt-3 px-4 py-2 bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 rounded-xl text-xs font-bold hover:bg-emerald-500/30 transition-all inline-block cursor-pointer"
             >
-              Take Baseline Photo
+              Take Baseline Day Check-In
             </button>
           </div>
         ) : (
@@ -638,7 +913,7 @@ export default function ProgressAnalytics({ profile, selectedDate, onProfileUpda
             
             {/* Album Header & View Mode Switcher */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-950 p-3 rounded-2xl border border-slate-800">
-              {/* Category Filter Pills */}
+              {/* Category Filter Pills (Based on Day Check-in Sessions) */}
               <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 sm:pb-0">
                 <button
                   type="button"
@@ -649,7 +924,7 @@ export default function ProgressAnalytics({ profile, selectedDate, onProfileUpda
                       : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
                   }`}
                 >
-                  All Photos ({photos.length})
+                  All Days ({daySessions.length})
                 </button>
                 <button
                   type="button"
@@ -660,7 +935,7 @@ export default function ProgressAnalytics({ profile, selectedDate, onProfileUpda
                       : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
                   }`}
                 >
-                  Baseline ({photos.filter(p => p.type === 'before').length})
+                  Baseline ({daySessions.filter(s => s.type === 'before').length})
                 </button>
                 <button
                   type="button"
@@ -671,7 +946,7 @@ export default function ProgressAnalytics({ profile, selectedDate, onProfileUpda
                       : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
                   }`}
                 >
-                  Current ({photos.filter(p => p.type === 'after').length})
+                  Current ({daySessions.filter(s => s.type === 'after').length})
                 </button>
                 <button
                   type="button"
@@ -682,7 +957,7 @@ export default function ProgressAnalytics({ profile, selectedDate, onProfileUpda
                       : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
                   }`}
                 >
-                  Check-ins ({photos.filter(p => p.type === 'checkin' || !p.type).length})
+                  Check-ins ({daySessions.filter(s => s.type === 'checkin' || !s.type).length})
                 </button>
               </div>
 
@@ -807,181 +1082,116 @@ export default function ProgressAnalytics({ profile, selectedDate, onProfileUpda
                   </div>
                 </div>
               </div>
-            ) : photos.length === 1 ? (
-              /* SINGLE PHOTO: DAY-1 BASELINE MILESTONE SHOWCASE */
-              <div className="bg-slate-950 border border-emerald-500/30 rounded-2xl p-5">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-                  {/* Photo Card */}
-                  <div 
-                    onClick={() => setSelectedZoomPhoto(photos[0])}
-                    className="group relative rounded-2xl overflow-hidden border border-slate-800 aspect-[3/4] max-h-96 bg-slate-900 cursor-pointer shadow-xl"
-                  >
-                    <img 
-                      src={photos[0].photoUrl} 
-                      alt="Baseline Physique" 
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent p-4 flex flex-col justify-end text-xs">
-                      <div className="flex items-center space-x-2 mb-1">
-                        <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30 uppercase text-[10px]">
-                          ⭐ Day 1 Baseline
-                        </span>
-                        <span className="px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 font-bold uppercase text-[10px]">
-                          {photos[0].pose || 'Front'}
-                        </span>
-                      </div>
-                      <span className="font-black text-white text-sm">{photos[0].date}</span>
-                      <span className="text-emerald-400 font-bold text-xs mt-0.5">
-                        {photos[0].weightKg ? `${photos[0].weightKg} kg Scale Weight` : ''}
-                      </span>
-                      {photos[0].notes && (
-                        <p className="text-slate-400 text-[11px] mt-1 line-clamp-2 italic">
-                          "{photos[0].notes}"
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="absolute top-3 right-3 flex items-center space-x-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); setSelectedZoomPhoto(photos[0]); }}
-                        className="p-1.5 bg-black/70 hover:bg-black text-white rounded-lg"
-                        title="Enlarge"
-                      >
-                        <Maximize2 className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); setPhotoToDelete(photos[0]); }}
-                        className="p-1.5 bg-rose-500/80 hover:bg-rose-600 text-white rounded-lg"
-                        title="Delete"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Milestone Description & Next Check-in Prompt */}
-                  <div className="space-y-4">
-                    <div className="inline-flex items-center space-x-2 px-3 py-1 bg-emerald-500/10 text-emerald-400 rounded-full text-xs font-bold border border-emerald-500/20">
-                      <Award className="w-3.5 h-3.5" />
-                      <span>Baseline Journey Started</span>
-                    </div>
-
-                    <h3 className="text-lg font-black text-white">
-                      Baseline Physique Check-In Secured
-                    </h3>
-
-                    <p className="text-xs text-slate-400 leading-relaxed">
-                      Your Day 1 physique photo is stored in your private vault. As you maintain your protein target and workout consistency, add check-in photos every 2 to 4 weeks to visually measure muscle growth and fat loss.
-                    </p>
-
-                    <div className="bg-slate-900 border border-slate-800 rounded-xl p-3.5 space-y-2 text-xs">
-                      <div className="flex items-center space-x-2 text-slate-300 font-bold">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                        <span>Baseline Stored: {photos[0].date} ({photos[0].weightKg ? `${photos[0].weightKg} kg` : 'Recorded'})</span>
-                      </div>
-                      <div className="flex items-center space-x-2 text-slate-400">
-                        <Calendar className="w-4 h-4 text-sky-400" />
-                        <span>Suggested Next Photo: Week 3 or Week 4 check-in</span>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => setIsAddingPhoto(true)}
-                      className="w-full sm:w-auto px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black rounded-xl text-xs transition-all shadow-md shadow-emerald-500/20 cursor-pointer flex items-center justify-center space-x-2"
-                    >
-                      <Plus className="w-4 h-4" />
-                      <span>+ Add Next Progress Photo</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
             ) : (
-              /* VIEW MODE 2: RESPONSIVE PHOTO ALBUM GRID */
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                {photos
-                  .filter((p) => {
+              /* VIEW MODE 2: ORGANIZED BY DAY CHECK-IN SESSIONS */
+              <div className="space-y-6">
+                {daySessions
+                  .filter((session) => {
                     if (albumTagFilter === 'all') return true;
-                    if (albumTagFilter === 'before') return p.type === 'before';
-                    if (albumTagFilter === 'after') return p.type === 'after';
-                    if (albumTagFilter === 'checkin') return p.type === 'checkin' || !p.type;
+                    if (albumTagFilter === 'before') return session.type === 'before';
+                    if (albumTagFilter === 'after') return session.type === 'after';
+                    if (albumTagFilter === 'checkin') return session.type === 'checkin' || !session.type;
                     return true;
                   })
-                  .map((p) => {
-                    const isBefore = p.type === 'before';
-                    const isAfter = p.type === 'after';
+                  .map((session) => {
+                    const isBefore = session.type === 'before';
+                    const isAfter = session.type === 'after';
 
                     return (
                       <div 
-                        key={p.id} 
-                        className="group relative bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 hover:border-emerald-500/40 transition-all duration-200 aspect-[3/4] shadow-lg cursor-pointer"
-                        onClick={() => setSelectedZoomPhoto(p)}
+                        key={session.date}
+                        className="bg-slate-950 border border-slate-800 hover:border-emerald-500/30 rounded-3xl p-5 shadow-xl transition-all space-y-4"
                       >
-                        <img 
-                          src={p.photoUrl} 
-                          alt="Physique Album Item" 
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
-                        />
+                        {/* Day Session Header */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-3 border-b border-slate-900">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <div className="flex items-center space-x-2 text-white font-black text-sm">
+                              <Calendar className="w-4 h-4 text-emerald-400" />
+                              <span>{session.date}</span>
+                            </div>
 
-                        {/* Top Badges */}
-                        <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between pointer-events-none">
-                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase backdrop-blur-md border ${
-                            isBefore
-                              ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
-                              : isAfter
-                              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                              : 'bg-slate-900/80 text-slate-300 border-slate-700'
-                          }`}>
-                            {isBefore ? 'Baseline' : isAfter ? 'Current' : (p.pose || 'Check-in')}
-                          </span>
-
-                          {p.weightKg && (
-                            <span className="px-1.5 py-0.5 rounded-md bg-slate-900/80 text-white font-mono text-[10px] font-bold backdrop-blur-md border border-slate-700">
-                              {p.weightKg} kg
+                            <span className={`px-2.5 py-0.5 rounded-lg text-[10px] font-bold uppercase border ${
+                              isBefore
+                                ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                                : isAfter
+                                ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                                : 'bg-slate-900 text-slate-300 border-slate-800'
+                            }`}>
+                              {isBefore ? 'Baseline' : isAfter ? 'Current Progress' : 'Day Check-in'}
                             </span>
-                          )}
-                        </div>
 
-                        {/* Bottom Gradient Overlay */}
-                        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent opacity-95 p-3 flex flex-col justify-end text-[11px]">
-                          <span className="font-bold text-white text-xs">{p.date}</span>
-                          <span className="text-slate-400 text-[10px] capitalize">
-                            {p.pose ? `${p.pose} pose` : 'Check-in'}
-                          </span>
-                          {p.notes && (
-                            <p className="text-slate-400 text-[10px] mt-0.5 truncate italic">
-                              "{p.notes}"
-                            </p>
-                          )}
-                        </div>
+                            {session.weightKg && (
+                              <span className="px-2 py-0.5 rounded-lg bg-slate-900 border border-slate-800 text-emerald-400 font-mono text-xs font-bold">
+                                {session.weightKg} kg
+                              </span>
+                            )}
 
-                        {/* Hover Quick Actions */}
-                        <div className="absolute top-2.5 right-2.5 flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <span className="text-[11px] text-slate-500">
+                              • {session.photos.length} {session.photos.length === 1 ? 'pose' : 'poses'} ({session.photos.map(p => p.pose || 'pose').join(', ')})
+                            </span>
+                          </div>
+
                           <button
                             type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedZoomPhoto(p);
-                            }}
-                            className="p-1.5 bg-black/80 hover:bg-black text-white rounded-lg cursor-pointer"
-                            title="Inspect fullscreen"
-                          >
-                            <Maximize2 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setPhotoToDelete(p);
-                            }}
-                            className="p-1.5 bg-rose-500/90 hover:bg-rose-600 text-white rounded-lg cursor-pointer"
-                            title="Delete photo"
+                            onClick={() => setDayToDelete(session)}
+                            className="self-end sm:self-auto p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-xl transition-all cursor-pointer text-xs flex items-center space-x-1"
+                            title="Delete all photos for this day"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
+                            <span className="text-[11px]">Delete Day</span>
                           </button>
                         </div>
+
+                        {/* Poses Side-by-Side Grid for this Date */}
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5">
+                          {session.photos.map((p) => (
+                            <div
+                              key={p.id}
+                              onClick={() => setSelectedZoomPhoto(p)}
+                              className="group relative bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 hover:border-emerald-500/50 aspect-[3/4] cursor-pointer shadow-lg transition-all"
+                            >
+                              <img 
+                                src={p.photoUrl} 
+                                alt={`${session.date} - ${p.pose}`}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
+                              />
+
+                              {/* Top Pose Badge */}
+                              <div className="absolute top-2.5 left-2.5 flex items-center space-x-1.5 pointer-events-none">
+                                <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-slate-950/85 backdrop-blur-md text-emerald-400 border border-emerald-500/30">
+                                  {p.pose ? `${p.pose.toUpperCase()} POSE` : 'PHOTO'}
+                                </span>
+                              </div>
+
+                              {/* Hover Actions */}
+                              <div className="absolute top-2.5 right-2.5 flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); setSelectedZoomPhoto(p); }}
+                                  className="p-1.5 bg-black/80 hover:bg-black text-white rounded-lg cursor-pointer"
+                                  title="Inspect fullscreen"
+                                >
+                                  <Maximize2 className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); setPhotoToDelete(p); }}
+                                  className="p-1.5 bg-rose-500/90 hover:bg-rose-600 text-white rounded-lg cursor-pointer"
+                                  title="Delete this pose"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Notes reflection if available */}
+                        {session.notes && (
+                          <div className="text-xs text-slate-400 italic bg-slate-900/60 p-2.5 rounded-xl border border-slate-900">
+                            "{session.notes}"
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -1060,14 +1270,26 @@ export default function ProgressAnalytics({ profile, selectedDate, onProfileUpda
         </div>
       )}
 
-      {/* Sleek Dark Confirmation Modal for Progress Photos */}
+      {/* Sleek Dark Confirmation Modal for Individual Progress Photos */}
       <ConfirmModal
         isOpen={Boolean(photoToDelete)}
         onClose={() => setPhotoToDelete(null)}
         onConfirm={handleConfirmDeletePhoto}
         title="Delete Progress Photo?"
-        message={`Are you sure you want to delete this ${photoToDelete?.pose || ''} physique check-in from ${photoToDelete?.date || 'your vault'}?`}
+        message={`Are you sure you want to delete this ${photoToDelete?.pose || ''} physique photo from ${photoToDelete?.date || 'your vault'}?`}
         confirmText="Yes, Delete Photo"
+        cancelText="Cancel"
+        danger={true}
+      />
+
+      {/* Sleek Dark Confirmation Modal for Full Day Check-in Session */}
+      <ConfirmModal
+        isOpen={Boolean(dayToDelete)}
+        onClose={() => setDayToDelete(null)}
+        onConfirm={handleConfirmDeleteDay}
+        title="Delete Day Check-In Session?"
+        message={`Are you sure you want to delete all photos taken on ${dayToDelete?.date}? This will delete all ${dayToDelete?.photos?.length || 0} poses recorded for this date.`}
+        confirmText="Yes, Delete Day"
         cancelText="Cancel"
         danger={true}
       />
@@ -1076,8 +1298,11 @@ export default function ProgressAnalytics({ profile, selectedDate, onProfileUpda
       <LiveCameraModal
         isOpen={isLiveCameraOpen}
         onClose={() => setIsLiveCameraOpen(false)}
-        onCapture={(dataUrl) => setPhotoPreview(dataUrl)}
-        title="Snap Progress Photo"
+        onCapture={(dataUrl) => {
+          setDayPhotos(prev => ({ ...prev, [activeSlotForCamera]: dataUrl }));
+          setIsLiveCameraOpen(false);
+        }}
+        title={`Snap ${activeSlotForCamera.toUpperCase()} Progress Photo`}
       />
 
     </div>

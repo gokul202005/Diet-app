@@ -56,7 +56,7 @@ const initialData = {
   ],
   settings: {
     geminiApiKey: process.env.GEMINI_API_KEY || '',
-    preferredModel: 'gemini-3.5-flash',
+    preferredModel: 'gemini-2.0-flash-lite-preview-02-05',
     useHeuristicFallback: true,
     cacheTokens: true,
     fastrackDeviceName: 'Fastrack Smartwatch',

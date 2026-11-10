@@ -159,16 +159,6 @@ export default function Navbar({
                 </button>
               </div>
 
-              {/* Universal Voice Assistant Pill (Desktop only; mobile has floating dock action) */}
-              <button
-                onClick={onOpenVoice || (() => window.dispatchEvent(new CustomEvent('open-universal-voice')))}
-                className="hidden sm:flex items-center space-x-1.5 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 px-2.5 py-1.5 rounded-xl transition-all cursor-pointer font-bold text-xs shadow-sm"
-                title="Universal Voice Assistant"
-              >
-                <Mic className="w-3.5 h-3.5 animate-pulse text-emerald-400" />
-                <span className="hidden md:inline">Voice Log</span>
-              </button>
-
               {/* Server Status Pill (Compact on Desktop) */}
               <div className="hidden lg:block">
                 <ServerStatusWidget variant="pill" />

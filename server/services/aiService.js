@@ -28,7 +28,7 @@ function extractJSON(text) {
 export class AIService {
   constructor(apiKey = process.env.GEMINI_API_KEY) {
     this.apiKey = apiKey;
-    this.modelName = 'gemini-3.5-flash-lite';
+    this.modelName = 'gemini-2.0-flash-lite-preview-02-05';
   }
 
   setApiKey(key) {
@@ -40,8 +40,8 @@ export class AIService {
     return new GoogleGenerativeAI(this.apiKey);
   }
 
-  // Resilient multi-model executor with automatic failover to prevent 404 / 503 errors
-  // Uses low-token Gemini 3.5 Flash Lite & 3.1 Flash Lite with 500 RPD rate limits
+  // Resilient multi-model executor with automatic failover to prevent 404 / 503 / 429 quota errors
+  // Uses low-token Gemini 2.0 Flash Lite & 1.5 Flash 8B with 500 RPD rate limits
   async callModel(contentParts, config = {}, customModels = null) {
     if (!this.apiKey) return null;
     const genAI = this.getGenAI();
@@ -50,9 +50,11 @@ export class AIService {
     const candidateModels = customModels && customModels.length > 0
       ? customModels
       : [
-          this.modelName || 'gemini-3.5-flash-lite',
-          'gemini-3.5-flash-lite',
-          'gemini-3.1-flash-lite'
+          this.modelName || 'gemini-2.0-flash-lite-preview-02-05',
+          'gemini-2.0-flash-lite-preview-02-05',
+          'gemini-1.5-flash-8b',
+          'gemini-2.0-flash',
+          'gemini-1.5-flash'
         ];
     const uniqueCandidates = [...new Set(candidateModels)];
 
@@ -103,7 +105,7 @@ Return ONLY the transcribed sentence as plain text without quotation marks, bull
         }
       },
       prompt
-    ], {}, ['gemini-3.5-transcribe', 'gemini-2.5-flash', 'gemini-3.5-flash-lite']);
+    ], {}, ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.0-flash-lite-preview-02-05', 'gemini-1.5-flash-8b']);
 
     const text = result?.response?.text();
     return (text || '').replace(/^["']|["']$/g, '').trim();
@@ -263,7 +265,7 @@ Return this JSON:
       const { result } = await this.callModel(
         [prompt, imagePart], 
         { responseMimeType: 'application/json' }, 
-        ['gemini-3.5-flash-lite', 'gemini-2.5-flash', 'gemini-3.1-flash-lite']
+        ['gemini-2.0-flash', 'gemini-2.0-flash-lite-preview-02-05', 'gemini-1.5-flash-8b', 'gemini-1.5-flash']
       );
       const rawText = result.response.text();
       const parsed = extractJSON(rawText) || JSON.parse(rawText);

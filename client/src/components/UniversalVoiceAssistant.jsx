@@ -226,10 +226,12 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
             isRecordingRef.current = false;
             setStateMode('idle');
           } else if (event.error === 'network') {
-            setErrorMsg('Network error connecting to speech recognition service.');
-            setIsRecording(false);
-            isRecordingRef.current = false;
-            setStateMode('idle');
+            console.log('WebSpeech network error, auto-fallback to direct audio recording...');
+            try {
+              recognition.stop();
+            } catch (e) {}
+            // Seamlessly fall back to direct audio recording without crashing
+            startMediaRecorderFallback();
           }
         };
 
@@ -262,10 +264,17 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
       }
     }
 
-    // FALLBACK: MediaRecorder for browsers without WebSpeech (e.g. Firefox)
+    // Direct MediaRecorder Fallback
+    await startMediaRecorderFallback();
+  };
+
+  const startMediaRecorderFallback = async () => {
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         setErrorMsg('Microphone access is not supported by this browser. You can type what you did below!');
+        setIsRecording(false);
+        isRecordingRef.current = false;
+        setStateMode('idle');
         return;
       }
 

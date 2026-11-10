@@ -348,8 +348,18 @@ export const api = {
       body: JSON.stringify(payload)
     });
   },
+  saveDayCheckin: async (payload) => {
+    return safeFetch(`${BASE_URL}/progress/day-checkin`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+  },
   deleteProgressPhoto: async (id) => {
     return safeFetch(`${BASE_URL}/progress/photos/${id}`, { method: 'DELETE' });
+  },
+  deleteDayCheckin: async (date) => {
+    return safeFetch(`${BASE_URL}/progress/day/${encodeURIComponent(date)}`, { method: 'DELETE' });
   },
 
   // AI Coach Chat
