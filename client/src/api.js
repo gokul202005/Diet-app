@@ -56,19 +56,35 @@ async function safeFetch(url, options = {}) {
       headers
     });
 
+    if (res.status === 413) {
+      return { 
+        error: 'Payload Too Large: Photo file size exceeds upload limit. Please choose a slightly smaller photo.', 
+        status: 413 
+      };
+    }
+
     const contentType = res.headers.get('content-type') || '';
     if (contentType.includes('application/json')) {
-      return await res.json();
+      const data = await res.json();
+      if (!res.ok && !data.error) {
+        data.error = `Server error (${res.status}): ${res.statusText}`;
+      }
+      return data;
     }
 
     const text = await res.text();
-    // Intercept HTML responses (e.g. Render spin-up pages or 404/502 fallbacks)
+    // Intercept true cold-start HTML responses (e.g. Render spin-up 502/503/504 gateway pages)
     if (text.trim().startsWith('<')) {
-      console.warn(`[API] Server returned HTML for ${url}. Backend is likely starting up on Render.`);
+      if (res.status === 502 || res.status === 503 || res.status === 504 || url.includes('onrender.com')) {
+        console.warn(`[API] Server returned HTML (${res.status}) for ${url}. Backend is likely starting up on Render.`);
+        return { 
+          error: 'Backend server is starting up. Please allow 15-30 seconds...', 
+          isWakingUp: true,
+          status: 'turning-on' 
+        };
+      }
       return { 
-        error: 'Backend server is starting up. Please allow 15-30 seconds...', 
-        isWakingUp: true,
-        status: 'turning-on' 
+        error: `Server returned unexpected HTML response (${res.status}).` 
       };
     }
 

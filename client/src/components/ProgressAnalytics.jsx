@@ -77,13 +77,39 @@ export default function ProgressAnalytics({ profile, selectedDate, onProfileUpda
     if (profile?.weightKg) setDayCheckinWeight(profile.weightKg);
   }, [profile?.weightKg]);
 
+  // Client-side image optimizer to keep uploads fast and well below server limits
+  const compressImage = (dataUrl, maxWidth = 1200, quality = 0.82) => {
+    return new Promise((resolve) => {
+      if (!dataUrl || typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image')) {
+        return resolve(dataUrl);
+      }
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = () => resolve(dataUrl);
+      img.src = dataUrl;
+    });
+  };
+
   const handleSnapCameraForSlot = async (slot) => {
     setActiveSlotForCamera(slot);
     if (isNativePlatform()) {
       try {
         const dataUrl = await openNativeCamera();
         if (dataUrl) {
-          setDayPhotos(prev => ({ ...prev, [slot]: dataUrl }));
+          const compressed = await compressImage(dataUrl);
+          setDayPhotos(prev => ({ ...prev, [slot]: compressed }));
         }
       } catch (err) {
         if (typeof window !== 'undefined' && window.showToast) {
@@ -99,8 +125,9 @@ export default function ProgressAnalytics({ profile, selectedDate, onProfileUpda
     const file = e.target.files && e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => {
-      setDayPhotos(prev => ({ ...prev, [slot]: reader.result }));
+    reader.onload = async () => {
+      const compressed = await compressImage(reader.result);
+      setDayPhotos(prev => ({ ...prev, [slot]: compressed }));
     };
     reader.readAsDataURL(file);
   };
@@ -1298,8 +1325,9 @@ export default function ProgressAnalytics({ profile, selectedDate, onProfileUpda
       <LiveCameraModal
         isOpen={isLiveCameraOpen}
         onClose={() => setIsLiveCameraOpen(false)}
-        onCapture={(dataUrl) => {
-          setDayPhotos(prev => ({ ...prev, [activeSlotForCamera]: dataUrl }));
+        onCapture={async (dataUrl) => {
+          const compressed = await compressImage(dataUrl);
+          setDayPhotos(prev => ({ ...prev, [activeSlotForCamera]: compressed }));
           setIsLiveCameraOpen(false);
         }}
         title={`Snap ${activeSlotForCamera.toUpperCase()} Progress Photo`}
