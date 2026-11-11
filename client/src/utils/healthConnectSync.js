@@ -204,6 +204,7 @@ class HealthConnectSyncEngine {
           client_id: customClientId,
           scope: [
             'https://www.googleapis.com/auth/fitness.activity.read',
+            'https://www.googleapis.com/auth/fitness.activity.write',
             'https://www.googleapis.com/auth/fitness.body.read',
             'https://www.googleapis.com/auth/fitness.location.read',
             'https://www.googleapis.com/auth/fitness.heart_rate.read',
@@ -521,8 +522,103 @@ class HealthConnectSyncEngine {
     };
   }
 
+  // --- TWO-WAY SYNC: WRITE STEPS INTO GOOGLE FIT & HEALTH CONNECT ---
+  async writeStepsToGoogleFit(stepsDelta, dateStr = new Date().toISOString().split('T')[0]) {
+    if (!this.googleFitToken || !stepsDelta || Number(stepsDelta) <= 0) {
+      return { success: false, reason: 'No active Google Fit token or invalid steps delta' };
+    }
+
+    try {
+      const stepVal = Math.round(Number(stepsDelta));
+      const dataSourcePayload = {
+        dataStreamName: "AGYFitWatchSync",
+        type: "raw",
+        application: {
+          name: "AGY Fit Diet & Biometrics Tracker",
+          version: "1.0"
+        },
+        dataType: {
+          name: "com.google.step_count.delta",
+          field: [
+            {
+              name: "steps",
+              format: "integer"
+            }
+          ]
+        }
+      };
+
+      // 1. Ensure DataSource exists
+      let dataSourceId = 'raw:com.google.step_count.delta:agy.fit.diet.tracker:AGYFitWatchSync';
+      try {
+        const dsRes = await fetch('https://www.googleapis.com/fitness/v1/users/me/dataSources', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${this.googleFitToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(dataSourcePayload)
+        });
+        if (dsRes.ok) {
+          const dsData = await dsRes.json();
+          if (dsData.dataStreamId) dataSourceId = dsData.dataStreamId;
+        }
+      } catch (dsErr) {
+        console.warn('[GoogleFit] DataSource check:', dsErr.message);
+      }
+
+      // 2. Prepare nanosecond timestamps for step delta window
+      const now = new Date();
+      const isToday = dateStr === now.toISOString().split('T')[0];
+      const endMs = isToday ? now.getTime() : new Date(`${dateStr}T23:59:00`).getTime();
+      const startMs = endMs - (30 * 60 * 1000); // 30-minute interval
+      const startNanos = BigInt(startMs) * 1000000n;
+      const endNanos = BigInt(endMs) * 1000000n;
+
+      const datasetId = `${startNanos}-${endNanos}`;
+      const datasetPayload = {
+        dataSourceId,
+        minStartTimeNs: startNanos.toString(),
+        maxEndTimeNs: endNanos.toString(),
+        point: [
+          {
+            startTimeNanos: startNanos.toString(),
+            endTimeNanos: endNanos.toString(),
+            dataTypeName: 'com.google.step_count.delta',
+            value: [
+              {
+                intVal: stepVal
+              }
+            ]
+          }
+        ]
+      };
+
+      const writeRes = await fetch(`https://www.googleapis.com/fitness/v1/users/me/dataSources/${encodeURIComponent(dataSourceId)}/datasets/${datasetId}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${this.googleFitToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(datasetPayload)
+      });
+
+      if (writeRes.ok) {
+        console.log(`[GoogleFit] Successfully wrote ${stepVal} step delta to Google Fit!`);
+        return { success: true, stepsWritten: stepVal };
+      } else {
+        const errText = await writeRes.text();
+        console.warn('[GoogleFit] Step insertion notice:', errText);
+        return { success: false, error: errText };
+      }
+    } catch (err) {
+      console.warn('[GoogleFit] writeStepsToGoogleFit exception:', err);
+      return { success: false, error: err.message };
+    }
+  }
+
   // --- AUTOMATIC BACKGROUND SYNC CONTROLLER ---
-  async syncNow(selectedDate = new Date().toISOString().split('T')[0]) {
+  async syncNow(selectedDate = new Date().toISOString().split('T')[0], syncStrategy = null) {
     if (this.isSyncing) return;
     this.isSyncing = true;
     this.notify({ isSyncing: true });
@@ -545,6 +641,8 @@ class HealthConnectSyncEngine {
         };
       }
 
+      const activeStrategy = syncStrategy || (typeof window !== 'undefined' ? localStorage.getItem('agy_steps_sync_strategy') : 'highest') || 'highest';
+
       // 2. Transmit real metrics to server auto-sync endpoint
       const payload = {
         date: selectedDate,
@@ -553,7 +651,8 @@ class HealthConnectSyncEngine {
         distanceKm: metrics.distanceKm,
         activeCalories: metrics.activeCalories,
         avgHeartRate: metrics.avgHeartRate,
-        sleepHours: metrics.sleepHours
+        sleepHours: metrics.sleepHours,
+        syncStrategy: activeStrategy
       };
 
       const res = await api.autoSyncFastrack(payload);

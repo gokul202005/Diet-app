@@ -1800,7 +1800,36 @@ app.get('/api/fastrack/summary', async (req, res) => {
   };
 
   const localLog = (db.fastrackLogs || []).find(l => (!l.userId || l.userId === userId) && l.date === date);
-  const log = cloudLog || localLog || defaultLog;
+  
+  // Intelligent Non-Destructive Merge: Never let a stale cloud record wipe out higher manual watch readings
+  let log = defaultLog;
+  if (cloudLog && localLog) {
+    const higherSteps = Math.max(Number(cloudLog.steps) || 0, Number(localLog.steps) || 0);
+    const higherActive = Math.max(
+      Number(cloudLog.activeCalories) || 0,
+      Number(localLog.activeCalories) || 0,
+      Math.round(higherSteps * 0.04)
+    );
+    log = {
+      ...defaultLog,
+      ...localLog,
+      ...cloudLog,
+      steps: higherSteps,
+      activeCalories: higherActive,
+      restingCalories: bmr,
+      totalBurned: bmr + higherActive,
+      distanceKm: Number(((higherSteps * 0.00075).toFixed(2))),
+      avgHeartRate: cloudLog.avgHeartRate || localLog.avgHeartRate || null,
+      peakHeartRate: Math.max(cloudLog.peakHeartRate || 0, localLog.peakHeartRate || 0) || null,
+      sleepHours: cloudLog.sleepHours || localLog.sleepHours || null,
+      deviceName: higherSteps === (localLog.steps || 0) ? (localLog.deviceName || cloudLog.deviceName) : (cloudLog.deviceName || localLog.deviceName),
+      syncedAt: cloudLog.syncedAt || localLog.syncedAt || new Date().toISOString()
+    };
+  } else if (cloudLog) {
+    log = { ...defaultLog, ...cloudLog };
+  } else if (localLog) {
+    log = { ...defaultLog, ...localLog };
+  }
 
   res.json({ success: true, log });
 });
@@ -1817,7 +1846,8 @@ app.post('/api/fastrack/sync', (req, res) => {
     avgHeartRate,
     peakHeartRate,
     sleepHours,
-    deviceName
+    deviceName,
+    isAdditive = false
   } = req.body;
 
   const bmr = FastrackService.calculateBMR(
@@ -1827,28 +1857,31 @@ app.post('/api/fastrack/sync', (req, res) => {
     userProfile.gender
   );
 
-  const active = Number(activeCalories) || Math.round((Number(steps) || 0) * 0.04);
+  db.fastrackLogs = db.fastrackLogs || [];
+  const existingIdx = db.fastrackLogs.findIndex(l => (!l.userId || l.userId === userId) && l.date === date);
+  const existing = existingIdx >= 0 ? db.fastrackLogs[existingIdx] : null;
+
+  const inputSteps = Number(steps) || 0;
+  const finalSteps = isAdditive && existing ? (existing.steps || 0) + inputSteps : inputSteps;
+  const active = Number(activeCalories) || Math.round(finalSteps * 0.04);
   const totalBurned = bmr + active;
 
   const syncRecord = {
-    id: `fastrack-${Date.now()}`,
+    id: existing?.id || `fastrack-${Date.now()}`,
     userId,
     date,
     deviceName: deviceName || db.settings?.fastrackDeviceName || 'Fastrack Smartwatch',
-    steps: Number(steps) || 0,
+    steps: finalSteps,
     activeCalories: active,
     restingCalories: bmr,
     totalBurned,
-    distanceKm: Number(distanceKm) || Number(((Number(steps) || 0) * 0.00075).toFixed(2)),
-    avgHeartRate: Number(avgHeartRate) > 0 ? Number(avgHeartRate) : null,
-    peakHeartRate: Number(peakHeartRate) > 0 ? Number(peakHeartRate) : null,
-    sleepHours: Number(sleepHours) > 0 ? Number(sleepHours) : null,
+    distanceKm: Number(distanceKm) || Number(((finalSteps * 0.00075).toFixed(2))),
+    avgHeartRate: Number(avgHeartRate) > 0 ? Number(avgHeartRate) : (existing?.avgHeartRate || null),
+    peakHeartRate: Number(peakHeartRate) > 0 ? Number(peakHeartRate) : (existing?.peakHeartRate || null),
+    sleepHours: Number(sleepHours) > 0 ? Number(sleepHours) : (existing?.sleepHours || null),
     syncedAt: new Date().toISOString()
   };
 
-  // Replace or add isolated by user and date
-  db.fastrackLogs = db.fastrackLogs || [];
-  const existingIdx = db.fastrackLogs.findIndex(l => (!l.userId || l.userId === userId) && l.date === date);
   if (existingIdx >= 0) {
     db.fastrackLogs[existingIdx] = syncRecord;
   } else {
@@ -1882,14 +1915,22 @@ app.post('/api/fastrack/auto-sync', (req, res) => {
   );
 
   const incomingSteps = req.body.steps !== undefined ? Number(req.body.steps) : null;
-  const steps = (incomingSteps !== null && incomingSteps > 0) 
-    ? Math.max(existing?.steps || 0, incomingSteps) 
-    : (existing?.steps || 0);
+  const syncStrategy = req.body.syncStrategy || db.settings?.fastrackSyncStrategy || 'highest'; // 'highest' | 'additive'
 
+  let steps = existing?.steps || 0;
+  if (incomingSteps !== null && incomingSteps > 0) {
+    if (syncStrategy === 'additive' && existing && existing.deviceName !== req.body.deviceName) {
+      // Additive interlink: Combine manual watch steps and phone steps
+      steps = (existing.steps || 0) + incomingSteps;
+    } else {
+      // Smart highest: Retain whichever is greater so hard-earned steps are NEVER downgraded
+      steps = Math.max(existing?.steps || 0, incomingSteps);
+    }
+  }
+
+  const calculatedActive = Math.round(steps * 0.04);
   const incomingActive = req.body.activeCalories !== undefined ? Number(req.body.activeCalories) : null;
-  const activeCalories = (incomingActive !== null && incomingActive > 0)
-    ? incomingActive
-    : (existing?.activeCalories || Math.round(steps * 0.04));
+  const activeCalories = Math.max(calculatedActive, incomingActive || 0, existing?.activeCalories || 0);
 
   const avgHeartRate = req.body.avgHeartRate !== undefined && Number(req.body.avgHeartRate) > 0 
     ? Number(req.body.avgHeartRate) 

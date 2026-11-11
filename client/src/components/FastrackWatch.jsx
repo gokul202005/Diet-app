@@ -50,6 +50,19 @@ export default function FastrackWatch({ selectedDate, profile, currentUser }) {
     if (typeof window === 'undefined' || !currentUser?.id) return false;
     return Boolean(localStorage.getItem(`agy_google_fit_token_${currentUser.id}`));
   });
+  const [syncStrategy, setSyncStrategy] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('agy_steps_sync_strategy') || 'highest';
+    }
+    return 'highest';
+  });
+
+  const handleSetSyncStrategy = (strategy) => {
+    setSyncStrategy(strategy);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('agy_steps_sync_strategy', strategy);
+    }
+  };
 
   useEffect(() => {
     if (currentUser?.id) {
@@ -71,15 +84,27 @@ export default function FastrackWatch({ selectedDate, profile, currentUser }) {
       if (state.stepCount !== undefined) setSensorSteps(Number(state.stepCount) || 0);
       if (state.googleFitConnected !== undefined) setIsGoogleFitConnected(Boolean(state.googleFitConnected));
       if (state.log) {
-        setFastrackLog(state.log);
-        setRealSteps(state.log.steps || 0);
+        setFastrackLog(prev => {
+          if (!prev) return state.log;
+          const maxSteps = Math.max(Number(prev.steps) || 0, Number(state.log.steps) || 0);
+          return {
+            ...prev,
+            ...state.log,
+            steps: maxSteps,
+            activeCalories: Math.max(Number(prev.activeCalories) || 0, Number(state.log.activeCalories) || 0, Math.round(maxSteps * 0.04))
+          };
+        });
+        setRealSteps(prev => {
+          const prevNum = Number(prev) || 0;
+          return Math.max(prevNum, Number(state.log.steps) || 0);
+        });
         if (state.log.avgHeartRate) setLiveHeartRate(state.log.avgHeartRate);
         if (state.log.sleepHours) setRealSleep(state.log.sleepHours);
         if (state.log.deviceName) setConnectedDeviceName(state.log.deviceName);
 
         const logEntry = {
           time: new Date().toLocaleTimeString(),
-          steps: state.log.steps || 0,
+          steps: Math.max(Number(state.log.steps) || 0, Number(realSteps) || 0),
           activeBurn: state.log.activeCalories || 0,
           hr: state.log.avgHeartRate || 0,
           source: state.log.deviceName || 'Android Health Connect'
@@ -110,7 +135,7 @@ export default function FastrackWatch({ selectedDate, profile, currentUser }) {
       await handleConnectGoogleFit();
       return;
     }
-    const res = await healthConnectSync.syncNow(selectedDate);
+    const res = await healthConnectSync.syncNow(selectedDate, syncStrategy);
     if (res?.success) {
       if (typeof window !== 'undefined' && window.showToast) {
         window.showToast(`Synced ${res.log.steps.toLocaleString()} steps via Google Fit!`, 'success', 'Health Sync Complete');
@@ -316,7 +341,16 @@ export default function FastrackWatch({ selectedDate, profile, currentUser }) {
         const balanceRes = await api.getEnergyBalance(selectedDate);
         setEnergyBalance(balanceRes.balance);
 
-        if (typeof window !== 'undefined' && window.showToast) {
+        // TWO-WAY INTERLINK: Also update steps directly in Google Fit & Health Connect!
+        if (isGoogleFitConnected && healthConnectSync.googleFitToken && stepsNum > 0) {
+          healthConnectSync.writeStepsToGoogleFit(stepsNum, selectedDate).then(writeRes => {
+            if (writeRes?.success && typeof window !== 'undefined' && window.showToast) {
+              window.showToast(`Saved to diary & synced ${stepsNum.toLocaleString()} steps directly into your Google Fit & Health Connect app!`, 'success', 'Two-Way Sync Active');
+            } else if (typeof window !== 'undefined' && window.showToast) {
+              window.showToast('Real watch readings saved successfully to your diary!', 'success', 'Watch Synced');
+            }
+          });
+        } else if (typeof window !== 'undefined' && window.showToast) {
           window.showToast('Real watch readings saved successfully to your diary!', 'success', 'Watch Synced');
         }
       }
@@ -515,6 +549,46 @@ export default function FastrackWatch({ selectedDate, profile, currentUser }) {
               <span>{showHealthGuide ? 'Hide Guide' : 'How to Connect Google Fit'}</span>
             </button>
           </div>
+        </div>
+
+        {/* TWO-WAY SYNC & INTERLINK STRATEGY CONTROLS */}
+        <div className="mt-5 pt-4 border-t border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">Interlink Mode:</span>
+            <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800">
+              <button
+                type="button"
+                onClick={() => handleSetSyncStrategy('highest')}
+                className={`px-3 py-1.5 rounded-lg font-black text-xs transition-all cursor-pointer ${
+                  syncStrategy === 'highest'
+                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="Keeps whichever is higher so your manual watch steps are never overwritten by lower phone steps"
+              >
+                🛡️ Smart Highest (Protected)
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSetSyncStrategy('additive')}
+                className={`px-3 py-1.5 rounded-lg font-black text-xs transition-all cursor-pointer ${
+                  syncStrategy === 'additive'
+                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="Adds phone steps to your manual watch log so both counts contribute"
+              >
+                ➕ Additive (Combine Phone + Watch)
+              </button>
+            </div>
+          </div>
+
+          {isGoogleFitConnected && (
+            <div className="flex items-center space-x-2 text-[11px] text-cyan-300 bg-cyan-950/40 px-3.5 py-1.5 rounded-xl border border-cyan-800/50">
+              <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse shrink-0" />
+              <span>Two-Way Interlink Active: Saving steps writes directly to Google Fit & Health Connect</span>
+            </div>
+          )}
         </div>
 
         {/* Expandable Google Fit & Health Connect Connection Guide */}
