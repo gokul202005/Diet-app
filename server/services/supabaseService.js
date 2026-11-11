@@ -24,6 +24,7 @@ const SUPABASE_KEY =
   EMBEDDED_KEY;
 
 let supabase = null;
+let supabaseInitError = null;
 
 if (SUPABASE_URL && SUPABASE_KEY && SUPABASE_URL.startsWith('http')) {
   try {
@@ -32,12 +33,19 @@ if (SUPABASE_URL && SUPABASE_KEY && SUPABASE_URL.startsWith('http')) {
     });
     console.log('[Supabase] Initialized cloud client with URL:', SUPABASE_URL);
   } catch (err) {
+    supabaseInitError = err.message;
     console.warn('[Supabase] Initialization warning:', err.message);
   }
+} else {
+  supabaseInitError = `Invalid or missing credentials: URL=${Boolean(SUPABASE_URL)}, KEY=${Boolean(SUPABASE_KEY)}`;
 }
 
 export function isSupabaseReady() {
   return Boolean(supabase && SUPABASE_URL && SUPABASE_KEY);
+}
+
+export function getSupabaseInitError() {
+  return supabaseInitError;
 }
 
 export function getSupabase() {

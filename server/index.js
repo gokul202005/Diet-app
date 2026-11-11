@@ -31,7 +31,8 @@ import {
   syncWaterLogToSupabase,
   syncWeightLogToSupabase,
   syncMealPlanToSupabase,
-  fetchMealPlanFromSupabase
+  fetchMealPlanFromSupabase,
+  getSupabaseInitError
 } from './services/supabaseService.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -2312,6 +2313,7 @@ app.get('/api/database/status', (req, res) => {
     status: 'ok',
     provider: ready ? 'supabase' : 'local_json',
     isCloudReady: ready,
+    initError: getSupabaseInitError(),
     supabaseUrl: process.env.SUPABASE_URL ? `${process.env.SUPABASE_URL.slice(0, 20)}...` : null,
     localStats: {
       usersCount: (db.users || []).length,
