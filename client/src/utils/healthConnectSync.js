@@ -290,7 +290,23 @@ class HealthConnectSyncEngine {
       // 1. Query latest telemetry from Health Connect / Google Fit / Hardware Sensor
       const metrics = await this.fetchGoogleFitMetrics();
 
-      // 2. Transmit to server auto-sync endpoint
+      // If no Google Fit OAuth token and no hardware motion sensor steps have been detected,
+      // do not transmit an empty 0-step payload that overwrites the user's diary!
+      if (!this.googleFitToken && metrics.steps === 0) {
+        const msg = 'Google Fit cloud link requires Google Cloud API authorization. Please pair via Fastrack BLE or enter your watch screen steps below!';
+        this.notify({
+          isSyncing: false,
+          needsOAuth: true,
+          message: msg
+        });
+        return { 
+          success: false, 
+          needsOAuth: true, 
+          error: msg 
+        };
+      }
+
+      // 2. Transmit real metrics to server auto-sync endpoint
       const payload = {
         date: selectedDate,
         deviceName: metrics.source || 'Android Health Connect',

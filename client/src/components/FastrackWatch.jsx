@@ -98,7 +98,7 @@ export default function FastrackWatch({ selectedDate, profile }) {
       loadWatchData();
     } else {
       if (typeof window !== 'undefined' && window.showToast) {
-        window.showToast('Could not sync Health Connect: ' + (res?.error || 'Unknown error'), 'error', 'Sync Failed');
+        window.showToast(res?.error || 'Google Fit cloud link requires API token. Use 1-Tap Watch Sync below!', 'warning', 'Sync Notice');
       }
     }
   };
@@ -419,30 +419,30 @@ export default function FastrackWatch({ selectedDate, profile }) {
             <div className="p-3.5 bg-slate-950 border border-slate-800 rounded-2xl space-y-1">
               <div className="font-bold text-sky-400 flex items-center space-x-1.5">
                 <span className="w-5 h-5 rounded-full bg-sky-500/20 flex items-center justify-center text-[11px]">1</span>
-                <span>In Google Fit App</span>
+                <span>Google Fit Cloud Privacy</span>
               </div>
               <p className="text-slate-400 text-[11px] leading-relaxed">
-                Open Google Fit on your phone → Tap Profile (top right) → Settings (Gear) → Turn ON <strong className="text-slate-200">"Sync Fit with Health Connect"</strong>.
+                Google Fit protects personal fitness data with strict Google OAuth. Web apps cannot pull private steps over the internet without an authorized Google Cloud Client ID.
               </p>
             </div>
 
             <div className="p-3.5 bg-slate-950 border border-slate-800 rounded-2xl space-y-1">
               <div className="font-bold text-emerald-400 flex items-center space-x-1.5">
                 <span className="w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center text-[11px]">2</span>
-                <span>In Fastrack Reflex App</span>
+                <span>Fastrack BLE Pairing (Zero Cloud)</span>
               </div>
               <p className="text-slate-400 text-[11px] leading-relaxed">
-                Open Fastrack Reflex (or watch companion app) → Settings / Profile → Third Party Apps → Turn ON <strong className="text-slate-200">"Sync to Google Fit / Health Connect"</strong>.
+                Tap <strong className="text-sky-400">"Pair Fastrack via BLE"</strong> at the top. Your device connects directly to your watch hardware over Bluetooth and streams live heart rate & steps without needing Google Fit!
               </p>
             </div>
 
             <div className="p-3.5 bg-slate-950 border border-slate-800 rounded-2xl space-y-1">
               <div className="font-bold text-teal-400 flex items-center space-x-1.5">
                 <span className="w-5 h-5 rounded-full bg-teal-500/20 flex items-center justify-center text-[11px]">3</span>
-                <span>In AGY FIT App</span>
+                <span>1-Tap Watch Display Sync</span>
               </div>
               <p className="text-slate-400 text-[11px] leading-relaxed">
-                Tap <strong className="text-emerald-400">"Enable Auto-Sync"</strong> above. Steps, calories, heart rate, and sleep automatically sync in real-time in the background!
+                Look at your watch screen on your wrist, enter your steps in the form right below, and tap <strong className="text-emerald-400">"Save Real Watch Reading"</strong>. It immediately updates your steps and calorie burn!
               </p>
             </div>
           </div>

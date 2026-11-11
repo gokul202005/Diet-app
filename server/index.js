@@ -1415,10 +1415,16 @@ app.post('/api/fastrack/auto-sync', (req, res) => {
     userProfile.gender
   );
 
-  const steps = req.body.steps !== undefined ? Number(req.body.steps) : (existing?.steps || 0);
-  const activeCalories = req.body.activeCalories !== undefined 
-    ? Number(req.body.activeCalories) 
+  const incomingSteps = req.body.steps !== undefined ? Number(req.body.steps) : null;
+  const steps = (incomingSteps !== null && incomingSteps > 0) 
+    ? incomingSteps 
+    : (existing?.steps || incomingSteps || 0);
+
+  const incomingActive = req.body.activeCalories !== undefined ? Number(req.body.activeCalories) : null;
+  const activeCalories = (incomingActive !== null && incomingActive > 0)
+    ? incomingActive
     : (existing?.activeCalories || Math.round(steps * 0.04));
+
   const avgHeartRate = req.body.avgHeartRate !== undefined && Number(req.body.avgHeartRate) > 0 
     ? Number(req.body.avgHeartRate) 
     : (existing?.avgHeartRate || null);
