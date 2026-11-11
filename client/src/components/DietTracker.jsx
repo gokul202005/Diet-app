@@ -29,11 +29,11 @@ export const POPULAR_FOODS_BY_MEAL = {
   breakfast: {
     veg: [
       'Idli', 'Ghee Roast Dosa', 'Pesarattu', 'Ven Pongal', 'Adai Avial', 
-      'Kuzhi Paniyaram', 'Appam', 'Idiyappam', 'Podi Idli', 'Poori Masala', 'Filter Coffee'
+      'Kuzhi Paniyaram', 'Appam', 'Idiyappam', 'Podi Idli', 'Poori Masala', 'Masala Chai', 'Filter Coffee'
     ],
     nonVeg: [
       'Boiled Egg', 'Egg Dosa', 'Muttai Podimas', 'Egg Thokku', 'Muttai Paniyaram', 
-      'South Indian Egg Omelet', 'Chicken Kari Dosa', 'Filter Coffee'
+      'South Indian Egg Omelet', 'Chicken Kari Dosa', 'Masala Chai', 'Filter Coffee'
     ]
   },
   lunch: {
@@ -50,12 +50,13 @@ export const POPULAR_FOODS_BY_MEAL = {
   },
   snack: {
     veg: [
-      'Kala Chana Sundal', 'Pachai Payaru Sundal', 'Masala Neer Mor', 'Filter Coffee', 
+      'Masala Chai', 'Filter Coffee', 'Marie Biscuits', 'Parle-G', 'Good Day Biscuits', 'Tea Rusk', 'Bourbon Biscuits', 'Green Tea',
+      'Kala Chana Sundal', 'Pachai Payaru Sundal', 'Masala Neer Mor', 
       'Sambar Vada', 'Medu Vada', 'Roasted Bengal Gram (Pottukadalai)', 'Tender Coconut Water', 'Banana'
     ],
     nonVeg: [
-      'Boiled Egg', 'Egg White', 'Muttai Podimas', 'Nethili Fish Fry', 
-      'Masala Neer Mor', 'Filter Coffee'
+      'Masala Chai', 'Filter Coffee', 'Marie Biscuits', 'Tea Rusk', 'Boiled Egg', 'Egg White', 'Muttai Podimas', 'Nethili Fish Fry', 
+      'Masala Neer Mor'
     ]
   },
   dinner: {

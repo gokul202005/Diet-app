@@ -127,13 +127,53 @@ export const foodDatabase = [
   // ==========================================
   // --- SOUTH INDIAN DRINKS & HEALTH SIPS ---
   // ==========================================
-  { name: 'South Indian Filter Coffee (Degree Kaapi with Whole Milk & Sugar)', aliases: ['filter coffee', 'degree coffee', 'filter kaapi', 'coffee'], serving: '1 cup / davarah (150ml)', calories: 110, protein: 3.5, carbs: 14.0, fat: 4.5, category: 'Beverages' },
-  { name: 'Black Filter Coffee (Sugar-free)', aliases: ['black coffee', 'black filter coffee'], serving: '1 cup (150ml)', calories: 5, protein: 0.3, carbs: 0.8, fat: 0.0, category: 'Beverages' },
+  { name: 'South Indian Filter Coffee (Degree Kaapi with Whole Milk & Sugar)', aliases: ['filter coffee', 'degree coffee', 'filter kaapi', 'coffee', 'coffe', 'kaapi', 'south indian coffee', 'degree kaapi', 'hot coffee'], serving: '1 cup / davarah (150ml)', calories: 110, protein: 3.5, carbs: 14.0, fat: 4.5, category: 'Beverages' },
+  { name: 'South Indian Filter Coffee (Sugar-Free)', aliases: ['sugar free coffee', 'sugarless coffee', 'sugar free filter coffee', 'sugarless filter coffee', 'coffee without sugar'], serving: '1 cup / davarah (150ml)', calories: 58, protein: 3.4, carbs: 4.5, fat: 3.8, category: 'Beverages' },
+  { name: 'Instant Coffee (Bru / Nescafe with Milk & Sugar)', aliases: ['instant coffee', 'nescafe', 'bru coffee', 'bru', 'milk coffee', 'instant milk coffee'], serving: '1 cup (150ml)', calories: 102, protein: 3.0, carbs: 13.5, fat: 4.0, category: 'Beverages' },
+  { name: 'Black Filter Coffee (Sugar-free)', aliases: ['black coffee', 'black filter coffee', 'sugar free black coffee', 'americano', 'espresso'], serving: '1 cup (150ml)', calories: 5, protein: 0.3, carbs: 0.8, fat: 0.0, category: 'Beverages' },
+  { name: 'Cold Coffee (with Whole Milk & Sugar)', aliases: ['cold coffee', 'iced coffee', 'frappe'], serving: '1 glass (250ml)', calories: 210, protein: 5.5, carbs: 32.0, fat: 7.0, category: 'Beverages' },
+  { name: 'Sukku Kaapi / Dry Ginger Coriander Herbal Coffee', aliases: ['sukku kaapi', 'dry ginger coffee', 'chukku kaapi'], serving: '1 cup (150ml)', calories: 45, protein: 0.4, carbs: 11.0, fat: 0.1, category: 'Beverages' },
+
+  // --- INDIAN CHAI & TEAS ---
+  { name: 'Masala Chai / Indian Milk Tea (with Sugar)', aliases: ['tea', 'chai', 'milk tea', 'masala chai', 'masala tea', 'hot tea', 'chaye', 'kadak chai', 'indian tea', 'cup tea', 'cup of tea'], serving: '1 cup (150ml)', calories: 105, protein: 3.2, carbs: 14.0, fat: 4.2, category: 'Beverages' },
+  { name: 'Masala Chai / Milk Tea (Sugar-free / Sugarless)', aliases: ['sugar free tea', 'sugarless tea', 'sugar free chai', 'tea without sugar', 'chai without sugar', 'sugarless chai'], serving: '1 cup (150ml)', calories: 55, protein: 3.2, carbs: 4.5, fat: 3.5, category: 'Beverages' },
+  { name: 'Inji Tea / Ginger Milk Tea (with Sugar)', aliases: ['inji tea', 'ginger tea', 'ginger chai', 'inji chai', 'adrak chai', 'adrak tea'], serving: '1 cup (150ml)', calories: 100, protein: 3.0, carbs: 13.5, fat: 4.0, category: 'Beverages' },
+  { name: 'Inji Tea / Ginger Tea (Sugar-Free)', aliases: ['sugar free ginger tea', 'sugarless inji tea', 'sugar free adrak chai', 'ginger tea without sugar'], serving: '1 cup (150ml)', calories: 52, protein: 3.0, carbs: 4.2, fat: 3.4, category: 'Beverages' },
+  { name: 'Elaichi Tea / Cardamom Chai (with Sugar)', aliases: ['elaichi tea', 'elaichi chai', 'cardamom tea', 'cardamom chai'], serving: '1 cup (150ml)', calories: 105, protein: 3.2, carbs: 14.0, fat: 4.2, category: 'Beverages' },
+  { name: 'Sulaimani Tea / Lemon Black Tea (with Sugar & Spices)', aliases: ['sulaimani tea', 'sulaimani', 'sulaimani chai', 'kerala sulaimani', 'spiced black tea'], serving: '1 cup (150ml)', calories: 45, protein: 0.2, carbs: 11.0, fat: 0.0, category: 'Beverages' },
+  { name: 'Green Tea (Plain, Sugar-Free)', aliases: ['green tea', 'hot green tea', 'plain green tea', 'organic green tea'], serving: '1 cup (180ml)', calories: 2, protein: 0.2, carbs: 0.4, fat: 0.0, category: 'Beverages' },
+  { name: 'Green Tea with Honey', aliases: ['green tea with honey', 'honey green tea'], serving: '1 cup (180ml)', calories: 28, protein: 0.2, carbs: 6.8, fat: 0.0, category: 'Beverages' },
+  { name: 'Black Tea (Plain, Sugar-Free)', aliases: ['black tea', 'plain black tea', 'sugar free black tea'], serving: '1 cup (180ml)', calories: 3, protein: 0.2, carbs: 0.6, fat: 0.0, category: 'Beverages' },
+  { name: 'Cutting Chai (Mumbai Kadak Chai)', aliases: ['cutting chai', 'cutting tea', 'tapri chai'], serving: '1 small glass (90ml)', calories: 75, protein: 2.2, carbs: 9.8, fat: 3.0, category: 'Beverages' },
+  { name: 'Irani Chai (Hyderabadi Dum Tea with Condensed Milk)', aliases: ['irani chai', 'irani tea', 'dum tea', 'hyderabadi chai'], serving: '1 cup (150ml)', calories: 165, protein: 4.5, carbs: 21.0, fat: 7.2, category: 'Beverages' },
+  { name: 'Lemon Tea (with Sugar / Honey)', aliases: ['lemon tea', 'hot lemon tea', 'lemon honey tea'], serving: '1 cup (150ml)', calories: 42, protein: 0.2, carbs: 10.5, fat: 0.0, category: 'Beverages' },
+
+  // --- TRADITIONAL SOUTH INDIAN COOLERS ---
   { name: 'Masala Neer Mor (Spiced South Indian Buttermilk with Ginger & Curry Leaves)', aliases: ['neer mor', 'mor', 'spiced buttermilk', 'sambharam', 'majjiga', 'buttermilk', 'chaas'], serving: '1 large glass (300ml)', calories: 45, protein: 2.5, carbs: 4.0, fat: 1.2, category: 'Beverages' },
   { name: 'Tender Coconut Water (Elaneer / Karikku)', aliases: ['tender coconut', 'elaneer', 'karikku', 'coconut water'], serving: '1 whole nut water (250ml)', calories: 48, protein: 1.7, carbs: 9.0, fat: 0.5, category: 'Beverages' },
   { name: 'Panakam (Jaggery, Dry Ginger, Cardamom, Lemon Cooler)', aliases: ['panakam'], serving: '1 glass (200ml)', calories: 95, protein: 0.2, carbs: 24.0, fat: 0.0, category: 'Beverages' },
   { name: 'Nannari Sarbath (with Sabja / Basil Seeds & Lemon)', aliases: ['nannari', 'nannari sarbath', 'sarbath'], serving: '1 glass (250ml)', calories: 120, protein: 0.5, carbs: 30.0, fat: 0.0, category: 'Beverages' },
-  { name: 'Sukku Kaapi / Dry Ginger Coriander Herbal Coffee', aliases: ['sukku kaapi', 'dry ginger coffee'], serving: '1 cup (150ml)', calories: 45, protein: 0.4, carbs: 11.0, fat: 0.1, category: 'Beverages' },
+
+  // ==========================================
+  // --- BISCUITS, RUSKS & BAKERY SNACKS ---
+  // ==========================================
+  { name: 'Marie Gold / Marie Biscuits (Britannia / Sunfeast)', aliases: ['marie gold', 'marie biscuit', 'marie biscuits', 'marie', 'tea biscuit', 'tea biscuits', 'biscuit', 'biscuits', 'bisket', 'biskets', 'bicket', 'bickets'], serving: '4 biscuits (21g)', calories: 90, protein: 1.8, carbs: 16.2, fat: 2.1, category: 'Snacks' },
+  { name: 'Parle-G Glucose Biscuits', aliases: ['parle g', 'parleg', 'parle-g', 'glucose biscuit', 'glucose biscuits', 'parle g biscuits', 'parle g biscuit'], serving: '4 biscuits (20g)', calories: 92, protein: 1.4, carbs: 15.6, fat: 2.8, category: 'Snacks' },
+  { name: 'Britannia Good Day (Butter / Cashew)', aliases: ['good day', 'good day biscuit', 'good day biscuits', 'butter biscuit', 'cashew biscuit', 'goodday', 'goodday biscuit'], serving: '2 biscuits (19g)', calories: 96, protein: 1.3, carbs: 12.8, fat: 4.6, category: 'Snacks' },
+  { name: 'Britannia Bourbon Chocolate Cream Biscuits', aliases: ['bourbon', 'bourbon biscuit', 'bourbon biscuits', 'chocolate biscuit', 'chocolate biscuits', 'bourbon cream'], serving: '2 biscuits (25g)', calories: 120, protein: 1.3, carbs: 18.0, fat: 4.8, category: 'Snacks' },
+  { name: 'Britannia Milk Bikis Biscuits', aliases: ['milk bikis', 'milkbikis', 'milk biscuit', 'milk biscuits', 'milk biki'], serving: '4 biscuits (22g)', calories: 100, protein: 1.8, carbs: 16.0, fat: 3.2, category: 'Snacks' },
+  { name: 'Tea Rusk / Milk Rusk (Crispy Toast Rusk)', aliases: ['rusk', 'rusks', 'tea rusk', 'milk rusk', 'crispy rusk', 'toast rusk'], serving: '2 rusks (30g)', calories: 125, protein: 2.8, carbs: 22.5, fat: 2.8, category: 'Snacks' },
+  { name: 'Cake Rusk (Bakery Double Baked Sponge)', aliases: ['cake rusk', 'sweet cake rusk'], serving: '2 pieces (35g)', calories: 165, protein: 2.5, carbs: 24.0, fat: 6.8, category: 'Snacks' },
+  { name: 'Hide & Seek Chocolate Chip Biscuits (Parle)', aliases: ['hide and seek', 'hide & seek', 'hide and seek biscuit', 'hide and seek biscuits', 'choco chip cookies'], serving: '3 biscuits (25g)', calories: 120, protein: 1.4, carbs: 17.5, fat: 5.0, category: 'Snacks' },
+  { name: 'Monaco Salted Crackers (Parle)', aliases: ['monaco', 'monaco biscuit', 'monaco biscuits', 'salted biscuit', 'salted crackers'], serving: '6 biscuits (24g)', calories: 115, protein: 2.0, carbs: 15.5, fat: 5.2, category: 'Snacks' },
+  { name: 'Britannia 50-50 Sweet & Salty Biscuits', aliases: ['50 50', '50-50', '50 50 biscuit', 'sweet and salty biscuit', 'maska chaska'], serving: '4 biscuits (20g)', calories: 95, protein: 1.6, carbs: 14.5, fat: 3.6, category: 'Snacks' },
+  { name: 'NutriChoice Digestive Biscuits (Britannia)', aliases: ['nutrichoice', 'digestive biscuit', 'digestive biscuits', 'wheat biscuit', 'nutri choice', 'nutrichoice biscuit'], serving: '2 biscuits (23g)', calories: 105, protein: 2.0, carbs: 15.0, fat: 4.2, category: 'Snacks' },
+  { name: 'NutriChoice Oats / Almond Cookies', aliases: ['oats biscuit', 'oats cookies', 'nutrichoice oats'], serving: '2 biscuits (24g)', calories: 112, protein: 2.2, carbs: 15.2, fat: 4.8, category: 'Snacks' },
+  { name: 'Bakery Butter Biscuit / Salt Biscuit (Nankhatai / Tea Stall Biscuits)', aliases: ['bakery biscuit', 'bakery biscuits', 'tea stall biscuit', 'nankhatai', 'benne biscuit'], serving: '2 pieces (25g)', calories: 135, protein: 1.5, carbs: 16.0, fat: 7.2, category: 'Snacks' },
+  { name: 'Bakery Khari Biscuit / Puff Biscuit', aliases: ['khari', 'khari biscuit', 'puff biscuit', 'khari puff'], serving: '2 pieces (30g)', calories: 160, protein: 2.4, carbs: 17.0, fat: 9.5, category: 'Snacks' },
+  { name: 'Osmania Biscuit (Hyderabadi Irani Chai Biscuit)', aliases: ['osmania biscuit', 'osmania biscuits', 'osmania'], serving: '2 biscuits (26g)', calories: 130, protein: 1.8, carbs: 16.5, fat: 6.5, category: 'Snacks' },
+  { name: 'Oreo Cookies (Original Vanilla Cream)', aliases: ['oreo', 'oreo biscuit', 'oreo cookies'], serving: '3 cookies (33g)', calories: 160, protein: 1.5, carbs: 23.0, fat: 7.0, category: 'Snacks' },
+  { name: 'Sunfeast Dark Fantasy Choco Fills', aliases: ['dark fantasy', 'choco fills', 'dark fantasy biscuit', 'dark fantasy cookies'], serving: '1 biscuit (15g)', calories: 75, protein: 0.8, carbs: 9.8, fat: 3.8, category: 'Snacks' },
 
   // ==========================================
   // --- FITNESS & GYM MACRO STAPLES ---
@@ -228,6 +268,10 @@ export function localParseMealText(text) {
 
   // Phonetic South Indian word normalizations & plural forms
   cleaned = cleaned
+    .replace(/\bbiscuits\b|\bbiscuit\b|\bbisket\b|\bbiskets\b|\bbickets\b|\bbicket\b|\bcookies\b|\bcookie\b/g, 'biscuit')
+    .replace(/\bcoffe\b|\bkaapi\b|\bkaapee\b/g, 'coffee')
+    .replace(/\bchay\b|\bchaai\b|\bchaye\b/g, 'chai')
+    .replace(/\brusks\b|\brusk\b/g, 'rusk')
     .replace(/\bvadi\b|\bvadai\b|\bwada\b|\bwadai\b|\bvadas\b|\bvadais\b/g, 'vada')
     .replace(/\bidly\b|\bidlies\b|\bidlis\b/g, 'idli')
     .replace(/\bdosai\b|\bdhosa\b|\bdosas\b|\bdosais\b/g, 'dosa')
@@ -250,6 +294,9 @@ export function localParseMealText(text) {
   for (const food of foodDatabase) {
     for (const alias of food.aliases) {
       const normAlias = alias.toLowerCase()
+        .replace(/\bbiscuits\b|\bbiscuit\b|\bbisket\b|\bbiskets\b|\bbickets\b|\bbicket\b/g, 'biscuit')
+        .replace(/\bcoffe\b/g, 'coffee')
+        .replace(/\bchay\b|\bchaai\b|\bchaye\b/g, 'chai')
         .replace(/\bvadi\b|\bvadai\b|\bwada\b|\bwadai\b/g, 'vada')
         .replace(/\bidly\b/g, 'idli')
         .replace(/\bdosai\b/g, 'dosa')
@@ -275,7 +322,7 @@ export function localParseMealText(text) {
 
     // Look for quantity immediately preceding the alias
     const preText = cleaned.slice(0, aliasIdx).trim();
-    const qtyMatch = preText.match(/(\d+(\.\d+)?)\s*(g|grams|gm|gms|cup|cups|plate|plates|piece|pieces|bowl|bowls|scoop|scoops|tbsp|glass|glasses)?(?:\s+of)?$/i);
+    const qtyMatch = preText.match(/(\d+(\.\d+)?)\s*(g|grams|gm|gms|cup|cups|plate|plates|piece|pieces|bowl|bowls|biscuit|biscuits|rusk|rusks|cookie|cookies|scoop|scoops|tbsp|glass|glasses)?(?:\s+of)?$/i);
 
     let qty = 1;
     let unit = '';
@@ -293,11 +340,11 @@ export function localParseMealText(text) {
         multiplier = qty / baseGrams;
         displayQuantity = `${qty}g`;
       } else {
-        // Check if serving has a base count e.g. "2 pieces" or "2 tbsp"
-        const baseCountMatch = food.serving.match(/^(\d+)\s*(piece|pieces|poori|pooris|egg|eggs|tbsp|nest|nests)/i);
+        // Check if serving has a base count e.g. "2 pieces" or "4 biscuits" or "2 tbsp"
+        const baseCountMatch = food.serving.match(/^(\d+)\s*(piece|pieces|poori|pooris|egg|eggs|tbsp|nest|nests|biscuit|biscuits|rusk|rusks|cookie|cookies)/i);
         const baseCount = baseCountMatch ? parseFloat(baseCountMatch[1]) : 1;
 
-        if (baseCount > 1 && (!unit || unit.includes('piece') || unit.includes('tbsp') || unit.includes('pc') || unit.includes('poori'))) {
+        if (baseCount > 1 && (!unit || unit.includes('piece') || unit.includes('biscuit') || unit.includes('rusk') || unit.includes('cookie') || unit.includes('tbsp') || unit.includes('pc') || unit.includes('poori'))) {
           multiplier = qty / baseCount;
         } else {
           multiplier = qty;
@@ -317,6 +364,12 @@ export function localParseMealText(text) {
             displayQuantity = `${qty} ${qty > 1 ? 'idlis' : 'idli'}`;
           } else if (foodNameLower.includes('vada')) {
             displayQuantity = `${qty} ${qty > 1 ? 'vadas' : 'vada'}`;
+          } else if (foodNameLower.includes('biscuit') || foodNameLower.includes('parle') || foodNameLower.includes('marie') || foodNameLower.includes('cookie')) {
+            displayQuantity = `${qty} ${qty > 1 ? 'biscuits' : 'biscuit'}`;
+          } else if (foodNameLower.includes('rusk')) {
+            displayQuantity = `${qty} ${qty > 1 ? 'rusks' : 'rusk'}`;
+          } else if (foodNameLower.includes('tea') || foodNameLower.includes('chai') || foodNameLower.includes('coffee') || foodNameLower.includes('kaapi')) {
+            displayQuantity = `${qty} ${qty > 1 ? 'cups' : 'cup'}`;
           } else if (food.serving.includes('piece') || food.category.includes('Tiffin')) {
             displayQuantity = `${qty} ${qty > 1 ? 'pieces' : 'piece'}`;
           } else if (food.serving.includes('bowl')) {
