@@ -439,5 +439,15 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(settings)
     });
+  },
+
+  // Cloud Database (Supabase / PostgreSQL)
+  getDatabaseStatus: async () => {
+    return safeFetch(`${BASE_URL}/database/status`);
+  },
+  migrateToSupabase: async () => {
+    return safeFetch(`${BASE_URL}/database/migrate-to-supabase`, {
+      method: 'POST'
+    });
   }
 };

@@ -11,6 +11,7 @@ import { FastrackService } from './services/fastrackService.js';
 import { searchFoodDatabase } from './data/foodDatabase.js';
 import { calculateNutritionTargets } from './services/profileCalculator.js';
 import { uploadImageToOnlineStorage, deleteImageFromOnlineStorage } from './services/cloudStorage.js';
+import { isSupabaseReady, migrateLocalDataToSupabase, getSupabase } from './services/supabaseService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1936,6 +1937,37 @@ app.post('/api/settings', (req, res) => {
 
   writeDB(db);
   res.json({ success: true, message: 'Settings saved' });
+});
+
+// --- CLOUD DATABASE (SUPABASE / POSTGRESQL) STATUS & MIGRATION ---
+app.get('/api/database/status', (req, res) => {
+  const ready = isSupabaseReady();
+  const db = readDB();
+  res.json({
+    status: 'ok',
+    provider: ready ? 'supabase' : 'local_json',
+    isCloudReady: ready,
+    supabaseUrl: process.env.SUPABASE_URL ? `${process.env.SUPABASE_URL.slice(0, 20)}...` : null,
+    localStats: {
+      usersCount: (db.users || []).length,
+      mealsCount: (db.meals || []).length,
+      workoutsCount: (db.workouts || []).length,
+      watchLogsCount: (db.fastrackLogs || []).length
+    }
+  });
+});
+
+app.post('/api/database/migrate-to-supabase', async (req, res) => {
+  if (!isSupabaseReady()) {
+    return res.status(400).json({
+      success: false,
+      message: 'Supabase is not configured yet. Please add SUPABASE_URL and SUPABASE_ANON_KEY to your server/.env file or run the schema.sql in Supabase SQL Editor.'
+    });
+  }
+
+  const localDb = readDB();
+  const result = await migrateLocalDataToSupabase(localDb);
+  res.json(result);
 });
 
 // Serve frontend static build

@@ -24,6 +24,9 @@ export default function SettingsModal({ isOpen, onClose, onEditProfile }) {
   });
   const [useFallback, setUseFallback] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [dbStatus, setDbStatus] = useState(null);
+  const [isMigrating, setIsMigrating] = useState(false);
+  const [migrationResult, setMigrationResult] = useState(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -32,8 +35,35 @@ export default function SettingsModal({ isOpen, onClose, onEditProfile }) {
         if (data.fastrackDeviceName) setDeviceName(data.fastrackDeviceName);
         if (data.useHeuristicFallback !== undefined) setUseFallback(data.useHeuristicFallback);
       });
+      api.getDatabaseStatus().then((data) => {
+        if (data) setDbStatus(data);
+      }).catch(() => null);
     }
   }, [isOpen]);
+
+  const handleMigrateToSupabase = async () => {
+    setIsMigrating(true);
+    setMigrationResult(null);
+    try {
+      const res = await api.migrateToSupabase();
+      setMigrationResult(res);
+      if (res.success) {
+        if (typeof window !== 'undefined' && window.showToast) {
+          window.showToast(`Successfully synced to Supabase! ${res.usersMigrated} users, ${res.mealsMigrated} meals, ${res.watchLogsMigrated} logs.`, 'success', 'Supabase Cloud Sync');
+        }
+      } else {
+        if (typeof window !== 'undefined' && window.showToast) {
+          window.showToast(res.message || 'Supabase credentials not configured in server/.env yet.', 'warning', 'Setup Required');
+        }
+      }
+    } catch (err) {
+      if (typeof window !== 'undefined' && window.showToast) {
+        window.showToast(err.message || 'Migration error', 'error', 'Error');
+      }
+    } finally {
+      setIsMigrating(false);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -228,6 +258,64 @@ export default function SettingsModal({ isOpen, onClose, onEditProfile }) {
                 </span>
               )}
             </p>
+          </div>
+
+          {/* CLOUD DATABASE & STORAGE (SUPABASE / POSTGRESQL) */}
+          <div className="p-4 bg-slate-950/80 border border-slate-800 rounded-2xl space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Database className="w-4 h-4 text-emerald-400" />
+                <span className="text-xs font-bold text-slate-200">Cloud Database & Photo Storage</span>
+              </div>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                dbStatus?.isCloudReady 
+                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
+                  : 'bg-slate-800 text-slate-400 border border-slate-700'
+              }`}>
+                {dbStatus?.isCloudReady ? 'Supabase Active' : 'Local JSON Mode'}
+              </span>
+            </div>
+
+            <p className="text-[11px] text-slate-400 leading-relaxed">
+              {dbStatus?.isCloudReady ? (
+                <span className="text-emerald-300">
+                  Connected to Supabase PostgreSQL! Photos, users, meals, and biometric data sync to the cloud.
+                </span>
+              ) : (
+                <span>
+                  Currently storing users, physique photos, and meal logs in high-speed local disk storage. Connect Supabase to enable cloud sync from any phone or PC.
+                </span>
+              )}
+            </p>
+
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-800/60">
+              <div className="text-[10px] text-slate-500">
+                Schema: <code className="text-slate-400 font-mono">server/data/supabase_schema.sql</code>
+              </div>
+              <button
+                type="button"
+                onClick={handleMigrateToSupabase}
+                disabled={isMigrating}
+                className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 font-bold rounded-xl text-xs transition-all flex items-center space-x-1.5 cursor-pointer"
+              >
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span>{isMigrating ? 'Migrating...' : '1-Click Sync Local Data to Supabase'}</span>
+              </button>
+            </div>
+
+            {migrationResult && (
+              <div className="p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-[11px] space-y-1">
+                {migrationResult.success ? (
+                  <div className="text-emerald-400 font-semibold">
+                    Synced: {migrationResult.usersMigrated} users, {migrationResult.profilesMigrated} profiles, {migrationResult.mealsMigrated} meals, {migrationResult.watchLogsMigrated} watch logs.
+                  </div>
+                ) : (
+                  <div className="text-amber-400">
+                    {migrationResult.message || migrationResult.error || 'Check server/.env for SUPABASE_URL & SUPABASE_ANON_KEY'}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* EDIT BIO PROFILE SHORTCUT */}

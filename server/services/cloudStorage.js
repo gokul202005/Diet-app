@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { isSupabaseReady, uploadPhotoToSupabase } from './supabaseService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -11,12 +12,24 @@ if (!fs.existsSync(VAULT_UPLOADS_DIR)) {
 }
 
 /**
- * Uploads a base64 or binary image to an online cloud provider (Cloudinary / ImgBB)
+ * Uploads a base64 or binary image to Supabase Storage or online CDN (Cloudinary / ImgBB)
  * or persists it on the server filesystem.
  */
 export async function uploadImageToOnlineStorage(photoUrl, { userId, date, pose, id }) {
   if (!photoUrl || typeof photoUrl !== 'string') return photoUrl;
   if (!photoUrl.startsWith('data:image/')) return photoUrl; // Already an online URL
+
+  // 1. Check if Supabase Cloud Storage is configured
+  if (isSupabaseReady()) {
+    try {
+      const res = await uploadPhotoToSupabase(photoUrl, { userId, date, pose, id });
+      if (res?.publicUrl) {
+        return res.publicUrl;
+      }
+    } catch (err) {
+      console.warn('[CloudStorage] Supabase photo upload failed, trying fallback:', err.message);
+    }
+  }
 
   const matches = photoUrl.match(/^data:image\/([a-zA-Z0-9]+);base64,(.+)$/);
   if (!matches) return photoUrl;
@@ -25,7 +38,7 @@ export async function uploadImageToOnlineStorage(photoUrl, { userId, date, pose,
   const ext = rawExt === 'jpeg' ? 'jpg' : rawExt;
   const base64Data = matches[2];
 
-  // 1. Check if ImgBB API key is configured (Free online CDN)
+  // 2. Check if ImgBB API key is configured (Free online CDN)
   const imgbbKey = process.env.IMGBB_API_KEY;
   if (imgbbKey) {
     try {

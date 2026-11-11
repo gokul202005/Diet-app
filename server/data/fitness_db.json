@@ -2,18 +2,19 @@
   "users": [
     {
       "id": "user-1794326427954",
-      "name": "GOKUL KRISHNA JN",
+      "name": "Gokul Krishna",
       "email": "jn.gokulkrishna@gmail.com",
       "password": "gokul@2k05",
       "provider": "email",
       "createdAt": "2026-11-10T16:00:27.955Z",
-      "geminiApiKey": "",
-      "apiKey": ""
+      "geminiApiKey": "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a",
+      "apiKey": "",
+      "picture": "https://lh3.googleusercontent.com/a/ACg8ocLRZRfLuZEzw1tLbTqySyGi50w9k6HSSOVAw--gwFiiSwhOnvCZ=s96-c"
     }
   ],
   "currentUser": {
     "id": "user-1794326427954",
-    "name": "GOKUL KRISHNA JN",
+    "name": "Gokul Krishna",
     "email": "jn.gokulkrishna@gmail.com",
     "provider": "email"
   },
@@ -70,7 +71,7 @@
         "recomp",
         "cutting"
       ],
-      "geminiApiKey": ""
+      "geminiApiKey": "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a"
     }
   },
   "profile": {
@@ -98,7 +99,8 @@
     "goals": [
       "recomp",
       "cutting"
-    ]
+    ],
+    "geminiApiKey": "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a"
   },
   "meals": [],
   "workouts": [],
@@ -108,19 +110,19 @@
       "id": "fastrack-1794378647318",
       "userId": "user-1794326427954",
       "date": "2026-11-11",
-      "deviceName": "Health Connect (Sensor Bridge)",
-      "steps": 0,
-      "activeCalories": 0,
+      "deviceName": "Android Health Connect / Google Fit",
+      "steps": 1362,
+      "activeCalories": 1104,
       "restingCalories": 2310,
-      "totalBurned": 2310,
-      "distanceKm": 0,
-      "avgHeartRate": null,
-      "peakHeartRate": null,
-      "sleepHours": 7.2,
+      "totalBurned": 3414,
+      "distanceKm": 1.02,
+      "avgHeartRate": 72,
+      "peakHeartRate": 72,
+      "sleepHours": 7,
       "batteryLevel": null,
       "isAutoSynced": true,
-      "lastAutoSyncAt": "2026-11-11T07:39:37.147Z",
-      "syncedAt": "2026-11-11T07:39:37.147Z"
+      "lastAutoSyncAt": "2026-11-11T08:26:57.966Z",
+      "syncedAt": "2026-11-11T08:26:57.966Z"
     }
   ],
   "waterLogs": [],
@@ -1163,6 +1165,6 @@
   "settings": {
     "fastrackDeviceName": "Fastrack Reflex Curve",
     "useHeuristicFallback": true,
-    "geminiApiKey": ""
+    "geminiApiKey": "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a"
   }
 }
