@@ -23,6 +23,28 @@ import {
 } from 'lucide-react';
 import { api } from '../api';
 
+function deduplicateSpeechRepetitions(text) {
+  if (!text || typeof text !== 'string') return '';
+  // 1. Remove consecutive identical words (e.g. "I I I" -> "I", "idli idli" -> "idli")
+  let clean = text.replace(/\b([a-zA-Z0-9]+)(\s+\1\b)+/gi, (m, p) => p);
+
+  // 2. Token-level duplicate phrase remover (e.g. repeated sentence halves)
+  const words = clean.split(/\s+/);
+  if (words.length > 3) {
+    for (let phraseLen = Math.floor(words.length / 2); phraseLen >= 2; phraseLen--) {
+      for (let i = 0; i <= words.length - (phraseLen * 2); i++) {
+        const s1 = words.slice(i, i + phraseLen).join(' ').toLowerCase();
+        const s2 = words.slice(i + phraseLen, i + phraseLen * 2).join(' ').toLowerCase();
+        if (s1 === s2) {
+          words.splice(i + phraseLen, phraseLen);
+        }
+      }
+    }
+    clean = words.join(' ');
+  }
+  return clean.replace(/\s+/g, ' ').trim();
+}
+
 function normalizeFitnessSpeech(rawText) {
   if (!rawText || typeof rawText !== 'string') return '';
   let clean = rawText;
@@ -37,6 +59,9 @@ function normalizeFitnessSpeech(rawText) {
     [/\bfree eggs\b/gi, '3 eggs'],
     [/\bto eggs\b/gi, '2 eggs'],
     [/\bfor eggs\b/gi, '4 eggs'],
+    [/\bfree idli\b/gi, '3 idli'],
+    [/\bto idli\b/gi, '2 idli'],
+    [/\bfor idli\b/gi, '4 idli'],
     [/\bwon\b(?=.*(?:egg|roti|dosa|idli|banana))/gi, '1'],
     [/\bto\b(?=.*(?:eggs|rotis|dosas|idlis|bananas))/gi, '2'],
     [/\bcheap at ease\b/gi, 'chapatis'],
@@ -80,9 +105,7 @@ function normalizeFitnessSpeech(rawText) {
   for (const [pattern, rep] of replacements) {
     clean = clean.replace(pattern, rep);
   }
-  // Deduplicate immediate repeated words (e.g. "I I I" -> "I", "idli idli" -> "idli")
-  clean = clean.replace(/\b(\w+)(?:\s+\1\b)+/gi, '$1');
-  return clean.replace(/\s+/g, ' ').trim();
+  return deduplicateSpeechRepetitions(clean);
 }
 
 export default function UniversalVoiceAssistant({ selectedDate, onActionCompleted, isOpen: externalIsOpen, onClose: externalOnClose, onOpen: externalOnOpen }) {
@@ -233,7 +256,7 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
         recognition.lang = speechLang || 'en-IN';
         recognition.maxAlternatives = 1;
 
-        let finalAccumulator = '';
+        let previousRestartsFinal = '';
 
         recognition.onstart = () => {
           setIsRecording(true);
@@ -243,26 +266,31 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
         };
 
         recognition.onresult = (event) => {
-          let interimTranscript = '';
+          let currentSessionFinal = '';
+          let currentSessionInterim = '';
 
-          // Only process NEW results from event.resultIndex to prevent duplicate sentence compounding
-          for (let i = event.resultIndex; i < event.results.length; ++i) {
+          // Rebuild whole session cleanly from event.results (never compound past tokens into runaway stutters)
+          for (let i = 0; i < event.results.length; ++i) {
             const item = event.results[i];
+            const text = item[0]?.transcript || '';
             if (item.isFinal) {
-              const text = item[0].transcript.trim();
-              if (text && !finalAccumulator.endsWith(text)) {
-                finalAccumulator = (finalAccumulator + ' ' + text).trim();
-              }
+              currentSessionFinal += text + ' ';
             } else {
-              interimTranscript += item[0].transcript;
+              currentSessionInterim += text;
             }
           }
 
-          interimTranscript = interimTranscript.trim();
+          currentSessionFinal = currentSessionFinal.trim();
+          currentSessionInterim = currentSessionInterim.trim();
 
-          const cleanFinal = normalizeFitnessSpeech(finalAccumulator);
-          const cleanInterim = normalizeFitnessSpeech(interimTranscript);
-          const fullDisplay = [cleanFinal, cleanInterim].filter(Boolean).join(' ').trim();
+          const totalRaw = [previousRestartsFinal, currentSessionFinal, currentSessionInterim]
+            .filter(Boolean)
+            .join(' ')
+            .trim();
+
+          const cleanFinal = normalizeFitnessSpeech([previousRestartsFinal, currentSessionFinal].filter(Boolean).join(' '));
+          const cleanInterim = normalizeFitnessSpeech(currentSessionInterim);
+          const fullDisplay = normalizeFitnessSpeech(totalRaw);
 
           setLiveFinalText(cleanFinal);
           setLiveInterimText(cleanInterim);
@@ -287,6 +315,9 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
         recognition.onend = () => {
           // If the user hasn't clicked stop and speech recognition times out, auto-restart to keep listening
           if (isRecordingRef.current) {
+            if (recognizedTextRef.current.trim()) {
+              previousRestartsFinal = recognizedTextRef.current.trim();
+            }
             try {
               recognition.start();
             } catch (e) {

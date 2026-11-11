@@ -226,7 +226,7 @@ class HealthConnectSyncEngine {
           { dataTypeName: 'com.google.heart_rate.bpm' },
           { dataTypeName: 'com.google.sleep.segment' }
         ],
-        bucketByTime: { durationMillis: endTimeMillis - startTimeMillis },
+        bucketByTime: { durationMillis: 86400000 }, // Full-day aggregation bucket
         startTimeMillis,
         endTimeMillis
       };
@@ -267,56 +267,83 @@ class HealthConnectSyncEngine {
   }
 
   parseGoogleFitResponse(data) {
-    let steps = 0;
-    let calories = 0;
-    let heartRate = null;
+    let totalSteps = 0;
+    let totalCalories = 0;
+    let heartRateVals = [];
     let sleepHours = 7.0;
 
     try {
       const buckets = data.bucket || [];
       for (const bucket of buckets) {
         if (!bucket.dataset) continue;
+        let bucketSteps = 0;
+        let bucketCalories = 0;
+
         for (const ds of bucket.dataset) {
           const type = (ds.dataSourceId || '').toLowerCase();
           
           // Steps extraction (matches all Google Fit step data streams)
           if (type.includes('step') || type.includes('delta')) {
-            const currentPointsSum = ds.point?.reduce((acc, pt) => {
+            const streamSum = ds.point?.reduce((acc, pt) => {
               const val = pt.value?.[0];
               const count = val?.intVal !== undefined ? Number(val.intVal) : (val?.fpVal !== undefined ? Math.round(Number(val.fpVal)) : 0);
               return acc + (isNaN(count) ? 0 : count);
             }, 0) || 0;
-            steps = Math.max(steps, currentPointsSum);
+            bucketSteps = Math.max(bucketSteps, streamSum);
           }
 
           // Calories extraction
           if (type.includes('calorie') || type.includes('expended')) {
-            const currentCalSum = ds.point?.reduce((acc, pt) => {
+            const streamCal = ds.point?.reduce((acc, pt) => {
               const val = pt.value?.[0];
               const cal = val?.fpVal !== undefined ? Number(val.fpVal) : (val?.intVal !== undefined ? Number(val.intVal) : 0);
               return acc + (isNaN(cal) ? 0 : cal);
             }, 0) || 0;
-            calories = Math.max(calories, currentCalSum);
+            bucketCalories = Math.max(bucketCalories, streamCal);
           }
 
           // Heart rate extraction
           if (type.includes('heart') || type.includes('bpm')) {
             const vals = ds.point?.map(pt => pt.value?.[0]?.fpVal || pt.value?.[0]?.intVal).filter(Boolean) || [];
-            if (vals.length > 0) {
-              heartRate = Math.round(vals.reduce((a, b) => a + Number(b), 0) / vals.length);
+            heartRateVals.push(...vals);
+          }
+
+          // Sleep duration extraction
+          if (type.includes('sleep')) {
+            const sleepNanos = ds.point?.reduce((acc, pt) => {
+              const start = Number(pt.startTimeNanos || 0);
+              const end = Number(pt.endTimeNanos || 0);
+              return acc + (end > start ? end - start : 0);
+            }, 0) || 0;
+            if (sleepNanos > 0) {
+              sleepHours = sleepNanos / (1e9 * 3600);
             }
           }
         }
+
+        totalSteps += bucketSteps;
+        totalCalories += bucketCalories;
       }
     } catch (e) {
       console.warn('[GoogleFit] Parsing error:', e);
     }
 
-    const finalSteps = Math.max(steps, this.stepCount);
+    const finalSteps = Math.max(totalSteps, this.stepCount);
+    if (finalSteps > this.stepCount) {
+      this.stepCount = finalSteps;
+      try {
+        localStorage.setItem(STORAGE_KEYS.LOCAL_STEPS_TODAY, String(finalSteps));
+      } catch (e) {}
+    }
+
+    const avgHeartRate = heartRateVals.length > 0
+      ? Math.round(heartRateVals.reduce((a, b) => a + Number(b), 0) / heartRateVals.length)
+      : 72;
+
     return {
       steps: finalSteps,
-      activeCalories: Math.round(calories) || Math.round(finalSteps * 0.04),
-      avgHeartRate: heartRate || 72,
+      activeCalories: Math.round(totalCalories) || Math.round(finalSteps * 0.04),
+      avgHeartRate,
       sleepHours: Number(sleepHours.toFixed(1)),
       source: 'Android Health Connect / Google Fit'
     };

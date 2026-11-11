@@ -1,34 +1,7 @@
 {
   "users": [],
   "currentUser": null,
-  "profiles": {
-    "user-google-1794388402462": {
-      "isConfigured": false,
-      "name": "",
-      "age": "",
-      "gender": "male",
-      "heightCm": "",
-      "weightKg": "",
-      "goal": "recomp",
-      "activityLevel": "moderately_active",
-      "dailyTargetCalories": 2100,
-      "dailyTargetProtein": 140,
-      "dailyTargetCarbs": 220,
-      "dailyTargetFat": 60,
-      "dailyTargetWater": 3000,
-      "dailyTargetSteps": 10000,
-      "recalculateTargets": true,
-      "dietaryTags": [
-        "🍗 Non-Veg"
-      ],
-      "focusAreas": [
-        "🛡️ Full Body Balance"
-      ],
-      "goals": [
-        "recomp"
-      ]
-    }
-  },
+  "profiles": {},
   "meals": [],
   "workouts": [],
   "workoutPlans": [],
@@ -48,8 +21,8 @@
       "sleepHours": 7,
       "batteryLevel": null,
       "isAutoSynced": true,
-      "lastAutoSyncAt": "2026-11-11T09:30:17.872Z",
-      "syncedAt": "2026-11-11T09:30:17.872Z"
+      "lastAutoSyncAt": "2026-11-11T09:44:45.395Z",
+      "syncedAt": "2026-11-11T09:44:45.395Z"
     }
   ],
   "waterLogs": [],
@@ -57,5 +30,35 @@
   "physiqueVault": [],
   "aiCache": {},
   "chatHistory": [],
-  "settings": {}
+  "settings": {},
+  "profile": {
+    "isConfigured": false,
+    "name": "",
+    "age": null,
+    "gender": "male",
+    "heightCm": null,
+    "weightKg": null,
+    "targetWeightKg": null,
+    "goal": "recomposition",
+    "activityLevel": "moderately_active",
+    "dietPreference": "south_indian_mixed",
+    "dailyTargetCalories": 2100,
+    "dailyTargetProtein": 140,
+    "dailyTargetCarbs": 220,
+    "dailyTargetFat": 60,
+    "dailyTargetWater": 3000,
+    "dailyTargetSteps": 10000,
+    "recalculateTargets": true,
+    "dietaryTags": [
+      "🍗 Non-Veg"
+    ],
+    "focusAreas": [
+      "🛡️ Full Body Balance"
+    ],
+    "goals": [
+      "recomp"
+    ]
+  },
+  "progressPhotos": [],
+  "dayCheckins": []
 }
