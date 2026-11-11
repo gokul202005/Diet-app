@@ -50,7 +50,9 @@ export default function AuthScreen({ onAuthSuccess }) {
   const [googleEmailInput, setGoogleEmailInput] = useState('');
   const [googleNameInput, setGoogleNameInput] = useState('');
   const [googleClientId, setGoogleClientId] = useState(
-    import.meta.env.VITE_GOOGLE_CLIENT_ID || localStorage.getItem('agy_google_client_id') || ''
+    (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GOOGLE_CLIENT_ID) || 
+    (typeof window !== 'undefined' ? localStorage.getItem('agy_google_client_id') : '') || 
+    ''
   );
 
   // Initialize official Google Identity Services if client ID is configured

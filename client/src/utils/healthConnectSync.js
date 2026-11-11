@@ -12,6 +12,7 @@ const STORAGE_KEYS = {
   LOCAL_STEPS_DATE: 'agy_sensor_steps_date'
 };
 
+
 class HealthConnectSyncEngine {
   constructor() {
     this.isEnabled = false;
@@ -69,7 +70,8 @@ class HealthConnectSyncEngine {
       provider: this.provider,
       lastSyncTime: this.lastSyncTime,
       stepCount: this.stepCount,
-      isSyncing: this.isSyncing
+      isSyncing: this.isSyncing,
+      googleFitConnected: Boolean(this.googleFitToken)
     });
     return () => this.listeners.delete(callback);
   }
@@ -81,6 +83,7 @@ class HealthConnectSyncEngine {
       lastSyncTime: this.lastSyncTime,
       stepCount: this.stepCount,
       isSyncing: this.isSyncing,
+      googleFitConnected: Boolean(this.googleFitToken),
       ...data
     };
     this.listeners.forEach(cb => {
@@ -139,18 +142,23 @@ class HealthConnectSyncEngine {
 
     const customClientId = 
       (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GOOGLE_CLIENT_ID) || 
-      localStorage.getItem('agy_google_client_id') || 
+      (typeof window !== 'undefined' ? localStorage.getItem('agy_google_client_id') : '') || 
       '';
 
-    // If no custom Google Cloud OAuth client ID is configured, connect seamlessly via built-in Health Connect sensor bridge
     if (!customClientId) {
-      console.log('[HealthConnect] Using built-in Health Connect sensor bridge (zero OAuth friction).');
-      return { success: true, provider: 'sensor_bridge' };
+      return { 
+        success: false, 
+        error: 'No Google Client ID set. Please paste your OAuth Client ID in Settings (or use built-in Health Connect auto-sync).' 
+      };
     }
 
     return new Promise((resolve) => {
       try {
-        const client = window.google?.accounts?.oauth2?.initTokenClient({
+        if (!window.google?.accounts?.oauth2) {
+          throw new Error('Google Identity Services SDK is loading. Please try again in 2 seconds.');
+        }
+
+        const client = window.google.accounts.oauth2.initTokenClient({
           client_id: customClientId,
           scope: [
             'https://www.googleapis.com/auth/fitness.activity.read',
@@ -158,28 +166,36 @@ class HealthConnectSyncEngine {
             'https://www.googleapis.com/auth/fitness.heart_rate.read',
             'https://www.googleapis.com/auth/fitness.sleep.read'
           ].join(' '),
-          callback: (response) => {
+          callback: async (response) => {
             if (response.error) {
               console.warn('[GoogleFit] Auth error:', response.error);
               resolve({ success: false, error: response.error });
             } else {
               this.googleFitToken = response.access_token;
               localStorage.setItem(STORAGE_KEYS.GOOGLE_FIT_TOKEN, response.access_token);
+              this.notify({ googleFitConnected: true });
+              await this.syncNow();
               resolve({ success: true, token: response.access_token });
             }
           }
         });
 
         if (client) {
-          client.requestAccessToken();
+          client.requestAccessToken({ prompt: 'consent' });
         } else {
-          resolve({ success: true, fallback: true });
+          resolve({ success: false, error: 'Could not initialize Google token client' });
         }
       } catch (err) {
         console.warn('[GoogleFit] GIS Init exception:', err);
-        resolve({ success: true, fallback: true });
+        resolve({ success: false, error: err.message });
       }
     });
+  }
+
+  disconnectGoogleFit() {
+    this.googleFitToken = null;
+    localStorage.removeItem(STORAGE_KEYS.GOOGLE_FIT_TOKEN);
+    this.notify({ googleFitConnected: false });
   }
 
   // Fetch real metrics from Google Fit REST API (or simulated Health Connect aggregation)
