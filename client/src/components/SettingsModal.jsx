@@ -10,7 +10,8 @@ import {
   User, 
   ExternalLink,
   Flame,
-  Info
+  Info,
+  Activity
 } from 'lucide-react';
 import { api } from '../api';
 
@@ -18,6 +19,9 @@ export default function SettingsModal({ isOpen, onClose, onEditProfile }) {
   const [settings, setSettings] = useState(null);
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [deviceName, setDeviceName] = useState('Fastrack Reflex Curve');
+  const [googleClientId, setGoogleClientId] = useState(() => {
+    return localStorage.getItem('agy_google_client_id') || '';
+  });
   const [useFallback, setUseFallback] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -43,6 +47,12 @@ export default function SettingsModal({ isOpen, onClose, onEditProfile }) {
       };
       if (apiKeyInput.trim()) {
         payload.geminiApiKey = apiKeyInput.trim();
+      }
+
+      if (googleClientId.trim()) {
+        localStorage.setItem('agy_google_client_id', googleClientId.trim());
+      } else {
+        localStorage.removeItem('agy_google_client_id');
       }
 
       const res = await api.updateSettings(payload);
@@ -166,6 +176,35 @@ export default function SettingsModal({ isOpen, onClose, onEditProfile }) {
               className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 focus:outline-none focus:border-emerald-500 text-xs"
               placeholder="e.g. Fastrack Reflex Beat / Fastrack Smart Nitro"
             />
+          </div>
+
+          {/* GOOGLE FIT OAUTH CLIENT ID (OPTIONAL) */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-slate-300 flex items-center space-x-1.5">
+                <Activity className="w-4 h-4 text-sky-400" />
+                <span>Google Cloud OAuth Client ID (Optional)</span>
+              </label>
+              <a
+                href="https://console.cloud.google.com/apis/credentials"
+                target="_blank"
+                rel="noreferrer"
+                className="text-[11px] text-sky-400 hover:underline flex items-center space-x-1"
+              >
+                <span>Google Cloud</span>
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
+            <input
+              type="text"
+              value={googleClientId}
+              onChange={(e) => setGoogleClientId(e.target.value)}
+              className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 placeholder-slate-600 focus:outline-none focus:border-emerald-500 text-xs font-mono"
+              placeholder="e.g. 123456789-abcdef.apps.googleusercontent.com"
+            />
+            <p className="text-[11px] text-slate-500">
+              Only required if you want direct 1-click Google Cloud REST sync. Otherwise, AGY Fit connects to Google Fit and smartwatches automatically via Android Health Connect with zero setup!
+            </p>
           </div>
 
           {/* EDIT BIO PROFILE SHORTCUT */}
