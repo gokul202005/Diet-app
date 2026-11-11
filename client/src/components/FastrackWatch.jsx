@@ -101,17 +101,6 @@ export default function FastrackWatch({ selectedDate, profile }) {
     }
   };
 
-  const handleConnectGoogleFit = async () => {
-    const res = await healthConnectSync.requestGoogleFitAuth();
-    if (res?.success) {
-      await healthConnectSync.enableAutoSync();
-      if (typeof window !== 'undefined' && window.showToast) {
-        window.showToast('Connected to Google Fit & Android Health Connect!', 'success', 'Google Fit Connected');
-      }
-      loadWatchData();
-    }
-  };
-
   // Load Real Saved Data for this Date from Server
   const loadWatchData = async () => {
     try {
@@ -409,16 +398,6 @@ export default function FastrackWatch({ selectedDate, profile }) {
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isHealthSyncing ? 'animate-spin text-emerald-400' : 'text-slate-400'}`} />
               <span>{isHealthSyncing ? 'Syncing...' : 'Sync Now'}</span>
-            </button>
-
-            {/* Connect Google Fit */}
-            <button
-              onClick={handleConnectGoogleFit}
-              className="px-3.5 py-2.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-2xl text-xs text-slate-400 hover:text-white font-medium transition-all flex items-center space-x-1.5 cursor-pointer"
-              title="Link Google Fit / Health Connect Account"
-            >
-              <Activity className="w-3.5 h-3.5 text-sky-400" />
-              <span>Google Fit Link</span>
             </button>
           </div>
         </div>
