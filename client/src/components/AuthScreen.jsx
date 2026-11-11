@@ -18,6 +18,7 @@ import {
   X
 } from 'lucide-react';
 import { api } from '../api';
+import { healthConnectSync } from '../utils/healthConnectSync';
 
 // Safe Base64 JWT Decoder to extract real Google account details
 function decodeJwt(token) {
@@ -141,19 +142,52 @@ export default function AuthScreen({ onAuthSuccess }) {
     }
   };
 
-  // Click on "Continue with Google"
-  const handleGoogleBtnClick = () => {
+  // Click on "Continue with Google" (Includes Google Fit permissions upfront!)
+  const handleGoogleBtnClick = async () => {
     setErrorMsg('');
+    setIsLoading(true);
+    try {
+      if (window.google?.accounts?.oauth2) {
+        const res = await healthConnectSync.requestGoogleFitAuth({
+          clientId: googleClientId
+        });
+        if (res.success && res.token) {
+          const userProfileRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+            headers: { Authorization: `Bearer ${res.token}` }
+          });
+          if (userProfileRes.ok) {
+            const googleProfile = await userProfileRes.json();
+            const authRes = await api.googleAuth({
+              email: googleProfile.email,
+              name: googleProfile.name || googleProfile.email.split('@')[0],
+              picture: googleProfile.picture,
+              googleId: googleProfile.sub
+            });
+            if (authRes.success && authRes.user) {
+              localStorage.setItem(`agy_google_fit_token_${authRes.user.id}`, res.token);
+              localStorage.setItem('agy_google_fit_token', res.token);
+              setSuccessMsg(`Google Fit authorized & signed in as ${authRes.user.name}!`);
+              setTimeout(() => {
+                onAuthSuccess(authRes.user, authRes.profile);
+              }, 400);
+              return;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Direct Google Fit login error, falling back:', e);
+    } finally {
+      setIsLoading(false);
+    }
+
     if (googleClientId && window.google?.accounts?.id) {
-      // Trigger official native Google Account Picker One-Tap
       window.google.accounts.id.prompt((notification) => {
         if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-          // If browser blocked One-Tap or running in iframe, open direct Google dialog
           setIsGoogleModalOpen(true);
         }
       });
     } else {
-      // Open direct Google Account Connector where user inputs their actual Google account
       setIsGoogleModalOpen(true);
     }
   };

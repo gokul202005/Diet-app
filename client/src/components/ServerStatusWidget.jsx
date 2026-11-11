@@ -21,6 +21,7 @@ export default function ServerStatusWidget({ variant = 'pill', onOpenModal }) {
   const [isChecking, setIsChecking] = useState(false);
   const [lastChecked, setLastChecked] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [liveUptime, setLiveUptime] = useState(0);
 
   // Ping Server function
   const checkHealth = async () => {
@@ -31,6 +32,9 @@ export default function ServerStatusWidget({ variant = 'pill', onOpenModal }) {
       setLatency(res.latency);
       setServerData(res);
       setLastChecked(new Date());
+      if (res?.uptimeSeconds) {
+        setLiveUptime(res.uptimeSeconds);
+      }
     } catch (e) {
       setStatus('offline');
       setLatency(null);
@@ -46,13 +50,23 @@ export default function ServerStatusWidget({ variant = 'pill', onOpenModal }) {
     return () => clearInterval(interval);
   }, []);
 
+  // Live second-by-second uptime ticker (Never freezes between pings)
+  useEffect(() => {
+    if (status !== 'running') return;
+    const timer = setInterval(() => {
+      setLiveUptime(prev => prev + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [status]);
+
   const formatUptime = (seconds) => {
     if (!seconds && seconds !== 0) return 'Just started';
-    const mins = Math.floor(seconds / 60);
-    const hrs = Math.floor(mins / 60);
-    if (hrs > 0) return `${hrs}h ${mins % 60}m`;
-    if (mins > 0) return `${mins}m ${seconds % 60}s`;
-    return `${seconds}s`;
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    if (hrs > 0) return `${hrs}h ${mins}m ${secs}s`;
+    if (mins > 0) return `${mins}m ${secs}s`;
+    return `${secs}s`;
   };
 
   // Helper for status styling
@@ -150,8 +164,8 @@ export default function ServerStatusWidget({ variant = 'pill', onOpenModal }) {
             <span className="text-xs font-black text-white">{latency !== null ? `${latency} ms` : '—'}</span>
           </div>
           <div className="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/60">
-            <span className="text-[10px] text-slate-500 uppercase block font-semibold">Server Uptime</span>
-            <span className="text-xs font-black text-white">{formatUptime(serverData?.uptimeSeconds)}</span>
+            <span className="text-[10px] text-slate-500 uppercase block font-semibold">Server Uptime (Live)</span>
+            <span className="text-xs font-black text-white font-mono">{formatUptime(liveUptime)}</span>
           </div>
           <div className="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/60">
             <span className="text-[10px] text-slate-500 uppercase block font-semibold">Database Sync</span>
@@ -245,7 +259,7 @@ export default function ServerStatusWidget({ variant = 'pill', onOpenModal }) {
               </div>
               <div className="flex justify-between py-1 border-b border-slate-800/80 text-slate-400">
                 <span>Cloud Uptime</span>
-                <span className="font-bold text-white">{formatUptime(serverData?.uptimeSeconds)}</span>
+                <span className="font-bold text-white font-mono">{formatUptime(liveUptime)}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-slate-800/80 text-slate-400">
                 <span>Last Heartbeat Check</span>
