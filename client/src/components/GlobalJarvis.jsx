@@ -10,7 +10,9 @@ import {
   ChevronDown, 
   ChevronUp, 
   MessageSquare,
-  Zap,
+  Settings2,
+  Check,
+  Play,
   Activity
 } from 'lucide-react';
 import { api } from '../api';
@@ -24,16 +26,35 @@ export default function GlobalJarvis({ profile, selectedDate, onActionCompleted,
     }
   });
 
-  const [jarvisState, setJarvisState] = useState('idle'); // 'idle' | 'listening' | 'thinking' | 'speaking'
+  // 'idle' | 'listening' | 'thinking' | 'speaking'
+  const [jarvisState, setJarvisState] = useState('idle');
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem('agy_jarvis_collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [showSettings, setShowSettings] = useState(false);
   const [liveTranscript, setLiveTranscript] = useState('');
   const [lastJarvisReply, setLastJarvisReply] = useState('');
   const [audioVolume, setAudioVolume] = useState(0);
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [voicePersona, setVoicePersona] = useState(() => {
+
+  // Audio Devices & Voices
+  const [audioDevices, setAudioDevices] = useState([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState(() => {
     try {
-      return localStorage.getItem('agy_jarvis_voice_persona') || 'jarvis';
+      return localStorage.getItem('agy_selected_audio_device') || '';
     } catch {
-      return 'jarvis';
+      return '';
+    }
+  });
+  const [availableVoices, setAvailableVoices] = useState([]);
+  const [selectedVoiceName, setSelectedVoiceName] = useState(() => {
+    try {
+      return localStorage.getItem('agy_selected_voice_name') || '';
+    } catch {
+      return '';
     }
   });
 
@@ -49,23 +70,72 @@ export default function GlobalJarvis({ profile, selectedDate, onActionCompleted,
   const silenceTimeoutRef = useRef(null);
   const capturedTextRef = useRef('');
 
+  // 1. Enumerate all audio input devices (PC mic vs Headset vs USB)
+  useEffect(() => {
+    const fetchDevices = async () => {
+      try {
+        if (!navigator.mediaDevices?.enumerateDevices) return;
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const audioInputs = devices.filter(d => d.kind === 'audioinput');
+        setAudioDevices(audioInputs);
+
+        // If no device currently saved, pick headset or first available
+        if (!selectedDeviceId && audioInputs.length > 0) {
+          const preferred = audioInputs.find(d => 
+            /headset|bluetooth|usb|mic|array/i.test(d.label)
+          ) || audioInputs[0];
+          setSelectedDeviceId(preferred.deviceId);
+          try { localStorage.setItem('agy_selected_audio_device', preferred.deviceId); } catch {}
+        }
+      } catch (e) {
+        console.warn('[GlobalJarvis] Device enum warning:', e);
+      }
+    };
+
+    fetchDevices();
+    if (navigator.mediaDevices?.addEventListener) {
+      navigator.mediaDevices.addEventListener('devicechange', fetchDevices);
+      return () => navigator.mediaDevices.removeEventListener('devicechange', fetchDevices);
+    }
+  }, [selectedDeviceId]);
+
+  // 2. Fetch and list ALL system voices
+  useEffect(() => {
+    const updateVoices = () => {
+      if (typeof window !== 'undefined' && window.speechSynthesis) {
+        const voices = window.speechSynthesis.getVoices() || [];
+        setAvailableVoices(voices);
+
+        if (!selectedVoiceName && voices.length > 0) {
+          // Prioritize British male voice (Jarvis style)
+          const british = voices.find(v => 
+            /ryan|george|oliver|google uk english male|david/i.test(v.name) && !/female/i.test(v.name)
+          ) || voices.find(v => v.lang.startsWith('en-GB') && !/female/i.test(v.name))
+            || voices.find(v => v.lang.startsWith('en'));
+          if (british) {
+            setSelectedVoiceName(british.name);
+            try { localStorage.setItem('agy_selected_voice_name', british.name); } catch {}
+          }
+        }
+      }
+    };
+
+    updateVoices();
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.onvoiceschanged = updateVoices;
+      return () => { window.speechSynthesis.onvoiceschanged = null; };
+    }
+  }, [selectedVoiceName]);
+
+  // Sync state across tabs
   useEffect(() => {
     isActiveRef.current = isActive;
     try {
       localStorage.setItem('agy_jarvis_voice_mode', String(isActive));
     } catch {}
-
-    // Dispatch global event so CoachChat stays in sync
     window.dispatchEvent(new CustomEvent('agy-jarvis-state-sync', { detail: { isActive } }));
 
-    if (isActive) {
-      // Greet user on first activation if not speaking
-      if (typeof window !== 'undefined' && window.speechSynthesis && !window.speechSynthesis.speaking) {
-        speakResponse("Jarvis online. All systems calibrated, Gokul. I am listening continuously across all tabs.");
-      } else {
-        startListening();
-      }
-    } else {
+    if (!isActive) {
       stopSpeaking();
       stopListening();
     }
@@ -76,9 +146,6 @@ export default function GlobalJarvis({ profile, selectedDate, onActionCompleted,
     const handleSync = (e) => {
       if (e?.detail?.isActive !== undefined && e.detail.isActive !== isActiveRef.current) {
         setIsActive(e.detail.isActive);
-      }
-      if (e?.detail?.persona) {
-        setVoicePersona(e.detail.persona);
       }
     };
     window.addEventListener('agy-jarvis-external-toggle', handleSync);
@@ -112,13 +179,19 @@ export default function GlobalJarvis({ profile, selectedDate, onActionCompleted,
     setAudioVolume(0);
   };
 
-  // Setup live audio visualizer for user headset
-  const setupVisualizer = (stream) => {
+  // Setup Web Audio Analyser with explicit AudioContext resume
+  const setupVisualizer = async (stream) => {
     try {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
       if (!AudioCtx) return;
       const ctx = new AudioCtx();
       audioCtxRef.current = ctx;
+
+      // Chrome requires explicit resume if context started in suspended state
+      if (ctx.state === 'suspended') {
+        await ctx.resume().catch(() => {});
+      }
+
       const src = ctx.createMediaStreamSource(stream);
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 64;
@@ -139,25 +212,24 @@ export default function GlobalJarvis({ profile, selectedDate, onActionCompleted,
         animFrameRef.current = requestAnimationFrame(updateMeter);
       };
       animFrameRef.current = requestAnimationFrame(updateMeter);
-    } catch {}
+    } catch (e) {
+      console.warn('[GlobalJarvis] Visualizer notice:', e);
+    }
   };
 
-  // Jarvis Voice synthesis (Paul Bettany British accent)
-  const getJarvisVoice = () => {
+  // Get currently selected voice object
+  const getCurrentVoice = () => {
     if (typeof window === 'undefined' || !window.speechSynthesis) return null;
     const voices = window.speechSynthesis.getVoices() || [];
     if (voices.length === 0) return null;
-
-    // Prioritize British male voices (George, Ryan, Oliver, Google UK English Male)
-    const britishMale = voices.find(v => 
-      (v.name.includes('Ryan') || v.name.includes('George') || v.name.includes('Oliver') || v.name.toLowerCase().includes('google uk english male')) && 
-      !v.name.includes('Female')
-    ) || voices.find(v => (v.lang === 'en-GB' || v.lang.startsWith('en-GB')) && !v.name.includes('Female'))
-      || voices.find(v => (v.name.includes('Guy') || v.name.includes('David') || v.name.includes('Christopher')) && !v.name.includes('Female'))
-      || voices.find(v => v.lang.startsWith('en') && !v.name.includes('Heera'));
-    return britishMale || voices[0];
+    if (selectedVoiceName) {
+      const match = voices.find(v => v.name === selectedVoiceName);
+      if (match) return match;
+    }
+    return voices[0];
   };
 
+  // Speak response aloud
   const speakResponse = (text) => {
     if (typeof window === 'undefined' || !window.speechSynthesis) return;
     window.speechSynthesis.cancel();
@@ -171,7 +243,7 @@ export default function GlobalJarvis({ profile, selectedDate, onActionCompleted,
       .trim();
 
     if (!clean) {
-      if (isActiveRef.current) startListening();
+      setJarvisState('idle');
       return;
     }
 
@@ -179,31 +251,20 @@ export default function GlobalJarvis({ profile, selectedDate, onActionCompleted,
     setJarvisState('speaking');
 
     const utt = new SpeechSynthesisUtterance(clean);
-    const voice = getJarvisVoice();
+    const voice = getCurrentVoice();
     if (voice) {
       utt.voice = voice;
       utt.lang = voice.lang;
     }
-    utt.pitch = 0.92;
+    utt.pitch = 0.94;
     utt.rate = 1.02;
 
     utt.onend = () => {
       setJarvisState('idle');
-      // Continuous Jarvis loop: Automatically listen again after speaking!
-      if (isActiveRef.current) {
-        setTimeout(() => {
-          if (isActiveRef.current) startListening();
-        }, 350);
-      }
     };
 
     utt.onerror = () => {
       setJarvisState('idle');
-      if (isActiveRef.current) {
-        setTimeout(() => {
-          if (isActiveRef.current) startListening();
-        }, 400);
-      }
     };
 
     window.speechSynthesis.speak(utt);
@@ -216,30 +277,37 @@ export default function GlobalJarvis({ profile, selectedDate, onActionCompleted,
     setJarvisState('idle');
   };
 
-  // Start dual-engine listening (Headset hardware stream + Web Speech API)
+  const testVoiceSample = (v) => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const utt = new SpeechSynthesisUtterance(`Hello Gokul, I am ${v.name.split(' ')[0]}. All systems ready.`);
+    utt.voice = v;
+    utt.lang = v.lang;
+    utt.pitch = 0.94;
+    utt.rate = 1.02;
+    window.speechSynthesis.speak(utt);
+  };
+
+  // Start Voice Listening Session (Headset / PC mic + Web Speech + Audio Fallback)
   const startListening = async () => {
     if (isListeningRef.current) return;
-    if (typeof window !== 'undefined' && window.speechSynthesis && window.speechSynthesis.speaking) {
-      window.speechSynthesis.cancel();
-    }
+    stopSpeaking();
 
     audioChunksRef.current = [];
     capturedTextRef.current = '';
     setLiveTranscript('');
     setJarvisState('listening');
 
-    // 1. Hardware Microphone stream (guarantees PC headset input)
+    // 1. Hardware Microphone stream from chosen device (or default PC mic)
     try {
-      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true
-          }
-        });
+      if (navigator.mediaDevices?.getUserMedia) {
+        const audioConstraints = selectedDeviceId
+          ? { deviceId: { exact: selectedDeviceId } }
+          : true;
+
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
         mediaStreamRef.current = stream;
-        setupVisualizer(stream);
+        await setupVisualizer(stream);
 
         let mimeType = 'audio/webm';
         if (typeof MediaRecorder !== 'undefined') {
@@ -262,7 +330,7 @@ export default function GlobalJarvis({ profile, selectedDate, onActionCompleted,
 
     isListeningRef.current = true;
 
-    // 2. Concurrently attach Web Speech Recognition
+    // 2. Concurrently run Web Speech Recognition
     const SpeechRec = typeof window !== 'undefined' ? (window.SpeechRecognition || window.webkitSpeechRecognition) : null;
     if (SpeechRec) {
       try {
@@ -282,11 +350,11 @@ export default function GlobalJarvis({ profile, selectedDate, onActionCompleted,
           capturedTextRef.current = text;
           setLiveTranscript(text);
 
-          // 1.8s silence pause detector: automatically process user speech
+          // 2s pause detector: auto-submit when user stops talking
           if (silenceTimeoutRef.current) clearTimeout(silenceTimeoutRef.current);
           silenceTimeoutRef.current = setTimeout(() => {
             finishListeningAndProcess();
-          }, 1800);
+          }, 2000);
         };
 
         rec.onerror = (e) => {
@@ -322,20 +390,19 @@ export default function GlobalJarvis({ profile, selectedDate, onActionCompleted,
     if (jarvisState === 'listening') setJarvisState('idle');
   };
 
-  // Process what the user spoke and get Jarvis's verbal reply
   const finishListeningAndProcess = async () => {
     if (!isListeningRef.current) return;
     stopListening();
 
     const spokenQuery = capturedTextRef.current.trim() || liveTranscript.trim();
 
-    // If Web Speech API captured text:
+    // 1. Direct Web Speech transcription
     if (spokenQuery.length > 1) {
       await executeQuery(spokenQuery);
       return;
     }
 
-    // Direct Audio Fallback: Process the background MediaRecorder audio blob through Gemini
+    // 2. Direct Hardware Audio Upload fallback (Zero-fail transcription via Gemini)
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       const recorder = mediaRecorderRef.current;
       recorder.onstop = async () => {
@@ -343,21 +410,20 @@ export default function GlobalJarvis({ profile, selectedDate, onActionCompleted,
         const audioBlob = new Blob(audioChunksRef.current, { type: mime });
         cleanupHardwareAudio();
 
-        if (audioBlob.size > 2000) {
+        if (audioBlob.size > 400) {
           try {
             setJarvisState('thinking');
             const res = await api.universalVoiceAudio(audioBlob, selectedDate);
             if (res.success && res.transcribedText) {
               await executeQuery(res.transcribedText);
             } else {
-              speakResponse("I couldn't hear clearly, Gokul. Could you please repeat that?");
+              speakResponse("I couldn't hear words clearly, Gokul. Could you please tap the mic and repeat?");
             }
           } catch {
             speakResponse("Pardon me, I had trouble processing that audio. Please speak again.");
           }
         } else {
           setJarvisState('idle');
-          if (isActiveRef.current) startListening();
         }
       };
 
@@ -366,7 +432,6 @@ export default function GlobalJarvis({ profile, selectedDate, onActionCompleted,
     }
 
     setJarvisState('idle');
-    if (isActiveRef.current) startListening();
   };
 
   const executeQuery = async (query) => {
@@ -374,24 +439,29 @@ export default function GlobalJarvis({ profile, selectedDate, onActionCompleted,
     setLiveTranscript(query);
 
     try {
-      // 1. Send query to AI Coach
       const res = await api.sendCoachMessage(query);
       if (res.success && res.message) {
-        // Also inform any mounted CoachChat to reload history
         window.dispatchEvent(new CustomEvent('agy-coach-chat-updated'));
         if (onActionCompleted) onActionCompleted();
         speakResponse(res.message.text);
       } else {
-        speakResponse("I have processed your request, sir. All parameters are updated.");
+        speakResponse("I have processed your query, sir. All parameters are updated.");
       }
     } catch (err) {
       speakResponse("Apologies, I encountered an issue connecting to the central mainframe: " + err.message);
     }
   };
 
-  const handleToggleJarvis = () => {
-    const next = !isActive;
-    setIsActive(next);
+  const handleToggleActive = () => {
+    setIsActive(prev => !prev);
+  };
+
+  const toggleCollapse = () => {
+    setIsCollapsed(prev => {
+      const next = !prev;
+      try { localStorage.setItem('agy_jarvis_collapsed', String(next)); } catch {}
+      return next;
+    });
   };
 
   // If user has not activated Jarvis, show a subtle floating activation beacon
@@ -399,7 +469,7 @@ export default function GlobalJarvis({ profile, selectedDate, onActionCompleted,
     return (
       <div className="fixed bottom-20 right-4 z-40 hidden sm:block">
         <button
-          onClick={handleToggleJarvis}
+          onClick={handleToggleActive}
           className="group relative flex items-center space-x-2 px-3.5 py-2 bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-cyan-400 border border-cyan-500/30 hover:border-cyan-400 rounded-full shadow-lg shadow-cyan-950/40 backdrop-blur-md transition-all duration-300 transform hover:scale-105 active:scale-95 cursor-pointer"
           title="Activate Persistent Jarvis Voice Assistant"
         >
@@ -413,84 +483,124 @@ export default function GlobalJarvis({ profile, selectedDate, onActionCompleted,
     );
   }
 
-  // Active Holographic Jarvis HUD (Floats across ALL tabs)
-  return (
-    <div className="fixed bottom-20 sm:bottom-6 right-3 sm:right-6 z-50 transition-all duration-300 max-w-sm w-[92vw] sm:w-96">
-      <div className="relative bg-gradient-to-br from-slate-950/95 via-slate-900/95 to-indigo-950/90 border border-cyan-500/50 rounded-2xl shadow-2xl shadow-cyan-950/60 backdrop-blur-xl p-3.5 text-white overflow-hidden">
-        {/* Top Glow Accent */}
-        <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-cyan-400 to-transparent animate-pulse" />
+  // COLLAPSED COMPACT PILL MODE (Zero clutter, perfectly minimal)
+  if (isCollapsed) {
+    return (
+      <div className="fixed bottom-20 sm:bottom-6 right-3 sm:right-6 z-50">
+        <div className="flex items-center space-x-2 px-3.5 py-2 bg-slate-950/95 border border-cyan-500/40 rounded-full shadow-2xl shadow-cyan-950/60 backdrop-blur-xl">
+          <div 
+            onClick={() => {
+              if (jarvisState === 'listening') finishListeningAndProcess();
+              else startListening();
+            }}
+            className="flex items-center space-x-2 cursor-pointer"
+          >
+            <span className={`w-2.5 h-2.5 rounded-full ${jarvisState === 'listening' ? 'bg-cyan-400 animate-ping' : jarvisState === 'speaking' ? 'bg-emerald-400 animate-pulse' : 'bg-cyan-500'}`} />
+            <span className="text-xs font-black tracking-wider text-cyan-300">JARVIS</span>
+          </div>
 
-        {/* Main Status Row */}
+          <div className="h-4 w-px bg-slate-800" />
+
+          {/* Quick Mic Action */}
+          <button
+            onClick={() => {
+              if (jarvisState === 'listening') finishListeningAndProcess();
+              else startListening();
+            }}
+            className={`p-1.5 rounded-full transition-all cursor-pointer ${
+              jarvisState === 'listening'
+                ? 'bg-cyan-500 text-slate-950 font-bold shadow-md shadow-cyan-500/50'
+                : 'bg-slate-800 hover:bg-slate-700 text-cyan-300'
+            }`}
+            title={jarvisState === 'listening' ? 'Send Query' : 'Speak to Jarvis'}
+          >
+            <Mic className="w-3.5 h-3.5" />
+          </button>
+
+          {/* Expand Button */}
+          <button
+            onClick={toggleCollapse}
+            className="p-1.5 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-all cursor-pointer"
+            title="Expand Jarvis HUD"
+          >
+            <ChevronUp className="w-3.5 h-3.5" />
+          </button>
+
+          {/* Close / Deactivate */}
+          <button
+            onClick={handleToggleActive}
+            className="p-1.5 rounded-full bg-slate-800 hover:bg-red-500/20 text-slate-400 hover:text-red-300 transition-all cursor-pointer"
+            title="Deactivate Jarvis"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // EXPANDED SPACIOUS HUD (Clean layout, generous padding, zero stuffing)
+  return (
+    <div className="fixed bottom-20 sm:bottom-6 right-3 sm:right-6 z-50 transition-all duration-300 max-w-sm w-[92vw] sm:w-[420px]">
+      <div className="relative bg-gradient-to-br from-slate-950/98 via-slate-900/98 to-indigo-950/95 border border-cyan-500/40 rounded-3xl shadow-2xl shadow-cyan-950/70 backdrop-blur-2xl p-4 sm:p-5 text-white overflow-hidden space-y-3.5">
+        
+        {/* Top Glow Bar */}
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-cyan-400 to-transparent" />
+
+        {/* Row 1: Header & Main Controls */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2.5">
-            {/* Pulsing Arc Reactor Orb */}
-            <div className="relative flex items-center justify-center">
-              <div 
-                className={`w-9 h-9 rounded-full flex items-center justify-center transition-all duration-300 ${
-                  jarvisState === 'listening'
-                    ? 'bg-cyan-500/20 text-cyan-300 ring-2 ring-cyan-400 shadow-lg shadow-cyan-500/50'
-                    : jarvisState === 'speaking'
-                      ? 'bg-emerald-500/20 text-emerald-300 ring-2 ring-emerald-400 shadow-lg shadow-emerald-500/50'
-                      : jarvisState === 'thinking'
-                        ? 'bg-purple-500/20 text-purple-300 ring-2 ring-purple-400 shadow-lg shadow-purple-500/50'
-                        : 'bg-slate-800 text-slate-400 ring-1 ring-slate-700'
-                }`}
-                style={{
-                  transform: jarvisState === 'listening' ? `scale(${1 + audioVolume * 0.003})` : 'scale(1)'
-                }}
-              >
-                {jarvisState === 'speaking' ? (
-                  <Volume2 className="w-5 h-5 animate-pulse" />
-                ) : jarvisState === 'thinking' ? (
-                  <Sparkles className="w-5 h-5 animate-spin" />
-                ) : (
-                  <Radio className={`w-5 h-5 ${jarvisState === 'listening' ? 'animate-pulse text-cyan-400' : ''}`} />
-                )}
-              </div>
-              {jarvisState === 'listening' && (
-                <span className="absolute -inset-1 rounded-full bg-cyan-400 opacity-25 animate-ping pointer-events-none" />
+          <div className="flex items-center space-x-3">
+            {/* Arc Reactor Orb */}
+            <div 
+              className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-all duration-300 ${
+                jarvisState === 'listening'
+                  ? 'bg-cyan-500/20 text-cyan-300 ring-2 ring-cyan-400 shadow-lg shadow-cyan-500/50 scale-105'
+                  : jarvisState === 'speaking'
+                    ? 'bg-emerald-500/20 text-emerald-300 ring-2 ring-emerald-400 shadow-lg shadow-emerald-500/50'
+                    : jarvisState === 'thinking'
+                      ? 'bg-purple-500/20 text-purple-300 ring-2 ring-purple-400 shadow-lg shadow-purple-500/50'
+                      : 'bg-slate-800/80 text-cyan-400 ring-1 ring-slate-700'
+              }`}
+            >
+              {jarvisState === 'speaking' ? (
+                <Volume2 className="w-5 h-5 animate-pulse" />
+              ) : jarvisState === 'thinking' ? (
+                <Sparkles className="w-5 h-5 animate-spin" />
+              ) : (
+                <Radio className={`w-5 h-5 ${jarvisState === 'listening' ? 'animate-pulse text-cyan-400' : ''}`} />
               )}
             </div>
 
             <div>
-              <div className="flex items-center space-x-1.5">
-                <span className="text-xs font-black tracking-wider text-cyan-300 uppercase">JARVIS AI</span>
-                <span className="text-[10px] px-1.5 py-0.2 bg-cyan-500/20 text-cyan-300 rounded border border-cyan-500/30 font-bold uppercase">
-                  Continuous Loop
+              <div className="flex items-center space-x-2">
+                <span className="text-sm font-black tracking-wider text-cyan-300">JARVIS AI</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-950/80 border border-cyan-500/40 text-cyan-300 font-bold uppercase">
+                  Online
                 </span>
               </div>
-              <div className="text-[11px] font-semibold text-slate-300 flex items-center space-x-1">
+              <div className="text-xs text-slate-400 flex items-center space-x-1.5 mt-0.5">
                 {jarvisState === 'listening' && (
-                  <>
-                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
-                    <span className="text-cyan-300">Listening to headset...</span>
-                  </>
+                  <span className="text-cyan-400 font-semibold animate-pulse">● Listening to mic...</span>
                 )}
                 {jarvisState === 'speaking' && (
-                  <>
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    <span className="text-emerald-300">Jarvis is Speaking...</span>
-                  </>
+                  <span className="text-emerald-400 font-semibold">● Jarvis is speaking...</span>
                 )}
                 {jarvisState === 'thinking' && (
-                  <>
-                    <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
-                    <span className="text-purple-300">Analyzing biological telemetry...</span>
-                  </>
+                  <span className="text-purple-400 font-semibold">● Processing request...</span>
                 )}
                 {jarvisState === 'idle' && (
-                  <span className="text-slate-400">Standby (Listening active)</span>
+                  <span>Ready • Tap mic to speak</span>
                 )}
               </div>
             </div>
           </div>
 
-          {/* Quick Action Controls */}
-          <div className="flex items-center space-x-1">
+          {/* Action Buttons Toolbar */}
+          <div className="flex items-center space-x-1.5">
             {jarvisState === 'speaking' && (
               <button
                 onClick={stopSpeaking}
-                className="p-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/40 text-xs transition-colors cursor-pointer"
+                className="p-2 rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/40 text-xs transition-colors cursor-pointer"
                 title="Mute Voice"
               >
                 <VolumeX className="w-4 h-4" />
@@ -498,44 +608,38 @@ export default function GlobalJarvis({ profile, selectedDate, onActionCompleted,
             )}
 
             <button
-              onClick={() => {
-                if (jarvisState === 'listening') {
-                  finishListeningAndProcess();
-                } else {
-                  startListening();
-                }
-              }}
-              className={`p-1.5 rounded-lg text-xs transition-all cursor-pointer ${
-                jarvisState === 'listening'
-                  ? 'bg-cyan-500 text-slate-950 font-bold shadow-md shadow-cyan-500/50'
-                  : 'bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700'
+              onClick={() => setShowSettings(!showSettings)}
+              className={`p-2 rounded-xl border text-xs transition-colors cursor-pointer ${
+                showSettings 
+                  ? 'bg-cyan-500/20 text-cyan-300 border-cyan-400' 
+                  : 'bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-slate-200 border-slate-700'
               }`}
-              title={jarvisState === 'listening' ? 'Send Query Now' : 'Tap to Speak'}
+              title="Voice & Microphone Settings"
             >
-              <Mic className="w-4 h-4" />
+              <Settings2 className="w-4 h-4" />
             </button>
 
             {onOpenCoach && (
               <button
                 onClick={onOpenCoach}
-                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-cyan-300 border border-slate-700 text-xs transition-colors cursor-pointer"
-                title="Open AI Coach Chat Tab"
+                className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-cyan-300 border border-slate-700 text-xs transition-colors cursor-pointer"
+                title="Open Full AI Coach Chat"
               >
                 <MessageSquare className="w-4 h-4" />
               </button>
             )}
 
             <button
-              onClick={() => setIsExpanded(prev => !prev)}
-              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition-colors cursor-pointer"
-              title={isExpanded ? 'Collapse' : 'Expand'}
+              onClick={toggleCollapse}
+              className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700 text-xs transition-colors cursor-pointer"
+              title="Collapse into Pill"
             >
-              {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+              <ChevronDown className="w-4 h-4" />
             </button>
 
             <button
-              onClick={handleToggleJarvis}
-              className="p-1.5 rounded-lg bg-slate-800 hover:bg-red-500/20 text-slate-400 hover:text-red-300 border border-slate-700 text-xs transition-colors cursor-pointer"
+              onClick={handleToggleActive}
+              className="p-2 rounded-xl bg-slate-800/80 hover:bg-red-500/20 text-slate-400 hover:text-red-300 border border-slate-700 text-xs transition-colors cursor-pointer"
               title="Deactivate Jarvis"
             >
               <X className="w-4 h-4" />
@@ -543,42 +647,139 @@ export default function GlobalJarvis({ profile, selectedDate, onActionCompleted,
           </div>
         </div>
 
-        {/* Live Audio Visualizer Bars (Pulses with Headset Volume) */}
-        {jarvisState === 'listening' && (
-          <div className="mt-2.5 pt-2 border-t border-slate-800/80 flex items-center justify-between">
-            <span className="text-[10px] text-cyan-400 font-mono tracking-wider">MIC INPUT ACTIVE</span>
-            <div className="flex items-center space-x-1">
-              {[0.4, 0.8, 1.2, 0.7, 1.0, 0.5, 0.9, 0.3].map((factor, idx) => {
-                const height = Math.max(3, Math.min(18, Math.round((audioVolume * factor * 0.4))));
-                return (
+        {/* SETTINGS PANEL: Voice & Input Microphone Pickers */}
+        {showSettings && (
+          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3.5 space-y-3">
+            {/* Input Device Selector */}
+            <div className="space-y-1">
+              <label className="text-[11px] font-black uppercase tracking-wider text-slate-400 flex items-center justify-between">
+                <span>🎙️ Microphone Device</span>
+                <span className="text-cyan-400">{audioDevices.length} Detected</span>
+              </label>
+              <select
+                value={selectedDeviceId}
+                onChange={(e) => {
+                  setSelectedDeviceId(e.target.value);
+                  try { localStorage.setItem('agy_selected_audio_device', e.target.value); } catch {}
+                  if (isListeningRef.current) {
+                    stopListening();
+                    setTimeout(() => startListening(), 200);
+                  }
+                }}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
+              >
+                {audioDevices.map(d => (
+                  <option key={d.deviceId} value={d.deviceId}>
+                    {d.label || `Microphone (${d.deviceId.slice(0, 8)})`}
+                  </option>
+                ))}
+                {audioDevices.length === 0 && (
+                  <option value="">Default System Microphone</option>
+                )}
+              </select>
+            </div>
+
+            {/* Voice Persona Selector (All Installed Voices) */}
+            <div className="space-y-1">
+              <label className="text-[11px] font-black uppercase tracking-wider text-slate-400 flex items-center justify-between">
+                <span>🔊 AI Spoken Voice</span>
+                <span className="text-cyan-400">{availableVoices.length} Available</span>
+              </label>
+              <div className="max-h-36 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
+                {availableVoices.map(v => (
                   <div
-                    key={idx}
-                    className="w-1 bg-cyan-400 rounded-full transition-all duration-75"
-                    style={{ height: `${height}px` }}
-                  />
-                );
-              })}
+                    key={v.name}
+                    className={`flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs transition-colors ${
+                      selectedVoiceName === v.name
+                        ? 'bg-cyan-950/60 text-cyan-200 border border-cyan-700/60'
+                        : 'bg-slate-950/60 text-slate-300 hover:bg-slate-800/60'
+                    }`}
+                  >
+                    <button
+                      onClick={() => {
+                        setSelectedVoiceName(v.name);
+                        try { localStorage.setItem('agy_selected_voice_name', v.name); } catch {}
+                      }}
+                      className="flex-1 text-left truncate mr-2 font-medium cursor-pointer"
+                    >
+                      {v.name} ({v.lang})
+                    </button>
+                    <button
+                      onClick={() => testVoiceSample(v)}
+                      className="p-1 rounded-lg bg-slate-800 hover:bg-cyan-500 hover:text-slate-950 text-cyan-300 text-[10px] flex items-center space-x-1 shrink-0 cursor-pointer transition-colors"
+                      title="Test Voice Sample"
+                    >
+                      <Play className="w-2.5 h-2.5" />
+                      <span>Test</span>
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         )}
 
-        {/* Live Spoken Query or Answer Preview */}
-        {(liveTranscript || lastJarvisReply || isExpanded) && (
-          <div className="mt-2 pt-2 border-t border-slate-800/80 space-y-1.5">
+        {/* Row 2: Live Mic Bar & Big Speak Button */}
+        <div className="flex items-center justify-between gap-3 bg-slate-900/60 border border-slate-800/80 rounded-2xl p-3">
+          <div className="flex-1 space-y-1">
+            <div className="flex items-center justify-between text-[11px]">
+              <span className="text-slate-400 font-bold uppercase tracking-wider">Microphone Input</span>
+              <span className={jarvisState === 'listening' ? 'text-cyan-400 font-bold' : 'text-slate-500'}>
+                {jarvisState === 'listening' ? `${audioVolume}% Level` : 'Standby'}
+              </span>
+            </div>
+            
+            {/* Visualizer Bar */}
+            <div className="w-full bg-slate-950 h-2 rounded-full overflow-hidden border border-slate-800">
+              <div
+                className={`h-full rounded-full transition-all duration-75 ${
+                  jarvisState === 'listening' 
+                    ? 'bg-gradient-to-r from-cyan-500 to-indigo-500' 
+                    : 'bg-slate-800'
+                }`}
+                style={{ width: `${jarvisState === 'listening' ? Math.max(8, audioVolume) : 0}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Primary Action Button */}
+          <button
+            onClick={() => {
+              if (jarvisState === 'listening') {
+                finishListeningAndProcess();
+              } else {
+                startListening();
+              }
+            }}
+            className={`px-4 py-2.5 rounded-xl font-black text-xs flex items-center space-x-2 transition-all cursor-pointer shadow-lg shrink-0 ${
+              jarvisState === 'listening'
+                ? 'bg-gradient-to-r from-cyan-400 to-cyan-500 text-slate-950 shadow-cyan-500/40 animate-pulse'
+                : 'bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-cyan-500/30 hover:border-cyan-400'
+            }`}
+          >
+            <Mic className="w-4 h-4" />
+            <span>{jarvisState === 'listening' ? 'Send Query' : 'Speak to Jarvis'}</span>
+          </button>
+        </div>
+
+        {/* Row 3: Transcript / Spoken Preview Area */}
+        {(liveTranscript || lastJarvisReply) && (
+          <div className="space-y-2 pt-1 border-t border-slate-800/80">
             {liveTranscript && (
-              <div className="text-xs text-slate-300 bg-slate-900/60 p-2 rounded-xl border border-slate-800">
-                <span className="text-[10px] font-bold text-cyan-400 block mb-0.5 uppercase tracking-wider">You:</span>
-                <p className="line-clamp-2">{liveTranscript}</p>
+              <div className="bg-slate-950/70 border border-cyan-500/20 p-2.5 rounded-xl text-xs space-y-0.5">
+                <span className="text-[10px] font-black uppercase tracking-wider text-cyan-400">You Said:</span>
+                <p className="text-slate-200 leading-relaxed">{liveTranscript}</p>
               </div>
             )}
-            {lastJarvisReply && !liveTranscript && (
-              <div className="text-xs text-slate-300 bg-slate-900/60 p-2 rounded-xl border border-slate-800">
-                <span className="text-[10px] font-bold text-emerald-400 block mb-0.5 uppercase tracking-wider">Jarvis:</span>
-                <p className={isExpanded ? '' : 'line-clamp-3'}>{lastJarvisReply}</p>
+            {lastJarvisReply && (
+              <div className="bg-slate-950/70 border border-emerald-500/20 p-2.5 rounded-xl text-xs space-y-0.5">
+                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400">Jarvis:</span>
+                <p className="text-slate-200 leading-relaxed max-h-24 overflow-y-auto">{lastJarvisReply}</p>
               </div>
             )}
           </div>
         )}
+
       </div>
     </div>
   );

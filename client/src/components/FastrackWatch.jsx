@@ -14,7 +14,8 @@ import {
   Sparkles,
   ShieldCheck,
   CheckCircle2,
-  Info
+  Info,
+  RotateCcw
 } from 'lucide-react';
 import { api } from '../api';
 import { watchAutoSync } from '../utils/watchAutoSync';
@@ -361,6 +362,39 @@ export default function FastrackWatch({ selectedDate, profile, currentUser }) {
       if (typeof window !== 'undefined' && window.showToast) {
         window.showToast('Failed to save watch reading: ' + err.message, 'error', 'Sync Error');
       }
+    } finally {
+      setIsSavingRealData(false);
+    }
+  };
+
+  const handleClearWatchReadings = async () => {
+    setIsSavingRealData(true);
+    try {
+      const payload = {
+        date: selectedDate,
+        deviceName: 'Reset / Cleared',
+        steps: 0,
+        activeCalories: 0,
+        distanceKm: 0,
+        avgHeartRate: null,
+        peakHeartRate: null,
+        sleepHours: null
+      };
+      const res = await api.syncFastrack(payload);
+      if (res.success) {
+        setFastrackLog(res.log);
+        setRealSteps('');
+        setRealHeartRate('');
+        setRealSleep('');
+        setLiveHeartRate(null);
+        const balanceRes = await api.getEnergyBalance(selectedDate);
+        setEnergyBalance(balanceRes.balance);
+        if (typeof window !== 'undefined' && window.showToast) {
+          window.showToast("Today's watch telemetry cleared successfully.", 'info', 'Metrics Reset');
+        }
+      }
+    } catch (e) {
+      console.warn('Reset error:', e);
     } finally {
       setIsSavingRealData(false);
     }
@@ -760,14 +794,27 @@ export default function FastrackWatch({ selectedDate, profile, currentUser }) {
             </div>
           </div>
 
-          <button
-            type="submit"
-            disabled={isSavingRealData}
-            className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-slate-950 font-extrabold rounded-2xl text-xs flex items-center justify-center space-x-2 transition-all shadow-md shadow-emerald-500/20"
-          >
-            <Check className="w-4 h-4" />
-            <span>{isSavingRealData ? 'Saving...' : "Save Real Watch Readings to Today's Log"}</span>
-          </button>
+          <div className="flex items-center space-x-2 pt-1">
+            <button
+              type="submit"
+              disabled={isSavingRealData}
+              className="flex-1 py-3 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-slate-950 font-extrabold rounded-2xl text-xs flex items-center justify-center space-x-2 transition-all shadow-md shadow-emerald-500/20 cursor-pointer"
+            >
+              <Check className="w-4 h-4" />
+              <span>{isSavingRealData ? 'Saving...' : "Save Real Watch Readings to Today's Log"}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleClearWatchReadings}
+              disabled={isSavingRealData}
+              className="px-4 py-3 bg-slate-950 hover:bg-red-500/15 border border-slate-800 hover:border-red-500/40 text-slate-400 hover:text-red-300 font-bold rounded-2xl text-xs flex items-center justify-center space-x-1.5 transition-all cursor-pointer"
+              title="Reset today's steps, heart rate, and active burn to zero"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Reset</span>
+            </button>
+          </div>
         </form>
       </div>
 

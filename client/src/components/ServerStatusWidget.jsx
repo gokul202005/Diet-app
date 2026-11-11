@@ -171,7 +171,9 @@ export default function ServerStatusWidget({ variant = 'pill', onOpenModal }) {
         title={`Render Cloud Server: ${badge.label} (diet-app-backend-udje.onrender.com)`}
       >
         <span className={`w-2 h-2 rounded-full ${badge.dotClass}`} />
-        <span className="inline font-bold">Render:</span>
+        <span className="inline font-bold">
+          {serverData?.serverType?.includes('Local') ? 'Local Backend:' : 'Render Cloud:'}
+        </span>
         <span className="capitalize">{badge.label}</span>
         {status === 'running' && latency !== null && (
           <span className="text-[9px] opacity-80 font-mono">({latency}ms)</span>
