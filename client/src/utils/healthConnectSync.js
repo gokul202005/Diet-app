@@ -241,19 +241,27 @@ class HealthConnectSyncEngine {
       });
 
       if (!res.ok) {
+        if (res.status === 401) {
+          // Access token expired! Clear cached token so user knows to reconnect
+          this.googleFitToken = null;
+          localStorage.removeItem(STORAGE_KEYS.GOOGLE_FIT_TOKEN);
+          this.notify({ googleFitConnected: false });
+          throw new Error('Google Fit login token expired. Please tap "Connect Google Fit" to refresh.');
+        }
         throw new Error(`Google Fit HTTP ${res.status}`);
       }
 
       const data = await res.json();
       return this.parseGoogleFitResponse(data);
     } catch (err) {
-      console.warn('[GoogleFit] API call failed, using hardware telemetry:', err.message);
+      console.warn('[GoogleFit] API call failed:', err.message);
       return {
         steps: this.stepCount,
         activeCalories: Math.round(this.stepCount * 0.04),
         avgHeartRate: 72,
         sleepHours: 7.0,
-        source: 'Health Connect (Hardware Fallback)'
+        source: 'Health Connect (Hardware Fallback)',
+        error: err.message
       };
     }
   }
@@ -265,20 +273,37 @@ class HealthConnectSyncEngine {
     let sleepHours = 7.0;
 
     try {
-      const bucket = data.bucket?.[0];
-      if (bucket && bucket.dataset) {
+      const buckets = data.bucket || [];
+      for (const bucket of buckets) {
+        if (!bucket.dataset) continue;
         for (const ds of bucket.dataset) {
-          const type = ds.dataSourceId || '';
-          if (type.includes('step_count')) {
-            steps = ds.point?.reduce((acc, pt) => acc + (pt.value?.[0]?.intVal || 0), 0) || 0;
+          const type = (ds.dataSourceId || '').toLowerCase();
+          
+          // Steps extraction (matches all Google Fit step data streams)
+          if (type.includes('step') || type.includes('delta')) {
+            const currentPointsSum = ds.point?.reduce((acc, pt) => {
+              const val = pt.value?.[0];
+              const count = val?.intVal !== undefined ? Number(val.intVal) : (val?.fpVal !== undefined ? Math.round(Number(val.fpVal)) : 0);
+              return acc + (isNaN(count) ? 0 : count);
+            }, 0) || 0;
+            steps = Math.max(steps, currentPointsSum);
           }
-          if (type.includes('calories')) {
-            calories = ds.point?.reduce((acc, pt) => acc + (pt.value?.[0]?.fpVal || 0), 0) || 0;
+
+          // Calories extraction
+          if (type.includes('calorie') || type.includes('expended')) {
+            const currentCalSum = ds.point?.reduce((acc, pt) => {
+              const val = pt.value?.[0];
+              const cal = val?.fpVal !== undefined ? Number(val.fpVal) : (val?.intVal !== undefined ? Number(val.intVal) : 0);
+              return acc + (isNaN(cal) ? 0 : cal);
+            }, 0) || 0;
+            calories = Math.max(calories, currentCalSum);
           }
-          if (type.includes('heart_rate')) {
-            const vals = ds.point?.map(pt => pt.value?.[0]?.fpVal).filter(Boolean) || [];
+
+          // Heart rate extraction
+          if (type.includes('heart') || type.includes('bpm')) {
+            const vals = ds.point?.map(pt => pt.value?.[0]?.fpVal || pt.value?.[0]?.intVal).filter(Boolean) || [];
             if (vals.length > 0) {
-              heartRate = Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
+              heartRate = Math.round(vals.reduce((a, b) => a + Number(b), 0) / vals.length);
             }
           }
         }
@@ -287,9 +312,10 @@ class HealthConnectSyncEngine {
       console.warn('[GoogleFit] Parsing error:', e);
     }
 
+    const finalSteps = Math.max(steps, this.stepCount);
     return {
-      steps: Math.max(steps, this.stepCount),
-      activeCalories: Math.round(calories) || Math.round(Math.max(steps, this.stepCount) * 0.04),
+      steps: finalSteps,
+      activeCalories: Math.round(calories) || Math.round(finalSteps * 0.04),
       avgHeartRate: heartRate || 72,
       sleepHours: Number(sleepHours.toFixed(1)),
       source: 'Android Health Connect / Google Fit'
