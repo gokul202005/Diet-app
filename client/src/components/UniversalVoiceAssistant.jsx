@@ -27,6 +27,13 @@ function normalizeFitnessSpeech(rawText) {
   if (!rawText || typeof rawText !== 'string') return '';
   let clean = rawText;
   const replacements = [
+    [/\bi hate\b/gi, 'I ate'],
+    [/\bi eight\b/gi, 'I ate'],
+    [/\beye ate\b/gi, 'I ate'],
+    [/\bsend for\b/gi, 'and 4'],
+    [/\bsend\b/gi, 'and'],
+    [/\band for\b/gi, 'and 4'],
+    [/\bfor boiled eggs?\b/gi, '4 boiled eggs'],
     [/\bfree eggs\b/gi, '3 eggs'],
     [/\bto eggs\b/gi, '2 eggs'],
     [/\bfor eggs\b/gi, '4 eggs'],
@@ -66,15 +73,15 @@ function normalizeFitnessSpeech(rawText) {
     [/\bhalf (?:a )?liter\b/gi, '500ml water'],
     [/\bone liter\b/gi, '1000ml water'],
     [/\btwo liters?\b/gi, '2000ml water'],
-    [/\bi 8\b|\bi ate\b/gi, 'i had'],
+    [/\bi 8\b/gi, 'I ate'],
     [/\b8374\b/gi, ''],
     [/(\b[|I]\b\s*){3,}/g, 'I ']
   ];
   for (const [pattern, rep] of replacements) {
     clean = clean.replace(pattern, rep);
   }
-  // Deduplicate accidental repeating phrases (e.g. "boiled eggs boiled eggs" -> "boiled eggs")
-  clean = clean.replace(/\b(\w+(?:\s+\w+)?)\s+\1\b/gi, '$1');
+  // Deduplicate immediate repeated words (e.g. "I I I" -> "I", "idli idli" -> "idli")
+  clean = clean.replace(/\b(\w+)(?:\s+\1\b)+/gi, '$1');
   return clean.replace(/\s+/g, ' ').trim();
 }
 
@@ -226,7 +233,7 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
         recognition.lang = speechLang || 'en-IN';
         recognition.maxAlternatives = 1;
 
-        let pastSessionsFinal = '';
+        let finalAccumulator = '';
 
         recognition.onstart = () => {
           setIsRecording(true);
@@ -236,37 +243,29 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
         };
 
         recognition.onresult = (event) => {
-          let currentSessionFinal = '';
-          let currentSessionInterim = '';
+          let interimTranscript = '';
 
-          // event.results contains the entire list of results for this recognition session
-          for (let i = 0; i < event.results.length; ++i) {
+          // Only process NEW results from event.resultIndex to prevent duplicate sentence compounding
+          for (let i = event.resultIndex; i < event.results.length; ++i) {
             const item = event.results[i];
             if (item.isFinal) {
-              currentSessionFinal += item[0].transcript + ' ';
+              const text = item[0].transcript.trim();
+              if (text && !finalAccumulator.endsWith(text)) {
+                finalAccumulator = (finalAccumulator + ' ' + text).trim();
+              }
             } else {
-              currentSessionInterim += item[0].transcript;
+              interimTranscript += item[0].transcript;
             }
           }
 
-          currentSessionFinal = currentSessionFinal.trim();
-          currentSessionInterim = currentSessionInterim.trim();
+          interimTranscript = interimTranscript.trim();
 
-          // Build clean, non-compounding final and interim text
-          const totalFinal = [pastSessionsFinal, currentSessionFinal]
-            .filter(Boolean)
-            .join(' ')
-            .replace(/\s+/g, ' ')
-            .trim();
+          const cleanFinal = normalizeFitnessSpeech(finalAccumulator);
+          const cleanInterim = normalizeFitnessSpeech(interimTranscript);
+          const fullDisplay = [cleanFinal, cleanInterim].filter(Boolean).join(' ').trim();
 
-          const fullDisplay = [totalFinal, currentSessionInterim]
-            .filter(Boolean)
-            .join(' ')
-            .replace(/\s+/g, ' ')
-            .trim();
-
-          setLiveFinalText(totalFinal);
-          setLiveInterimText(currentSessionInterim);
+          setLiveFinalText(cleanFinal);
+          setLiveInterimText(cleanInterim);
           setTranscript(fullDisplay);
           recognizedTextRef.current = fullDisplay;
         };
@@ -288,9 +287,6 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
         recognition.onend = () => {
           // If the user hasn't clicked stop and speech recognition times out, auto-restart to keep listening
           if (isRecordingRef.current) {
-            if (recognizedTextRef.current.trim()) {
-              pastSessionsFinal = recognizedTextRef.current.trim();
-            }
             try {
               recognition.start();
             } catch (e) {
