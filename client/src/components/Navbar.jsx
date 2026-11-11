@@ -37,15 +37,8 @@ export default function Navbar({
   onLogout
 }) {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const [canInstall, setCanInstall] = useState(false);
   const userMenuRef = useRef(null);
   const isToday = selectedDate === new Date().toISOString().split('T')[0];
-
-  useEffect(() => {
-    return pwaManager.subscribeToInstall((state) => {
-      setCanInstall(state.canInstall && !state.isInstalled);
-    });
-  }, []);
 
   // Close user dropdown when clicking outside
   useEffect(() => {
@@ -172,18 +165,6 @@ export default function Navbar({
               <div className="hidden lg:block">
                 <ServerStatusWidget variant="pill" />
               </div>
-
-              {/* Install App Quick Button (Visible when PWA install is ready) */}
-              {canInstall && (
-                <button
-                  onClick={() => pwaManager.promptInstall()}
-                  className="hidden sm:flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/40 rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer"
-                  title="Install App directly on your device"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Install App</span>
-                </button>
-              )}
 
               {/* Unified User Avatar & Dropdown Menu */}
               <div className="relative" ref={userMenuRef}>

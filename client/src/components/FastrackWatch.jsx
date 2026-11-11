@@ -1,20 +1,15 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Watch, 
   Activity, 
   Flame, 
   Heart, 
   Moon, 
-  Zap, 
   RefreshCw, 
   Bluetooth, 
   Check, 
-  ArrowRight,
-  TrendingDown,
-  TrendingUp,
-  Battery,
-  Radio,
-  AlertCircle,
+  Battery, 
+  Radio, 
   Smartphone,
   Sparkles,
   ShieldCheck,
@@ -27,7 +22,6 @@ import { healthConnectSync } from '../utils/healthConnectSync';
 export default function FastrackWatch({ selectedDate, profile }) {
   const [fastrackLog, setFastrackLog] = useState(null);
   const [energyBalance, setEnergyBalance] = useState(null);
-  const [loading, setLoading] = useState(true);
 
   // Connection & Live Stream State (Zero Fake Data)
   const [isBleConnected, setIsBleConnected] = useState(false);
@@ -48,14 +42,16 @@ export default function FastrackWatch({ selectedDate, profile }) {
   const [isHealthSyncing, setIsHealthSyncing] = useState(false);
   const [healthLastSync, setHealthLastSync] = useState(null);
   const [healthProvider, setHealthProvider] = useState('health_connect');
+  const [sensorSteps, setSensorSteps] = useState(0);
 
   // Subscribe to Automatic Health Connect Sync pulses
   useEffect(() => {
     const unsubHealth = healthConnectSync.subscribe((state) => {
-      setIsHealthConnectEnabled(state.isEnabled);
-      setIsHealthSyncing(state.isSyncing);
+      setIsHealthConnectEnabled(Boolean(state.isEnabled));
+      setIsHealthSyncing(Boolean(state.isSyncing));
       if (state.lastSyncTime) setHealthLastSync(state.lastSyncTime);
       if (state.provider) setHealthProvider(state.provider);
+      if (state.stepCount !== undefined) setSensorSteps(Number(state.stepCount) || 0);
       if (state.log) {
         setFastrackLog(state.log);
         setRealSteps(state.log.steps || 0);
@@ -381,12 +377,12 @@ export default function FastrackWatch({ selectedDate, profile }) {
               Your steps, active calories, sleep hours, and resting heart rate sync automatically in the background even if the app is closed. Compatible with Android Health Connect, Google Fit, Samsung Health, and Fastrack Reflex.
             </p>
 
-            {healthLastSync && (
+            {Boolean(healthLastSync) && !isNaN(new Date(healthLastSync).getTime()) && (
               <div className="flex items-center space-x-2 text-[11px] text-slate-400 pt-1">
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Last background sync: {new Date(healthLastSync).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+                <span>Last background sync: {new Date(healthLastSync).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                 <span className="text-slate-600">•</span>
-                <span className="text-emerald-400 font-semibold">{sensorSteps > 0 ? `${sensorSteps.toLocaleString()} sensor steps cached` : 'Live'}</span>
+                <span className="text-emerald-400 font-semibold">{Number(sensorSteps) > 0 ? `${Number(sensorSteps).toLocaleString()} sensor steps cached` : 'Live Provider Active'}</span>
               </div>
             )}
           </div>
