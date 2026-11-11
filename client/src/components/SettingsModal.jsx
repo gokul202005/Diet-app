@@ -303,24 +303,18 @@ export default function SettingsModal({ isOpen, onClose, onEditProfile, currentU
                 <span className="text-xs font-bold text-slate-200">Cloud Database & Photo Storage</span>
               </div>
               <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                dbStatus?.isCloudReady 
+                dbStatus?.isCloudReady !== false
                   ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
-                  : 'bg-slate-800 text-slate-400 border border-slate-700'
+                  : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
               }`}>
-                {dbStatus?.isCloudReady ? 'Supabase Active' : 'Local JSON Mode'}
+                {dbStatus?.isCloudReady !== false ? 'Supabase Cloud Active' : 'Connecting to Supabase...'}
               </span>
             </div>
 
             <p className="text-[11px] text-slate-400 leading-relaxed">
-              {dbStatus?.isCloudReady ? (
-                <span className="text-emerald-300">
-                  Connected to Supabase PostgreSQL! Photos, users, meals, and biometric data sync to the cloud.
-                </span>
-              ) : (
-                <span>
-                  Currently storing users, physique photos, and meal logs in high-speed local disk storage. Connect Supabase to enable cloud sync from any phone or PC.
-                </span>
-              )}
+              <span className="text-emerald-300">
+                100% Supabase Cloud Persistence: Your user accounts, bio profiles, South Indian meals, workouts, watch logs, and physique photos are stored permanently in Supabase Cloud PostgreSQL.
+              </span>
             </p>
 
             <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-800/60">

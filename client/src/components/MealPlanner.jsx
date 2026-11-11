@@ -28,38 +28,21 @@ export default function MealPlanner({ profile, selectedDate, onPlanLogged }) {
   const [isLoggingAll, setIsLoggingAll] = useState(false);
   const [loggedSuccess, setLoggedSuccess] = useState(false);
 
-  // Load saved meal plan on mount
+  // Load saved meal plan on mount from database
   useEffect(() => {
     const loadSavedPlan = async () => {
-      // 1. Check localStorage first for instant 0ms restoration
-      try {
-        const cached = localStorage.getItem('antigravity_saved_meal_plan');
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          if (parsed && parsed.days && parsed.days.length > 0) {
-            setGeneratedPlan(parsed);
-            if (parsed.preference) setPreference(parsed.preference);
-            if (parsed.days?.length) setDaysCount(parsed.days.length);
-            return;
-          }
-        }
-      } catch (e) {}
-
-      // 2. Check backend for persisted plan
+      // 1. Fetch cloud-persisted plan from Supabase backend
       try {
         const res = await api.getSavedMealPlan();
         if (res.success && res.plan && res.plan.days && res.plan.days.length > 0) {
           setGeneratedPlan(res.plan);
           if (res.plan.preference) setPreference(res.plan.preference);
           if (res.plan.days?.length) setDaysCount(res.plan.days.length);
-          try {
-            localStorage.setItem('antigravity_saved_meal_plan', JSON.stringify(res.plan));
-          } catch (e2) {}
           return;
         }
       } catch (e) {}
 
-      // 3. If no plan has ever been generated, generate fresh
+      // 2. If no plan has ever been generated, generate fresh
       handleGeneratePlan('south_indian_mixed', 7, true);
     };
 
@@ -81,9 +64,6 @@ export default function MealPlanner({ profile, selectedDate, onPlanLogged }) {
       if (res.success && res.plan) {
         setGeneratedPlan(res.plan);
         setSelectedDayIdx(0);
-        try {
-          localStorage.setItem('antigravity_saved_meal_plan', JSON.stringify(res.plan));
-        } catch (e) {}
         if (forceFresh && typeof window !== 'undefined' && window.showToast) {
           window.showToast('Fresh South Indian weekly menu generated with varied dishes!', 'success', 'New Menu Ready');
         }
@@ -139,9 +119,6 @@ export default function MealPlanner({ profile, selectedDate, onPlanLogged }) {
         };
 
         setGeneratedPlan(updatedPlan);
-        try {
-          localStorage.setItem('antigravity_saved_meal_plan', JSON.stringify(updatedPlan));
-        } catch (e) {}
         api.saveMealPlan(updatedPlan).catch(() => {});
 
         if (typeof window !== 'undefined' && window.showToast) {

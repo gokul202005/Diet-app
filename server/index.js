@@ -24,7 +24,14 @@ import {
   deleteMealFromSupabase,
   syncWorkoutToSupabase,
   deleteWorkoutFromSupabase,
-  syncWatchLogToSupabase
+  syncWatchLogToSupabase,
+  fetchMealsFromSupabase,
+  fetchWorkoutsFromSupabase,
+  fetchWatchLogFromSupabase,
+  syncWaterLogToSupabase,
+  syncWeightLogToSupabase,
+  syncMealPlanToSupabase,
+  fetchMealPlanFromSupabase
 } from './services/supabaseService.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -604,12 +611,25 @@ app.get('/api/nutrition-db/search', (req, res) => {
 });
 
 // --- DIET & MEAL TRACKING ---
-app.get('/api/meals', (req, res) => {
+app.get('/api/meals', async (req, res) => {
   const db = readDB();
   const userId = getAuthUserId(req, db);
   const userProfile = getUserProfile(db, userId);
   const date = req.query.date || new Date().toISOString().split('T')[0];
-  const mealsForDate = (db.meals || []).filter(m => (!m.userId || m.userId === userId) && m.date === date);
+
+  let mealsForDate = null;
+  if (isSupabaseReady()) {
+    try {
+      const cloudMeals = await fetchMealsFromSupabase(userId, date);
+      if (Array.isArray(cloudMeals) && cloudMeals.length > 0) {
+        mealsForDate = cloudMeals;
+      }
+    } catch (e) {}
+  }
+
+  if (!mealsForDate) {
+    mealsForDate = (db.meals || []).filter(m => (!m.userId || m.userId === userId) && m.date === date);
+  }
 
   // Daily totals
   const totals = mealsForDate.reduce((acc, m) => {
@@ -1284,18 +1304,36 @@ app.post('/api/ai/universal-voice-audio', upload.single('audio'), async (req, re
   }
 });
 
-app.get('/api/ai/saved-meal-plan', (req, res) => {
+app.get('/api/ai/saved-meal-plan', async (req, res) => {
   const db = readDB();
-  res.json({ success: true, plan: db.savedMealPlan || null });
+  const userId = getAuthUserId(req, db);
+  let plan = null;
+  if (isSupabaseReady()) {
+    try {
+      plan = await fetchMealPlanFromSupabase(userId);
+    } catch (e) {}
+  }
+  if (!plan) {
+    plan = db.savedMealPlan || null;
+  }
+  res.json({ success: true, plan });
 });
 
-app.post('/api/ai/save-meal-plan', (req, res) => {
+app.post('/api/ai/save-meal-plan', async (req, res) => {
   try {
     const { plan } = req.body;
     if (!plan) return res.status(400).json({ error: 'Plan is required' });
     const db = readDB();
+    const userId = getAuthUserId(req, db);
     db.savedMealPlan = plan;
     writeDB(db);
+
+    if (isSupabaseReady()) {
+      try {
+        await syncMealPlanToSupabase(userId, plan);
+      } catch (e) {}
+    }
+
     res.json({ success: true, message: 'Meal plan saved successfully' });
   } catch (err) {
     res.status(500).json({ error: 'Failed to save meal plan', details: err.message });
@@ -1316,8 +1354,14 @@ app.post('/api/ai/generate-meal-plan', async (req, res) => {
       seed
     });
 
-    // Persist saved meal plan
+    // Persist saved meal plan to local memory & Supabase PostgreSQL
     db.savedMealPlan = plan;
+
+    if (isSupabaseReady()) {
+      try {
+        await syncMealPlanToSupabase(userId, plan);
+      } catch (e) {}
+    }
 
     // Track usage
     if (db.settings?.tokenUsage) {
@@ -1351,13 +1395,26 @@ app.post('/api/ai/swap-meal', (req, res) => {
 });
 
 // --- WORKOUT TRACKING & AI PLAN ANALYZER ---
-app.get('/api/workouts', (req, res) => {
+app.get('/api/workouts', async (req, res) => {
   const db = readDB();
   const userId = getAuthUserId(req, db);
   const date = req.query.date;
-  let workouts = (db.workouts || []).filter(w => !w.userId || w.userId === userId);
-  if (date) {
-    workouts = workouts.filter(w => w.date === date);
+
+  let workouts = null;
+  if (isSupabaseReady()) {
+    try {
+      const cloudWorkouts = await fetchWorkoutsFromSupabase(userId, date);
+      if (Array.isArray(cloudWorkouts) && cloudWorkouts.length > 0) {
+        workouts = cloudWorkouts;
+      }
+    } catch (e) {}
+  }
+
+  if (!workouts) {
+    workouts = (db.workouts || []).filter(w => !w.userId || w.userId === userId);
+    if (date) {
+      workouts = workouts.filter(w => w.date === date);
+    }
   }
   res.json({ workouts });
 });
@@ -1523,7 +1580,7 @@ app.post('/api/ai/analyze-workout-plan', async (req, res) => {
 });
 
 // --- FASTRACK SMARTWATCH SYNC & METRICS ---
-app.get('/api/fastrack/summary', (req, res) => {
+app.get('/api/fastrack/summary', async (req, res) => {
   const db = readDB();
   const userId = getAuthUserId(req, db);
   const userProfile = getUserProfile(db, userId);
@@ -1535,7 +1592,14 @@ app.get('/api/fastrack/summary', (req, res) => {
     userProfile.gender || 'male'
   );
 
-  const log = (db.fastrackLogs || []).find(l => (!l.userId || l.userId === userId) && l.date === date) || {
+  let cloudLog = null;
+  if (isSupabaseReady()) {
+    try {
+      cloudLog = await fetchWatchLogFromSupabase(userId, date);
+    } catch (e) {}
+  }
+
+  const defaultLog = {
     date,
     userId,
     deviceName: db.settings?.fastrackDeviceName || 'Fastrack Smartwatch',
@@ -1549,6 +1613,9 @@ app.get('/api/fastrack/summary', (req, res) => {
     sleepHours: 0,
     syncedAt: null
   };
+
+  const localLog = (db.fastrackLogs || []).find(l => (!l.userId || l.userId === userId) && l.date === date);
+  const log = cloudLog || localLog || defaultLog;
 
   res.json({ success: true, log });
 });
@@ -1726,6 +1793,10 @@ app.post('/api/water/log', (req, res) => {
   }
 
   writeDB(db);
+  if (isSupabaseReady()) {
+    const totalMl = existing ? existing.amountMl : Math.max(0, Number(amountMl));
+    syncWaterLogToSupabase(userId, date, Math.round(totalMl / 250), totalMl).catch(() => {});
+  }
   res.json({ success: true, water: existing || { date, amountMl } });
 });
 
@@ -1761,6 +1832,9 @@ app.post('/api/weight/log', (req, res) => {
   }
 
   writeDB(db);
+  if (isSupabaseReady()) {
+    syncWeightLogToSupabase(userId, date, numWeight).catch(() => {});
+  }
   res.json({ success: true, currentWeight: numWeight, profile: userProfile });
 });
 
