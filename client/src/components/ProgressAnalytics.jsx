@@ -58,7 +58,8 @@ export default function ProgressAnalytics({ profile, selectedDate, onProfileUpda
   const [dayCheckinNotes, setDayCheckinNotes] = useState('');
   const [dayPhotos, setDayPhotos] = useState({
     front: null,
-    side: null,
+    left_side: null,
+    right_side: null,
     back: null
   });
   const [isSubmittingDay, setIsSubmittingDay] = useState(false);
@@ -223,12 +224,13 @@ export default function ProgressAnalytics({ profile, selectedDate, onProfileUpda
   const handleSaveDayCheckin = async () => {
     const photoList = [];
     if (dayPhotos.front) photoList.push({ pose: 'front', photoUrl: dayPhotos.front });
-    if (dayPhotos.side) photoList.push({ pose: 'side', photoUrl: dayPhotos.side });
+    if (dayPhotos.left_side) photoList.push({ pose: 'left_side', photoUrl: dayPhotos.left_side });
+    if (dayPhotos.right_side) photoList.push({ pose: 'right_side', photoUrl: dayPhotos.right_side });
     if (dayPhotos.back) photoList.push({ pose: 'back', photoUrl: dayPhotos.back });
 
     if (photoList.length === 0) {
       if (typeof window !== 'undefined' && window.showToast) {
-        window.showToast('Please snap or choose at least one photo (e.g. Front or Side pose)', 'warning', 'No Photos');
+        window.showToast('Please snap or choose at least one photo (e.g. Front, Left Side, Right Side, or Back pose)', 'warning', 'No Photos');
       }
       return;
     }
@@ -246,7 +248,7 @@ export default function ProgressAnalytics({ profile, selectedDate, onProfileUpda
       const res = await api.saveDayCheckin(payload);
       if (res.success) {
         setIsAddingPhoto(false);
-        setDayPhotos({ front: null, side: null, back: null });
+        setDayPhotos({ front: null, left_side: null, right_side: null, back: null });
         setDayCheckinNotes('');
         if (typeof window !== 'undefined' && window.showToast) {
           window.showToast(`Saved Day Check-In with ${res.savedCount || photoList.length} photos for ${payload.date}!`, 'success', 'Check-In Saved');
@@ -320,6 +322,41 @@ export default function ProgressAnalytics({ profile, selectedDate, onProfileUpda
 
   const selectedBeforePhoto = photos.find(p => p.id === beforePhotoId) || photos[photos.length - 1];
   const selectedAfterPhoto = photos.find(p => p.id === afterPhotoId) || photos[0];
+
+  const formatPoseLabel = (pose) => {
+    if (!pose) return 'Photo';
+    const clean = String(pose).toLowerCase().replace(/_/g, ' ');
+    if (clean === 'front') return 'Front Pose';
+    if (clean === 'left side' || clean === 'left') return 'Left Side';
+    if (clean === 'right side' || clean === 'right') return 'Right Side';
+    if (clean === 'side') return 'Side Profile';
+    if (clean === 'back') return 'Back Pose';
+    return clean.toUpperCase();
+  };
+
+  const getPoseBadgeClasses = (pose) => {
+    const p = String(pose || '').toLowerCase();
+    if (p === 'front') return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
+    if (p === 'left_side' || p === 'left') return 'bg-teal-500/20 text-teal-300 border-teal-500/30';
+    if (p === 'right_side' || p === 'right') return 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30';
+    if (p === 'side') return 'bg-teal-500/20 text-teal-300 border-teal-500/30';
+    if (p === 'back') return 'bg-sky-500/20 text-sky-300 border-sky-500/30';
+    return 'bg-slate-800/80 text-slate-300 border-slate-700';
+  };
+
+  const filteredPhotos = useMemo(() => {
+    return photos.filter((p) => {
+      if (albumTagFilter === 'all') return true;
+      if (albumTagFilter === 'front') return p.pose === 'front';
+      if (albumTagFilter === 'left_side') return p.pose === 'left_side' || p.pose === 'left' || p.pose === 'side';
+      if (albumTagFilter === 'right_side') return p.pose === 'right_side' || p.pose === 'right';
+      if (albumTagFilter === 'back') return p.pose === 'back';
+      if (albumTagFilter === 'before') return p.type === 'before';
+      if (albumTagFilter === 'after') return p.type === 'after';
+      if (albumTagFilter === 'checkin') return p.type === 'checkin' || !p.type;
+      return true;
+    });
+  }, [photos, albumTagFilter]);
 
   return (
     <div className="space-y-6 pb-20">
@@ -697,24 +734,29 @@ export default function ProgressAnalytics({ profile, selectedDate, onProfileUpda
               />
             </div>
 
-            {/* 3 Pose Slots (Front, Side, Back) for this Day */}
+            {/* 4 Pose Slots (Front, Left Side, Right Side, Back) for this Day */}
             <div>
-              <label className="block text-[11px] font-bold text-slate-300 mb-2">
-                Pose Photos for this Day (Snap or upload each angle):
-              </label>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-[11px] font-bold text-slate-300">
+                  Pose Angles for this Day Check-In (Snap or upload each angle):
+                </label>
+                <span className="text-[10px] text-slate-500 font-medium">
+                  {['front', 'left_side', 'right_side', 'back'].filter(s => dayPhotos[s]).length} of 4 angles snapped
+                </span>
+              </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 
                 {/* SLOT 1: FRONT POSE */}
-                <div className={`p-3.5 rounded-2xl border transition-all ${
+                <div className={`p-3 rounded-2xl border transition-all ${
                   dayPhotos.front 
                     ? 'bg-slate-900/90 border-emerald-500/50 shadow-md shadow-emerald-500/10' 
                     : 'bg-slate-900/40 border-slate-800 border-dashed hover:border-slate-700'
                 }`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-black uppercase text-emerald-400 flex items-center space-x-1.5">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[11px] font-black uppercase text-emerald-400 flex items-center space-x-1">
                       <span>Front Pose</span>
-                      {dayPhotos.front && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />}
+                      {dayPhotos.front && <CheckCircle2 className="w-3 h-3 text-emerald-400" />}
                     </span>
                     {dayPhotos.front && (
                       <button
@@ -726,6 +768,7 @@ export default function ProgressAnalytics({ profile, selectedDate, onProfileUpda
                       </button>
                     )}
                   </div>
+                  <p className="text-[10px] text-slate-500 mb-2 truncate">Chest, Abs & Quads</p>
 
                   {dayPhotos.front ? (
                     <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-black/60 border border-slate-800 group">
@@ -741,20 +784,20 @@ export default function ProgressAnalytics({ profile, selectedDate, onProfileUpda
                       </div>
                     </div>
                   ) : (
-                    <div className="aspect-[3/4] rounded-xl flex flex-col items-center justify-center p-3 text-center space-y-2.5">
-                      <Camera className="w-8 h-8 text-slate-600 animate-pulse" />
+                    <div className="aspect-[3/4] rounded-xl flex flex-col items-center justify-center p-2 text-center space-y-2">
+                      <Camera className="w-6 h-6 text-slate-600 animate-pulse" />
                       <div className="space-y-1.5 w-full">
                         <button
                           type="button"
                           onClick={() => handleSnapCameraForSlot('front')}
-                          className="w-full py-1.5 px-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-[11px] font-black rounded-lg transition-all shadow-sm cursor-pointer flex items-center justify-center space-x-1"
+                          className="w-full py-1.5 px-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-[10px] font-black rounded-lg transition-all shadow-sm cursor-pointer flex items-center justify-center space-x-1"
                         >
                           <Camera className="w-3 h-3" />
                           <span>Snap Front</span>
                         </button>
-                        <label className="w-full py-1.5 px-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-bold rounded-lg transition-all border border-slate-700 cursor-pointer flex items-center justify-center space-x-1 block">
-                          <Upload className="w-3 h-3 text-slate-400" />
-                          <span>From Gallery</span>
+                        <label className="w-full py-1 px-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold rounded-lg transition-all border border-slate-700 cursor-pointer flex items-center justify-center space-x-1 block">
+                          <Upload className="w-2.5 h-2.5 text-slate-400" />
+                          <span>Gallery</span>
                           <input
                             type="file"
                             accept="image/*"
@@ -767,60 +810,61 @@ export default function ProgressAnalytics({ profile, selectedDate, onProfileUpda
                   )}
                 </div>
 
-                {/* SLOT 2: SIDE PROFILE */}
-                <div className={`p-3.5 rounded-2xl border transition-all ${
-                  dayPhotos.side 
-                    ? 'bg-slate-900/90 border-emerald-500/50 shadow-md shadow-emerald-500/10' 
+                {/* SLOT 2: LEFT SIDE PROFILE */}
+                <div className={`p-3 rounded-2xl border transition-all ${
+                  dayPhotos.left_side 
+                    ? 'bg-slate-900/90 border-teal-500/50 shadow-md shadow-teal-500/10' 
                     : 'bg-slate-900/40 border-slate-800 border-dashed hover:border-slate-700'
                 }`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-black uppercase text-teal-400 flex items-center space-x-1.5">
-                      <span>Side Profile</span>
-                      {dayPhotos.side && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />}
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[11px] font-black uppercase text-teal-400 flex items-center space-x-1">
+                      <span>Left Side</span>
+                      {dayPhotos.left_side && <CheckCircle2 className="w-3 h-3 text-teal-400" />}
                     </span>
-                    {dayPhotos.side && (
+                    {dayPhotos.left_side && (
                       <button
                         type="button"
-                        onClick={() => handleClearSlot('side')}
+                        onClick={() => handleClearSlot('left_side')}
                         className="text-[10px] text-rose-400 hover:text-rose-300"
                       >
                         Remove
                       </button>
                     )}
                   </div>
+                  <p className="text-[10px] text-slate-500 mb-2 truncate">Left Torso & Lat</p>
 
-                  {dayPhotos.side ? (
+                  {dayPhotos.left_side ? (
                     <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-black/60 border border-slate-800 group">
-                      <img src={dayPhotos.side} alt="Side Profile" className="w-full h-full object-cover" />
+                      <img src={dayPhotos.left_side} alt="Left Side Profile" className="w-full h-full object-cover" />
                       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center space-x-2">
                         <button
                           type="button"
-                          onClick={() => handleSnapCameraForSlot('side')}
-                          className="px-2.5 py-1 bg-emerald-500 text-slate-950 rounded-lg text-[10px] font-bold cursor-pointer"
+                          onClick={() => handleSnapCameraForSlot('left_side')}
+                          className="px-2.5 py-1 bg-teal-400 text-slate-950 rounded-lg text-[10px] font-bold cursor-pointer"
                         >
                           Retake
                         </button>
                       </div>
                     </div>
                   ) : (
-                    <div className="aspect-[3/4] rounded-xl flex flex-col items-center justify-center p-3 text-center space-y-2.5">
-                      <Camera className="w-8 h-8 text-slate-600 animate-pulse" />
+                    <div className="aspect-[3/4] rounded-xl flex flex-col items-center justify-center p-2 text-center space-y-2">
+                      <Camera className="w-6 h-6 text-slate-600 animate-pulse" />
                       <div className="space-y-1.5 w-full">
                         <button
                           type="button"
-                          onClick={() => handleSnapCameraForSlot('side')}
-                          className="w-full py-1.5 px-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-[11px] font-black rounded-lg transition-all shadow-sm cursor-pointer flex items-center justify-center space-x-1"
+                          onClick={() => handleSnapCameraForSlot('left_side')}
+                          className="w-full py-1.5 px-2 bg-teal-500 hover:bg-teal-400 text-slate-950 text-[10px] font-black rounded-lg transition-all shadow-sm cursor-pointer flex items-center justify-center space-x-1"
                         >
                           <Camera className="w-3 h-3" />
-                          <span>Snap Side</span>
+                          <span>Snap Left</span>
                         </button>
-                        <label className="w-full py-1.5 px-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-bold rounded-lg transition-all border border-slate-700 cursor-pointer flex items-center justify-center space-x-1 block">
-                          <Upload className="w-3 h-3 text-slate-400" />
-                          <span>From Gallery</span>
+                        <label className="w-full py-1 px-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold rounded-lg transition-all border border-slate-700 cursor-pointer flex items-center justify-center space-x-1 block">
+                          <Upload className="w-2.5 h-2.5 text-slate-400" />
+                          <span>Gallery</span>
                           <input
                             type="file"
                             accept="image/*"
-                            onChange={(e) => handleSlotFileUpload('side', e)}
+                            onChange={(e) => handleSlotFileUpload('left_side', e)}
                             className="hidden"
                           />
                         </label>
@@ -829,16 +873,79 @@ export default function ProgressAnalytics({ profile, selectedDate, onProfileUpda
                   )}
                 </div>
 
-                {/* SLOT 3: BACK POSE (OPTIONAL) */}
-                <div className={`p-3.5 rounded-2xl border transition-all ${
-                  dayPhotos.back 
-                    ? 'bg-slate-900/90 border-emerald-500/50 shadow-md shadow-emerald-500/10' 
+                {/* SLOT 3: RIGHT SIDE PROFILE */}
+                <div className={`p-3 rounded-2xl border transition-all ${
+                  dayPhotos.right_side 
+                    ? 'bg-slate-900/90 border-cyan-500/50 shadow-md shadow-cyan-500/10' 
                     : 'bg-slate-900/40 border-slate-800 border-dashed hover:border-slate-700'
                 }`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-black uppercase text-sky-400 flex items-center space-x-1.5">
-                      <span>Back Pose (Opt)</span>
-                      {dayPhotos.back && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />}
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[11px] font-black uppercase text-cyan-400 flex items-center space-x-1">
+                      <span>Right Side</span>
+                      {dayPhotos.right_side && <CheckCircle2 className="w-3 h-3 text-cyan-400" />}
+                    </span>
+                    {dayPhotos.right_side && (
+                      <button
+                        type="button"
+                        onClick={() => handleClearSlot('right_side')}
+                        className="text-[10px] text-rose-400 hover:text-rose-300"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-slate-500 mb-2 truncate">Right Torso & Lat</p>
+
+                  {dayPhotos.right_side ? (
+                    <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-black/60 border border-slate-800 group">
+                      <img src={dayPhotos.right_side} alt="Right Side Profile" className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center space-x-2">
+                        <button
+                          type="button"
+                          onClick={() => handleSnapCameraForSlot('right_side')}
+                          className="px-2.5 py-1 bg-cyan-400 text-slate-950 rounded-lg text-[10px] font-bold cursor-pointer"
+                        >
+                          Retake
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="aspect-[3/4] rounded-xl flex flex-col items-center justify-center p-2 text-center space-y-2">
+                      <Camera className="w-6 h-6 text-slate-600 animate-pulse" />
+                      <div className="space-y-1.5 w-full">
+                        <button
+                          type="button"
+                          onClick={() => handleSnapCameraForSlot('right_side')}
+                          className="w-full py-1.5 px-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-[10px] font-black rounded-lg transition-all shadow-sm cursor-pointer flex items-center justify-center space-x-1"
+                        >
+                          <Camera className="w-3 h-3" />
+                          <span>Snap Right</span>
+                        </button>
+                        <label className="w-full py-1 px-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold rounded-lg transition-all border border-slate-700 cursor-pointer flex items-center justify-center space-x-1 block">
+                          <Upload className="w-2.5 h-2.5 text-slate-400" />
+                          <span>Gallery</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => handleSlotFileUpload('right_side', e)}
+                            className="hidden"
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* SLOT 4: BACK POSE */}
+                <div className={`p-3 rounded-2xl border transition-all ${
+                  dayPhotos.back 
+                    ? 'bg-slate-900/90 border-sky-500/50 shadow-md shadow-sky-500/10' 
+                    : 'bg-slate-900/40 border-slate-800 border-dashed hover:border-slate-700'
+                }`}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[11px] font-black uppercase text-sky-400 flex items-center space-x-1">
+                      <span>Back Pose</span>
+                      {dayPhotos.back && <CheckCircle2 className="w-3 h-3 text-sky-400" />}
                     </span>
                     {dayPhotos.back && (
                       <button
@@ -850,6 +957,7 @@ export default function ProgressAnalytics({ profile, selectedDate, onProfileUpda
                       </button>
                     )}
                   </div>
+                  <p className="text-[10px] text-slate-500 mb-2 truncate">Lats, Glutes & Hamstrings</p>
 
                   {dayPhotos.back ? (
                     <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-black/60 border border-slate-800 group">
@@ -858,27 +966,27 @@ export default function ProgressAnalytics({ profile, selectedDate, onProfileUpda
                         <button
                           type="button"
                           onClick={() => handleSnapCameraForSlot('back')}
-                          className="px-2.5 py-1 bg-emerald-500 text-slate-950 rounded-lg text-[10px] font-bold cursor-pointer"
+                          className="px-2.5 py-1 bg-sky-400 text-slate-950 rounded-lg text-[10px] font-bold cursor-pointer"
                         >
                           Retake
                         </button>
                       </div>
                     </div>
                   ) : (
-                    <div className="aspect-[3/4] rounded-xl flex flex-col items-center justify-center p-3 text-center space-y-2.5">
-                      <Camera className="w-8 h-8 text-slate-600 animate-pulse" />
+                    <div className="aspect-[3/4] rounded-xl flex flex-col items-center justify-center p-2 text-center space-y-2">
+                      <Camera className="w-6 h-6 text-slate-600 animate-pulse" />
                       <div className="space-y-1.5 w-full">
                         <button
                           type="button"
                           onClick={() => handleSnapCameraForSlot('back')}
-                          className="w-full py-1.5 px-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-[11px] font-black rounded-lg transition-all shadow-sm cursor-pointer flex items-center justify-center space-x-1"
+                          className="w-full py-1.5 px-2 bg-sky-500 hover:bg-sky-400 text-slate-950 text-[10px] font-black rounded-lg transition-all shadow-sm cursor-pointer flex items-center justify-center space-x-1"
                         >
                           <Camera className="w-3 h-3" />
                           <span>Snap Back</span>
                         </button>
-                        <label className="w-full py-1.5 px-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-bold rounded-lg transition-all border border-slate-700 cursor-pointer flex items-center justify-center space-x-1 block">
-                          <Upload className="w-3 h-3 text-slate-400" />
-                          <span>From Gallery</span>
+                        <label className="w-full py-1 px-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold rounded-lg transition-all border border-slate-700 cursor-pointer flex items-center justify-center space-x-1 block">
+                          <Upload className="w-2.5 h-2.5 text-slate-400" />
+                          <span>Gallery</span>
                           <input
                             type="file"
                             accept="image/*"
@@ -906,14 +1014,14 @@ export default function ProgressAnalytics({ profile, selectedDate, onProfileUpda
               <button
                 type="button"
                 onClick={handleSaveDayCheckin}
-                disabled={isSubmittingDay || (!dayPhotos.front && !dayPhotos.side && !dayPhotos.back)}
+                disabled={isSubmittingDay || (!dayPhotos.front && !dayPhotos.left_side && !dayPhotos.right_side && !dayPhotos.back)}
                 className="flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-slate-950 font-black text-xs rounded-xl transition-all shadow-md shadow-emerald-500/20 cursor-pointer flex items-center justify-center space-x-2"
               >
                 <CheckCircle2 className="w-4 h-4" />
                 <span>
                   {isSubmittingDay 
                     ? 'Saving Day Check-In...' 
-                    : `Save Day Check-In (${[dayPhotos.front, dayPhotos.side, dayPhotos.back].filter(Boolean).length} Photos)`
+                    : `Save Day Check-In (${[dayPhotos.front, dayPhotos.left_side, dayPhotos.right_side, dayPhotos.back].filter(Boolean).length} Photos)`
                   }
                 </span>
               </button>
@@ -941,83 +1049,228 @@ export default function ProgressAnalytics({ profile, selectedDate, onProfileUpda
             
             {/* Album Header & View Mode Switcher */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-950 p-3 rounded-2xl border border-slate-800">
-              {/* Category Filter Pills (Based on Day Check-in Sessions) */}
-              <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 sm:pb-0">
+              {/* Category Filter Pills */}
+              <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
                 <button
                   type="button"
-                  onClick={() => { setAlbumTagFilter('all'); setAlbumViewMode('album'); }}
+                  onClick={() => setAlbumTagFilter('all')}
                   className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
-                    albumViewMode === 'album' && albumTagFilter === 'all'
+                    albumTagFilter === 'all'
                       ? 'bg-emerald-500 text-slate-950 shadow-sm'
                       : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
                   }`}
                 >
-                  All Days ({daySessions.length})
+                  All Photos ({photos.length})
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setAlbumTagFilter('before'); setAlbumViewMode('album'); }}
+                  onClick={() => setAlbumTagFilter('front')}
                   className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
-                    albumViewMode === 'album' && albumTagFilter === 'before'
+                    albumTagFilter === 'front'
                       ? 'bg-emerald-500 text-slate-950 shadow-sm'
                       : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
                   }`}
                 >
-                  Baseline ({daySessions.filter(s => s.type === 'before').length})
+                  Front ({photos.filter(p => p.pose === 'front').length})
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setAlbumTagFilter('after'); setAlbumViewMode('album'); }}
+                  onClick={() => setAlbumTagFilter('left_side')}
                   className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
-                    albumViewMode === 'album' && albumTagFilter === 'after'
-                      ? 'bg-emerald-500 text-slate-950 shadow-sm'
+                    albumTagFilter === 'left_side'
+                      ? 'bg-teal-500 text-slate-950 shadow-sm'
                       : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
                   }`}
                 >
-                  Current ({daySessions.filter(s => s.type === 'after').length})
+                  Left Side ({photos.filter(p => p.pose === 'left_side' || p.pose === 'left' || p.pose === 'side').length})
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setAlbumTagFilter('checkin'); setAlbumViewMode('album'); }}
+                  onClick={() => setAlbumTagFilter('right_side')}
                   className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
-                    albumViewMode === 'album' && albumTagFilter === 'checkin'
-                      ? 'bg-emerald-500 text-slate-950 shadow-sm'
+                    albumTagFilter === 'right_side'
+                      ? 'bg-cyan-500 text-slate-950 shadow-sm'
                       : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
                   }`}
                 >
-                  Check-ins ({daySessions.filter(s => s.type === 'checkin' || !s.type).length})
+                  Right Side ({photos.filter(p => p.pose === 'right_side' || p.pose === 'right').length})
                 </button>
-              </div>
-
-              {/* View Mode Toggle: Grid Album vs Compare Slider */}
-              {photos.length >= 2 && (
-                <div className="flex items-center space-x-1 shrink-0 bg-slate-900 p-1 rounded-xl border border-slate-800 self-start sm:self-auto">
+                <button
+                  type="button"
+                  onClick={() => setAlbumTagFilter('back')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                    albumTagFilter === 'back'
+                      ? 'bg-sky-500 text-slate-950 shadow-sm'
+                      : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                  }`}
+                >
+                  Back ({photos.filter(p => p.pose === 'back').length})
+                </button>
+                {photos.some(p => p.type === 'before') && (
                   <button
                     type="button"
-                    onClick={() => setAlbumViewMode('album')}
-                    className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                      albumViewMode === 'album' ? 'bg-emerald-500 text-slate-950 shadow-sm' : 'text-slate-400 hover:text-white'
+                    onClick={() => setAlbumTagFilter('before')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                      albumTagFilter === 'before'
+                        ? 'bg-amber-400 text-slate-950 shadow-sm'
+                        : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
                     }`}
                   >
-                    <Grid className="w-3.5 h-3.5" />
-                    <span>Album Grid</span>
+                    Baseline ({photos.filter(p => p.type === 'before').length})
                   </button>
+                )}
+                {photos.some(p => p.type === 'after') && (
+                  <button
+                    type="button"
+                    onClick={() => setAlbumTagFilter('after')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                      albumTagFilter === 'after'
+                        ? 'bg-emerald-500 text-slate-950 shadow-sm'
+                        : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                    }`}
+                  >
+                    Current ({photos.filter(p => p.type === 'after').length})
+                  </button>
+                )}
+              </div>
+
+              {/* View Mode Toggle: Single Unified Album (Default) vs By Date vs Compare */}
+              <div className="flex items-center space-x-1 shrink-0 bg-slate-900 p-1 rounded-xl border border-slate-800 self-start sm:self-auto">
+                <button
+                  type="button"
+                  onClick={() => setAlbumViewMode('album')}
+                  className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    albumViewMode === 'album' ? 'bg-emerald-500 text-slate-950 shadow-sm' : 'text-slate-400 hover:text-white'
+                  }`}
+                  title="Single Unified Continuous Album Grid"
+                >
+                  <Grid className="w-3.5 h-3.5" />
+                  <span>Single Album</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAlbumViewMode('by-date')}
+                  className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    albumViewMode === 'by-date' ? 'bg-emerald-500 text-slate-950 shadow-sm' : 'text-slate-400 hover:text-white'
+                  }`}
+                  title="Grouped by Check-in Date"
+                >
+                  <Calendar className="w-3.5 h-3.5" />
+                  <span>By Date</span>
+                </button>
+                {photos.length >= 2 && (
                   <button
                     type="button"
                     onClick={() => setAlbumViewMode('compare')}
                     className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                       albumViewMode === 'compare' ? 'bg-emerald-500 text-slate-950 shadow-sm' : 'text-slate-400 hover:text-white'
                     }`}
+                    title="Split Before / After Compare Slider"
                   >
                     <Sliders className="w-3.5 h-3.5" />
                     <span>Compare</span>
                   </button>
-                </div>
-              )}
+                )}
+              </div>
             </div>
 
-            {/* VIEW MODE 1: COMPARE SPLIT SLIDER */}
-            {albumViewMode === 'compare' && photos.length >= 2 ? (
+            {/* VIEW MODE 1: SINGLE UNIFIED CONTINUOUS ALBUM GRID (DEFAULT) */}
+            {albumViewMode === 'album' && (
+              <div>
+                {filteredPhotos.length === 0 ? (
+                  <div className="text-center py-12 bg-slate-950/60 rounded-2xl border border-dashed border-slate-800">
+                    <p className="text-xs text-slate-500">No photos match the selected filter ({albumTagFilter}).</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3.5">
+                    {filteredPhotos.map((p) => {
+                      const isBaseline = p.type === 'before';
+                      const isCurrent = p.type === 'after';
+                      const badgeClasses = getPoseBadgeClasses(p.pose);
+
+                      return (
+                        <div
+                          key={p.id}
+                          onClick={() => setSelectedZoomPhoto(p)}
+                          className="group relative bg-slate-950 rounded-2xl overflow-hidden border border-slate-800/80 hover:border-emerald-500/50 aspect-[3/4] cursor-pointer shadow-lg hover:shadow-emerald-500/10 transition-all duration-200"
+                        >
+                          <img 
+                            src={api.resolvePhotoUrl(p.photoUrl)} 
+                            alt={`${p.date} - ${p.pose}`}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
+                            loading="lazy"
+                          />
+
+                          {/* Gradient Vignette for clear readability */}
+                          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-transparent to-slate-950/40 pointer-events-none" />
+
+                          {/* Top Badges */}
+                          <div className="absolute top-2 left-2 right-2 flex items-center justify-between pointer-events-none">
+                            <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider border backdrop-blur-md ${badgeClasses}`}>
+                              {formatPoseLabel(p.pose)}
+                            </span>
+
+                            {isBaseline && (
+                              <span className="px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30 backdrop-blur-md">
+                                Baseline
+                              </span>
+                            )}
+                            {isCurrent && (
+                              <span className="px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 backdrop-blur-md">
+                                Current
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Hover Actions (Top-right on hover) */}
+                          <div className="absolute top-2 right-2 flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setSelectedZoomPhoto(p); }}
+                              className="p-1.5 bg-black/80 hover:bg-black text-white rounded-lg cursor-pointer transition-all shadow-md"
+                              title="Inspect fullscreen"
+                            >
+                              <Maximize2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setPhotoToDelete(p); }}
+                              className="p-1.5 bg-rose-500/90 hover:bg-rose-600 text-white rounded-lg cursor-pointer transition-all shadow-md"
+                              title="Delete this photo"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+
+                          {/* Bottom Info Bar */}
+                          <div className="absolute bottom-2 left-2 right-2 pointer-events-none flex items-end justify-between">
+                            <div className="space-y-0.5">
+                              <span className="text-[11px] font-bold text-white block drop-shadow-sm">
+                                {p.date}
+                              </span>
+                              {p.notes && (
+                                <p className="text-[10px] text-slate-300 truncate max-w-[110px] drop-shadow-sm">
+                                  {p.notes}
+                                </p>
+                              )}
+                            </div>
+
+                            {p.weightKg && (
+                              <span className="px-1.5 py-0.5 rounded-md bg-slate-900/90 border border-slate-700/80 text-emerald-400 font-mono text-[10px] font-black backdrop-blur-sm">
+                                {p.weightKg} kg
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* VIEW MODE 2: COMPARE SPLIT SLIDER */}
+            {albumViewMode === 'compare' && photos.length >= 2 && (
               <div className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-950 p-3 rounded-2xl border border-slate-800">
                   <div>
@@ -1110,8 +1363,10 @@ export default function ProgressAnalytics({ profile, selectedDate, onProfileUpda
                   </div>
                 </div>
               </div>
-            ) : (
-              /* VIEW MODE 2: ORGANIZED BY DAY CHECK-IN SESSIONS */
+            )}
+
+            {/* VIEW MODE 3: ORGANIZED BY DAY CHECK-IN SESSIONS */}
+            {albumViewMode === 'by-date' && (
               <div className="space-y-6">
                 {daySessions
                   .filter((session) => {
@@ -1119,6 +1374,10 @@ export default function ProgressAnalytics({ profile, selectedDate, onProfileUpda
                     if (albumTagFilter === 'before') return session.type === 'before';
                     if (albumTagFilter === 'after') return session.type === 'after';
                     if (albumTagFilter === 'checkin') return session.type === 'checkin' || !session.type;
+                    if (albumTagFilter === 'front') return session.photos.some(p => p.pose === 'front');
+                    if (albumTagFilter === 'left_side') return session.photos.some(p => p.pose === 'left_side' || p.pose === 'left' || p.pose === 'side');
+                    if (albumTagFilter === 'right_side') return session.photos.some(p => p.pose === 'right_side' || p.pose === 'right');
+                    if (albumTagFilter === 'back') return session.photos.some(p => p.pose === 'back');
                     return true;
                   })
                   .map((session) => {
@@ -1155,7 +1414,7 @@ export default function ProgressAnalytics({ profile, selectedDate, onProfileUpda
                             )}
 
                             <span className="text-[11px] text-slate-500">
-                              • {session.photos.length} {session.photos.length === 1 ? 'pose' : 'poses'} ({session.photos.map(p => p.pose || 'pose').join(', ')})
+                              • {session.photos.length} {session.photos.length === 1 ? 'pose' : 'poses'} ({session.photos.map(p => formatPoseLabel(p.pose)).join(', ')})
                             </span>
                           </div>
 
@@ -1171,7 +1430,7 @@ export default function ProgressAnalytics({ profile, selectedDate, onProfileUpda
                         </div>
 
                         {/* Poses Side-by-Side Grid for this Date */}
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
                           {session.photos.map((p) => (
                             <div
                               key={p.id}
@@ -1186,8 +1445,8 @@ export default function ProgressAnalytics({ profile, selectedDate, onProfileUpda
 
                               {/* Top Pose Badge */}
                               <div className="absolute top-2.5 left-2.5 flex items-center space-x-1.5 pointer-events-none">
-                                <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-slate-950/85 backdrop-blur-md text-emerald-400 border border-emerald-500/30">
-                                  {p.pose ? `${p.pose.toUpperCase()} POSE` : 'PHOTO'}
+                                <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider border backdrop-blur-md ${getPoseBadgeClasses(p.pose)}`}>
+                                  {formatPoseLabel(p.pose)}
                                 </span>
                               </div>
 
@@ -1331,7 +1590,7 @@ export default function ProgressAnalytics({ profile, selectedDate, onProfileUpda
           setDayPhotos(prev => ({ ...prev, [activeSlotForCamera]: compressed }));
           setIsLiveCameraOpen(false);
         }}
-        title={`Snap ${activeSlotForCamera.toUpperCase()} Progress Photo`}
+        title={`Snap ${activeSlotForCamera.replace('_', ' ').toUpperCase()} Progress Photo`}
       />
 
     </div>

@@ -11,7 +11,7 @@ import { FastrackService } from './services/fastrackService.js';
 import { searchFoodDatabase } from './data/foodDatabase.js';
 import { calculateNutritionTargets } from './services/profileCalculator.js';
 import { uploadImageToOnlineStorage, deleteImageFromOnlineStorage } from './services/cloudStorage.js';
-import { isSupabaseReady, migrateLocalDataToSupabase, getSupabase } from './services/supabaseService.js';
+import { isSupabaseReady, migrateLocalDataToSupabase, getSupabase, getPhotosFromSupabase } from './services/supabaseService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1652,10 +1652,26 @@ app.get('/api/analytics/trends', (req, res) => {
 });
 
 // --- BEFORE / AFTER BODY PROGRESS PHOTO VAULT (ONLINE CLOUD STORAGE & BACKEND HOSTED) ---
-app.get('/api/progress/photos', (req, res) => {
+app.get('/api/progress/photos', async (req, res) => {
   const db = readDB();
   const userId = getAuthUserId(req, db);
-  const photos = (db.photoVault || []).filter(p => !p.userId || p.userId === userId);
+  let photos = (db.photoVault || []).filter(p => !p.userId || p.userId === userId);
+
+  if (isSupabaseReady()) {
+    try {
+      const cloudPhotos = await getPhotosFromSupabase(userId);
+      if (cloudPhotos && cloudPhotos.length > 0) {
+        const photoMap = new Map();
+        photos.forEach(p => photoMap.set(p.id, p));
+        cloudPhotos.forEach(p => photoMap.set(p.id, p));
+        photos = Array.from(photoMap.values());
+      }
+    } catch (e) {
+      console.warn('Error fetching photos from Supabase:', e.message);
+    }
+  }
+
+  photos.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
   res.json({ success: true, photos });
 });
 
@@ -1671,7 +1687,16 @@ app.post('/api/progress/photos', async (req, res) => {
     }
 
     const photoId = `photo-${Date.now()}`;
-    const savedUrl = await uploadImageToOnlineStorage(photoUrl, { userId, date, pose, id: photoId });
+    const effectiveWeight = weightKg ? parseFloat(weightKg) : (userProfile.weightKg || null);
+    const savedUrl = await uploadImageToOnlineStorage(photoUrl, { 
+      userId, 
+      date, 
+      pose, 
+      id: photoId, 
+      weightKg: effectiveWeight, 
+      notes, 
+      type 
+    });
 
     const newPhoto = {
       id: photoId,
@@ -1725,12 +1750,20 @@ app.post('/api/progress/day-checkin', async (req, res) => {
       const item = photos[index];
       if (item && item.photoUrl) {
         const photoId = `photo-${baseTime}-${index}`;
-        const savedUrl = await uploadImageToOnlineStorage(item.photoUrl, { userId, date, pose: item.pose || 'front', id: photoId });
+        const savedUrl = await uploadImageToOnlineStorage(item.photoUrl, { 
+          userId, 
+          date, 
+          pose: item.pose || 'front', 
+          id: photoId, 
+          weightKg: effectiveWeight, 
+          notes: item.notes || notes || '', 
+          type 
+        });
 
         // If user is updating the EXACT same pose for the SAME date, clean up the old file & replace
         const existingIdx = db.photoVault.findIndex(p => p.userId === userId && p.date === date && p.pose === (item.pose || 'front'));
         if (existingIdx !== -1) {
-          deleteImageFromOnlineStorage(db.photoVault[existingIdx].photoUrl);
+          deleteImageFromOnlineStorage(db.photoVault[existingIdx].photoUrl, db.photoVault[existingIdx].id);
           db.photoVault.splice(existingIdx, 1);
         }
 
@@ -1764,7 +1797,7 @@ app.delete('/api/progress/day/:date', (req, res) => {
   const userId = getAuthUserId(req, db);
   const targetDate = req.params.date;
   const toDelete = (db.photoVault || []).filter(p => p.date === targetDate && (!p.userId || p.userId === userId));
-  toDelete.forEach(p => deleteImageFromOnlineStorage(p.photoUrl));
+  toDelete.forEach(p => deleteImageFromOnlineStorage(p.photoUrl, p.id));
   db.photoVault = (db.photoVault || []).filter(p => p.date !== targetDate || (p.userId && p.userId !== userId));
   writeDB(db);
   res.json({ success: true, message: `All check-in photos for ${targetDate} deleted` });
@@ -1775,7 +1808,7 @@ app.delete('/api/progress/photos/:id', (req, res) => {
   const userId = getAuthUserId(req, db);
   const id = req.params.id;
   const toDelete = (db.photoVault || []).find(p => p.id === id && (!p.userId || p.userId === userId));
-  if (toDelete) deleteImageFromOnlineStorage(toDelete.photoUrl);
+  if (toDelete) deleteImageFromOnlineStorage(toDelete.photoUrl, toDelete.id);
   db.photoVault = (db.photoVault || []).filter(p => p.id !== id || (p.userId && p.userId !== userId));
   writeDB(db);
   res.json({ success: true, message: 'Photo deleted' });

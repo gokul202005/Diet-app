@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { isSupabaseReady, uploadPhotoToSupabase } from './supabaseService.js';
+import { isSupabaseReady, uploadPhotoToSupabase, deletePhotoFromSupabase } from './supabaseService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -15,14 +15,14 @@ if (!fs.existsSync(VAULT_UPLOADS_DIR)) {
  * Uploads a base64 or binary image to Supabase Storage or online CDN (Cloudinary / ImgBB)
  * or persists it on the server filesystem.
  */
-export async function uploadImageToOnlineStorage(photoUrl, { userId, date, pose, id }) {
+export async function uploadImageToOnlineStorage(photoUrl, { userId, date, pose, id, weightKg, notes, type }) {
   if (!photoUrl || typeof photoUrl !== 'string') return photoUrl;
   if (!photoUrl.startsWith('data:image/')) return photoUrl; // Already an online URL
 
   // 1. Check if Supabase Cloud Storage is configured
   if (isSupabaseReady()) {
     try {
-      const res = await uploadPhotoToSupabase(photoUrl, { userId, date, pose, id });
+      const res = await uploadPhotoToSupabase(photoUrl, { userId, date, pose, id, weightKg, notes, type });
       if (res?.publicUrl) {
         return res.publicUrl;
       }
@@ -96,8 +96,11 @@ export async function uploadImageToOnlineStorage(photoUrl, { userId, date, pose,
   }
 }
 
-export function deleteImageFromOnlineStorage(photoUrl) {
+export function deleteImageFromOnlineStorage(photoUrl, id) {
   if (!photoUrl || typeof photoUrl !== 'string') return;
+  if (isSupabaseReady()) {
+    deletePhotoFromSupabase({ photoUrl, id });
+  }
   if (photoUrl.startsWith('/uploads/vault/')) {
     try {
       const filename = path.basename(photoUrl);

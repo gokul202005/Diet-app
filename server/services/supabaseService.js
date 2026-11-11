@@ -10,10 +10,11 @@ const __dirname = path.dirname(__filename);
 
 dotenv.config({ path: path.join(__dirname, '../.env') });
 
-const SUPABASE_URL = process.env.SUPABASE_URL || '';
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://tfamtanfyqtungrypdkh.supabase.co';
 const SUPABASE_KEY = 
   process.env.SUPABASE_SECRET_KEY || 
   process.env.SUPABASE_SERVICE_ROLE_KEY || 
+  process.env.SUPABASE_KEY ||
   process.env.SUPABASE_ANON_KEY || 
   process.env.SUPABASE_PUBLISHABLE_KEY || 
   '';
@@ -41,9 +42,10 @@ export function getSupabase() {
 
 /**
  * Uploads a base64 or buffer photo directly into Supabase Storage ('physique_vault' bucket)
- * Returns the public URL of the uploaded image.
+ * AND records the metadata into the 'vault_photos' PostgreSQL table in Supabase.
+ * Returns { publicUrl, storagePath }.
  */
-export async function uploadPhotoToSupabase(imageData, { userId, date, pose, filename }) {
+export async function uploadPhotoToSupabase(imageData, { userId, date, pose, filename, id, photoId, weightKg, notes, type }) {
   if (!isSupabaseReady()) return null;
 
   try {
@@ -69,18 +71,20 @@ export async function uploadPhotoToSupabase(imageData, { userId, date, pose, fil
     const cleanUserId = userId ? String(userId).replace(/[^a-zA-Z0-9_-]/g, '_') : 'guest';
     const cleanDate = date || new Date().toISOString().split('T')[0];
     const timestamp = Date.now();
-    const finalFilename = filename || `${cleanDate}_${pose ? pose.replace(/\s+/g, '_').toLowerCase() : 'photo'}_${timestamp}.${ext}`;
+    const finalFilename = filename || `${cleanDate}_${pose ? String(pose).replace(/\s+/g, '_').toLowerCase() : 'photo'}_${timestamp}.${ext}`;
     const storagePath = `${cleanUserId}/${finalFilename}`;
+    const finalPhotoId = photoId || id || `photo-${cleanUserId}-${timestamp}`;
 
-    const { data, error } = await supabase.storage
+    // 1. Upload binary buffer to Supabase Storage ('physique_vault' bucket)
+    const { data: uploadData, error: uploadErr } = await supabase.storage
       .from('physique_vault')
       .upload(storagePath, buffer, {
         contentType,
         upsert: true
       });
 
-    if (error) {
-      console.warn('[Supabase Storage] Upload error:', error.message);
+    if (uploadErr) {
+      console.warn('[Supabase Storage] Upload error:', uploadErr.message);
       return null;
     }
 
@@ -88,12 +92,100 @@ export async function uploadPhotoToSupabase(imageData, { userId, date, pose, fil
       .from('physique_vault')
       .getPublicUrl(storagePath);
 
+    const publicUrl = publicData?.publicUrl || null;
+
+    // 2. Ensure foreign key exists in public.users table
+    try {
+      await supabase.from('users').upsert({
+        id: cleanUserId,
+        email: `${cleanUserId}@agyfit.local`,
+        name: 'Athlete',
+        provider: 'local'
+      }, { onConflict: 'id' });
+    } catch (e) {}
+
+    // 3. Save entry into Supabase 'vault_photos' table
+    try {
+      await supabase.from('vault_photos').upsert({
+        id: finalPhotoId,
+        user_id: cleanUserId,
+        date: cleanDate,
+        pose: pose || 'Front Pose',
+        photo_url: publicUrl,
+        storage_path: storagePath,
+        weight_kg: weightKg ? parseFloat(weightKg) : null,
+        notes: notes || '',
+        tags: [type || 'checkin', pose || 'front']
+      }, { onConflict: 'id' });
+    } catch (dbErr) {
+      console.warn('[Supabase vault_photos table] Record insertion note:', dbErr.message);
+    }
+
     return {
-      publicUrl: publicData?.publicUrl || null,
+      publicUrl,
       storagePath
     };
   } catch (err) {
     console.warn('[Supabase Storage] Exception during upload:', err.message);
+    return null;
+  }
+}
+
+/**
+ * Deletes a photo from Supabase Storage and vault_photos table
+ */
+export async function deletePhotoFromSupabase({ photoUrl, storagePath, id }) {
+  if (!isSupabaseReady()) return;
+  try {
+    if (id) {
+      await supabase.from('vault_photos').delete().eq('id', id);
+    }
+    if (storagePath) {
+      await supabase.storage.from('physique_vault').remove([storagePath]);
+    } else if (photoUrl && photoUrl.includes('/physique_vault/')) {
+      const parts = photoUrl.split('/physique_vault/');
+      if (parts[1]) {
+        const pathOnStorage = decodeURIComponent(parts[1].split('?')[0]);
+        await supabase.storage.from('physique_vault').remove([pathOnStorage]);
+      }
+    }
+  } catch (e) {
+    console.warn('[Supabase deletePhoto] Error:', e.message);
+  }
+}
+
+/**
+ * Retrieves user's progress photos from Supabase 'vault_photos' table
+ */
+export async function getPhotosFromSupabase(userId) {
+  if (!isSupabaseReady()) return null;
+  try {
+    const cleanUserId = userId ? String(userId).replace(/[^a-zA-Z0-9_-]/g, '_') : null;
+    let query = supabase.from('vault_photos').select('*').order('date', { ascending: false });
+    if (cleanUserId && cleanUserId !== 'guest') {
+      query = query.or(`user_id.eq.${cleanUserId},user_id.eq.guest`);
+    }
+    const { data, error } = await query;
+    if (error) {
+      console.warn('[Supabase getPhotos] Error:', error.message);
+      return null;
+    }
+    return (data || []).map(p => ({
+      id: p.id,
+      userId: p.user_id,
+      date: p.date,
+      pose: p.pose,
+      photoUrl: p.photo_url,
+      storagePath: p.storage_path,
+      weightKg: p.weight_kg,
+      notes: p.notes,
+      type: Array.isArray(p.tags) && p.tags.includes('before') 
+        ? 'before' 
+        : (Array.isArray(p.tags) && p.tags.includes('after') ? 'after' : 'checkin'),
+      createdAt: p.created_at
+    }));
+  } catch (err) {
+    console.warn('[Supabase getPhotos] Exception:', err.message);
     return null;
   }
 }
@@ -112,6 +204,7 @@ export async function migrateLocalDataToSupabase(localDb) {
     mealsMigrated: 0,
     workoutsMigrated: 0,
     watchLogsMigrated: 0,
+    photosMigrated: 0,
     errors: []
   };
 
@@ -230,6 +323,25 @@ export async function migrateLocalDataToSupabase(localDb) {
       }, { onConflict: 'user_id, date' });
       if (error) results.errors.push(`WatchLog ${wl.date}: ${error.message}`);
       else results.watchLogsMigrated++;
+    }
+
+    // 6. Migrate Progress Photos
+    const photos = localDb.photoVault || [];
+    for (const p of photos) {
+      if (!p.id || !p.photoUrl) continue;
+      const { error } = await supabase.from('vault_photos').upsert({
+        id: p.id,
+        user_id: p.userId || 'guest',
+        date: p.date || new Date().toISOString().split('T')[0],
+        pose: p.pose || 'front',
+        photo_url: p.photoUrl,
+        storage_path: p.storagePath || null,
+        weight_kg: p.weightKg ? parseFloat(p.weightKg) : null,
+        notes: p.notes || '',
+        tags: [p.type || 'checkin', p.pose || 'front']
+      }, { onConflict: 'id' });
+      if (error) results.errors.push(`Photo ${p.id}: ${error.message}`);
+      else results.photosMigrated++;
     }
 
     return {
