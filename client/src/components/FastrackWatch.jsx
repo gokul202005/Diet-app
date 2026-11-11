@@ -433,7 +433,7 @@ export default function FastrackWatch({ selectedDate, profile, currentUser }) {
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
                 <span>Last background sync: {new Date(healthLastSync).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                 <span className="text-slate-600">•</span>
-                <span className="text-emerald-400 font-semibold">{Number(sensorSteps) > 0 ? `${Number(sensorSteps).toLocaleString()} sensor steps cached` : 'Live Provider Active'}</span>
+                <span className="text-emerald-400 font-semibold">{isGoogleFitConnected ? 'Google Fit Live Streaming' : 'Ready to Sync'}</span>
               </div>
             )}
           </div>

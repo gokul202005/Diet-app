@@ -57,21 +57,25 @@ class HealthConnectSyncEngine {
       this.googleFitToken = (uid ? localStorage.getItem(`agy_google_fit_token_${uid}`) : null) || null;
       this.lastSyncTime = localStorage.getItem(STORAGE_KEYS.LAST_SYNC) || null;
 
-      // Restore daily hardware steps
+      // Restore daily hardware steps ONLY on real mobile phones (never on laptops/desktops where typing vibrates)
+      const isMobile = typeof navigator !== 'undefined' && /android|iphone|ipad|ipod/i.test(navigator.userAgent || '');
       const todayStr = new Date().toISOString().split('T')[0];
       const savedDate = localStorage.getItem(STORAGE_KEYS.LOCAL_STEPS_DATE);
-      if (savedDate === todayStr) {
+
+      if (isMobile && savedDate === todayStr) {
         this.stepCount = parseInt(localStorage.getItem(STORAGE_KEYS.LOCAL_STEPS_TODAY) || '0', 10);
       } else {
         this.stepCount = 0;
+        localStorage.removeItem(STORAGE_KEYS.LOCAL_STEPS_TODAY);
         localStorage.setItem(STORAGE_KEYS.LOCAL_STEPS_DATE, todayStr);
-        localStorage.setItem(STORAGE_KEYS.LOCAL_STEPS_TODAY, '0');
       }
 
       // If enabled, start background sync loops and motion sensors
       if (this.isEnabled) {
         this.startBackgroundSync();
-        this.startHardwarePedometer();
+        if (isMobile) {
+          this.startHardwarePedometer();
+        }
       }
     } catch (e) {
       console.warn('[HealthConnect] Storage initialization error:', e);
@@ -106,9 +110,11 @@ class HealthConnectSyncEngine {
     });
   }
 
-  // --- HARDWARE MOTION PEDOMETER (ZERO-SETUP WEB SENSOR) ---
+  // --- HARDWARE MOTION PEDOMETER (MOBILE SENSOR ONLY) ---
   startHardwarePedometer() {
     if (typeof window === 'undefined' || !window.DeviceMotionEvent) return;
+    const isMobile = typeof navigator !== 'undefined' && /android|iphone|ipad|ipod/i.test(navigator.userAgent || '');
+    if (!isMobile) return; // Never run pedometer on desktop/laptop keyboards!
 
     // Mobile Safari permission request if needed
     if (typeof DeviceMotionEvent.requestPermission === 'function') {
@@ -165,6 +171,13 @@ class HealthConnectSyncEngine {
         if (!customClientId) {
           customClientId = localStorage.getItem('agy_google_client_id') || '';
         }
+      } catch (e) {}
+    }
+
+    if (!customClientId) {
+      try {
+        const cfg = await api.getGoogleClientId();
+        if (cfg?.clientId) customClientId = cfg.clientId;
       } catch (e) {}
     }
 
@@ -253,14 +266,14 @@ class HealthConnectSyncEngine {
     const endTimeMillis = Date.now();
 
     if (!this.googleFitToken) {
-      // Return local hardware pedometer metrics + default sleep/HR
-      const activeCalories = Math.round(this.stepCount * 0.04);
       return {
-        steps: this.stepCount,
-        activeCalories,
-        avgHeartRate: this.stepCount > 1000 ? 74 : null,
-        sleepHours: 7.2,
-        source: 'Health Connect (Sensor Bridge)'
+        steps: this.stepCount || 0,
+        activeCalories: Math.round((this.stepCount || 0) * 0.04),
+        distanceKm: Number(((this.stepCount || 0) * 0.00075).toFixed(2)),
+        avgHeartRate: null,
+        sleepHours: null,
+        source: this.stepCount > 0 ? 'Mobile Pedometer' : 'Fastrack Hardware',
+        needsAuth: true
       };
     }
 
@@ -449,18 +462,17 @@ class HealthConnectSyncEngine {
       // 1. Query latest telemetry from Health Connect / Google Fit / Hardware Sensor
       const metrics = await this.fetchGoogleFitMetrics();
 
-      // If no Google Fit OAuth token and no hardware motion sensor steps have been detected,
-      // do not transmit an empty 0-step payload that overwrites the user's diary!
-      if (!this.googleFitToken && metrics.steps === 0) {
-        const msg = 'Google Fit authorization required. Tap "Authorize Google Fit" above to pull your live watch steps!';
+      // If no Google Fit OAuth token, do not transmit background telemetry that overwrites the user's diary
+      if (!this.googleFitToken) {
         this.notify({
           isSyncing: false,
-          needsOAuth: true
+          needsOAuth: true,
+          googleFitConnected: false
         });
         return { 
           success: false, 
           needsOAuth: true, 
-          error: msg 
+          error: 'Google Fit authorization required. Tap "Authorize Google Fit" above to pull your live watch steps!' 
         };
       }
 

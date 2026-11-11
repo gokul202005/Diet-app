@@ -442,6 +442,13 @@ app.get('/api/auth/me', (req, res) => {
   });
 });
 
+app.get('/api/auth/google-client-id', (req, res) => {
+  res.json({
+    success: true,
+    clientId: process.env.GOOGLE_CLIENT_ID || ''
+  });
+});
+
 app.post('/api/auth/logout', (req, res) => {
   const db = readDB();
   db.currentUser = null;
@@ -1597,6 +1604,11 @@ app.post('/api/fastrack/sync', (req, res) => {
   }
 
   writeDB(db);
+
+  if (isSupabaseReady()) {
+    syncWatchLogToSupabase(syncRecord).catch(() => {});
+  }
+
   res.json({ success: true, log: syncRecord });
 });
 
@@ -1619,8 +1631,8 @@ app.post('/api/fastrack/auto-sync', (req, res) => {
 
   const incomingSteps = req.body.steps !== undefined ? Number(req.body.steps) : null;
   const steps = (incomingSteps !== null && incomingSteps > 0) 
-    ? incomingSteps 
-    : (existing?.steps || incomingSteps || 0);
+    ? Math.max(existing?.steps || 0, incomingSteps) 
+    : (existing?.steps || 0);
 
   const incomingActive = req.body.activeCalories !== undefined ? Number(req.body.activeCalories) : null;
   const activeCalories = (incomingActive !== null && incomingActive > 0)

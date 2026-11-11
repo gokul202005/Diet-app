@@ -177,6 +177,9 @@ export const api = {
     }
     return safeFetch(`${BASE_URL}/auth/logout`, { method: 'POST' });
   },
+  getGoogleClientId: async () => {
+    return safeFetch(`${BASE_URL}/auth/google-client-id`);
+  },
 
   // Profile
   getProfile: async () => {
