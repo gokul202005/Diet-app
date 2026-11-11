@@ -19,7 +19,8 @@ import {
   Activity,
   Layers,
   ChevronDown,
-  Download
+  Download,
+  Shield
 } from 'lucide-react';
 import { pwaManager } from '../utils/pwaService';
 
@@ -68,6 +69,7 @@ export default function Navbar({
     { id: 'diet', label: 'Diet Tracker', icon: Utensils },
     { id: 'workouts', label: 'Workouts', icon: Dumbbell },
     { id: 'progress', label: 'Trends & Vault', icon: TrendingUp },
+    { id: 'hunter', label: 'Hunter Rank', icon: Shield },
     { id: 'planner', label: 'Meal Plan', icon: Sparkles },
     { id: 'fastrack', label: 'Fastrack', icon: Watch },
     { id: 'coach', label: 'AI Coach', icon: Bot },

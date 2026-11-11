@@ -1531,6 +1531,185 @@ app.get('/api/workouts/prs', (req, res) => {
   res.json({ success: true, prs });
 });
 
+// --- SOLO LEVELING HUNTER SYSTEM ---
+app.get('/api/hunter/stats', async (req, res) => {
+  const db = readDB();
+  const userId = getAuthUserId(req, db);
+  const profile = getUserProfile(db, userId);
+  const today = req.query.date || new Date().toISOString().split('T')[0];
+
+  // 1. Gather today's metrics
+  let meals = (db.meals || []).filter(m => (!m.userId || m.userId === userId) && m.date === today);
+  if (isSupabaseReady()) {
+    try {
+      const cloudMeals = await fetchMealsFromSupabase(userId, today);
+      if (Array.isArray(cloudMeals) && cloudMeals.length > 0) meals = cloudMeals;
+    } catch (e) {}
+  }
+
+  let workouts = (db.workouts || []).filter(w => (!w.userId || w.userId === userId) && w.date === today);
+  if (isSupabaseReady()) {
+    try {
+      const cloudWorkouts = await fetchWorkoutsFromSupabase(userId, today);
+      if (Array.isArray(cloudWorkouts) && cloudWorkouts.length > 0) workouts = cloudWorkouts;
+    } catch (e) {}
+  }
+
+  let watchLog = (db.fastrackLogs || []).find(l => (!l.userId || l.userId === userId) && l.date === today);
+  if (isSupabaseReady()) {
+    try {
+      const cloudWatch = await fetchWatchLogFromSupabase(userId, today);
+      if (cloudWatch) watchLog = cloudWatch;
+    } catch (e) {}
+  }
+
+  const todayCalories = meals.reduce((a, m) => a + (Number(m.totalCalories) || 0), 0);
+  const todayProtein = meals.reduce((a, m) => a + (Number(m.totalProtein) || 0), 0);
+  const todaySteps = Number(watchLog?.steps) || 0;
+  const todaySleep = Number(watchLog?.sleepHours) || 7.0;
+  const todayWorkoutSets = workouts.reduce((a, w) => a + ((w.sets || []).length || 3), 0);
+
+  // Lifetime user stats
+  if (!db.hunterProfiles) db.hunterProfiles = {};
+  if (!db.hunterProfiles[userId]) {
+    db.hunterProfiles[userId] = {
+      level: 1,
+      xp: 0,
+      totalQuestsCompleted: 0,
+      claimedQuests: {},
+      title: 'E-Rank Awakened Hunter'
+    };
+  }
+  const hProfile = db.hunterProfiles[userId];
+
+  // Calculate 5 Core Stats (Scaled 10 to 100)
+  const str = Math.min(100, Math.round(15 + (todayWorkoutSets * 3.5) + (hProfile.level * 1.5)));
+  const agi = Math.min(100, Math.round(15 + (todaySteps / 200) + (hProfile.level * 1.2)));
+  const vit = Math.min(100, Math.round(15 + (todayProtein / 2.5) + (todaySleep * 2.5)));
+  const intStat = Math.min(100, Math.round(20 + (hProfile.totalQuestsCompleted * 2)));
+  const per = Math.min(100, Math.round(15 + (meals.length * 8) + (todayCalories > 0 ? 15 : 0)));
+
+  // Daily Quests Status
+  const targetProtein = profile.dailyTargetProtein || 130;
+  const targetSteps = profile.dailyTargetSteps || 10000;
+
+  const quests = [
+    {
+      id: 'quest_agi_steps',
+      stat: 'AGI',
+      title: 'Agility Trial: 10,000 Steps',
+      description: 'Traverse the dungeon realm with 10k physical steps',
+      target: targetSteps,
+      current: todaySteps,
+      isCompleted: todaySteps >= targetSteps,
+      xp: 40
+    },
+    {
+      id: 'quest_vit_protein',
+      stat: 'VIT',
+      title: 'Vitality Trial: Hit Protein Target',
+      description: `Consume ${targetProtein}g of protein to regenerate muscle tissue`,
+      target: targetProtein,
+      current: Math.round(todayProtein),
+      isCompleted: todayProtein >= targetProtein,
+      xp: 40
+    },
+    {
+      id: 'quest_str_gym',
+      stat: 'STR',
+      title: 'Strength Trial: Slay the Iron',
+      description: 'Complete at least 1 gym workout session today',
+      target: 1,
+      current: workouts.length > 0 ? 1 : 0,
+      isCompleted: workouts.length > 0,
+      xp: 40
+    },
+    {
+      id: 'quest_per_log',
+      stat: 'PER',
+      title: 'Perception Trial: Full Meal Logging',
+      description: 'Log all 3 daily South Indian meals with awareness',
+      target: 3,
+      current: Math.min(3, meals.length),
+      isCompleted: meals.length >= 3,
+      xp: 30
+    }
+  ];
+
+  // Rank Calculation
+  let rank = 'E-Rank Hunter';
+  let title = 'E-Rank Novice';
+  const lv = hProfile.level || 1;
+  if (lv >= 75) { rank = 'S-Rank Hunter'; title = 'Shadow Monarch / S-Rank Elite'; }
+  else if (lv >= 50) { rank = 'A-Rank Hunter'; title = 'Dungeon Raid Leader'; }
+  else if (lv >= 30) { rank = 'B-Rank Hunter'; title = 'High-Tier Awakened'; }
+  else if (lv >= 15) { rank = 'C-Rank Hunter'; title = 'Dungeon Striker'; }
+  else if (lv >= 6) { rank = 'D-Rank Hunter'; title = 'Awakened Fighter'; }
+
+  // Check penalty condition (Past 10 PM and quests unfinished)
+  const currentHour = new Date().getHours();
+  const allQuestsCompleted = quests.every(q => q.isCompleted);
+  const isPenaltyActive = currentHour >= 22 && !allQuestsCompleted;
+
+  res.json({
+    success: true,
+    hunter: {
+      userId,
+      level: lv,
+      xp: hProfile.xp || 0,
+      xpToNextLevel: lv * 100,
+      rank,
+      title,
+      totalQuestsCompleted: hProfile.totalQuestsCompleted || 0,
+      claimedQuests: hProfile.claimedQuests?.[today] || [],
+      stats: {
+        str,
+        agi,
+        vit,
+        int: intStat,
+        per
+      },
+      quests,
+      isPenaltyActive,
+      penaltyDescription: '50 Push-Ups or 15-Minute Night Walk to evade the penalty zone!'
+    }
+  });
+});
+
+app.post('/api/hunter/claim-quest', (req, res) => {
+  const { questId, date } = req.body;
+  const db = readDB();
+  const userId = getAuthUserId(req, db);
+  const today = date || new Date().toISOString().split('T')[0];
+
+  if (!db.hunterProfiles) db.hunterProfiles = {};
+  if (!db.hunterProfiles[userId]) {
+    db.hunterProfiles[userId] = { level: 1, xp: 0, totalQuestsCompleted: 0, claimedQuests: {} };
+  }
+  const h = db.hunterProfiles[userId];
+  if (!h.claimedQuests) h.claimedQuests = {};
+  if (!h.claimedQuests[today]) h.claimedQuests[today] = [];
+
+  if (h.claimedQuests[today].includes(questId)) {
+    return res.json({ success: true, message: 'Already claimed', level: h.level, xp: h.xp });
+  }
+
+  h.claimedQuests[today].push(questId);
+  h.xp = (h.xp || 0) + 40;
+  h.totalQuestsCompleted = (h.totalQuestsCompleted || 0) + 1;
+
+  // Level up calculation
+  let leveledUp = false;
+  while (h.xp >= h.level * 100) {
+    h.xp -= h.level * 100;
+    h.level += 1;
+    leveledUp = true;
+  }
+
+  writeDB(db);
+  res.json({ success: true, level: h.level, xp: h.xp, leveledUp });
+});
+
 app.get('/api/workout-plans', (req, res) => {
   const db = readDB();
   res.json({ workoutPlans: db.workoutPlans || [] });

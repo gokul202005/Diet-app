@@ -16,7 +16,8 @@ import {
   Zap,
   TrendingDown,
   TrendingUp,
-  Scale
+  Scale,
+  Shield
 } from 'lucide-react';
 import { api } from '../api';
 
@@ -27,6 +28,7 @@ export default function Dashboard({
   onNavigateToWorkouts, 
   onNavigateToFastrack,
   onNavigateToProgress,
+  onNavigateToHunter,
   onOpenCoach,
   onOpenProfile
 }) {
@@ -132,6 +134,15 @@ export default function Dashboard({
             </div>
 
             <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+              <button
+                onClick={onNavigateToHunter}
+                className="flex items-center space-x-1.5 px-3.5 py-2 bg-gradient-to-r from-cyan-950/80 to-indigo-950/80 hover:from-cyan-900/90 hover:to-indigo-900/90 border border-cyan-500/40 hover:border-cyan-400 text-cyan-200 rounded-xl text-xs font-black transition-all shadow-md shadow-cyan-950/30 cursor-pointer"
+                title="Solo Leveling Hunter System & 5-Stat Radar"
+              >
+                <Shield className="w-4 h-4 text-cyan-400" />
+                <span>Hunter Rank & Stats</span>
+              </button>
+
               <button
                 onClick={onNavigateToProgress}
                 className="flex items-center space-x-1.5 px-3.5 py-2 bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-emerald-500/50 text-slate-200 rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer"

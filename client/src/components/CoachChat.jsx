@@ -1,6 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ConfirmModal from './ConfirmModal';
-import { Bot, Send, Sparkles, User, Flame, Dumbbell, Watch, RefreshCw, Trash2, Mic, MicOff } from 'lucide-react';
+import { 
+  Bot, 
+  Send, 
+  Sparkles, 
+  User, 
+  Flame, 
+  Dumbbell, 
+  Watch, 
+  RefreshCw, 
+  Trash2, 
+  Mic, 
+  MicOff,
+  Volume2,
+  VolumeX,
+  Radio,
+  Zap
+} from 'lucide-react';
 import { api } from '../api';
 
 // Markdown text & inline parser for rich AI Coach responses (bold, italics, lists, code)
@@ -163,6 +179,14 @@ export default function CoachChat({ profile, selectedDate }) {
   const [isSending, setIsSending] = useState(false);
   const [isConfirmClearOpen, setIsConfirmClearOpen] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [isJarvisMode, setIsJarvisMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('agy_jarvis_voice_mode') === 'true';
+    }
+    return false;
+  });
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [speakingMsgId, setSpeakingMsgId] = useState(null);
   const messagesEndRef = useRef(null);
   const recognitionRef = useRef(null);
 
@@ -184,8 +208,77 @@ export default function CoachChat({ profile, selectedDate }) {
       if (recognitionRef.current) {
         try { recognitionRef.current.stop(); } catch (e) {}
       }
+      if (typeof window !== 'undefined' && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
     };
   }, []);
+
+  const stopSpeaking = () => {
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+      setSpeakingMsgId(null);
+    }
+  };
+
+  const speakText = (text, msgId = null, autoListenAfter = false) => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+
+    // Clean markdown for natural spoken English
+    const cleanSpeech = text
+      .replace(/[*#`_~>]/g, '')
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .replace(/https?:\/\/\S+/g, '')
+      .replace(/•/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (!cleanSpeech) return;
+
+    const utterance = new SpeechSynthesisUtterance(cleanSpeech);
+    utterance.rate = 1.05;
+    utterance.pitch = 1.0;
+    utterance.lang = 'en-IN';
+
+    const voices = window.speechSynthesis.getVoices();
+    const voice = voices.find(v => v.lang === 'en-IN') || voices.find(v => v.lang.startsWith('en'));
+    if (voice) utterance.voice = voice;
+
+    utterance.onstart = () => {
+      setIsSpeaking(true);
+      if (msgId) setSpeakingMsgId(msgId);
+    };
+
+    utterance.onend = () => {
+      setIsSpeaking(false);
+      setSpeakingMsgId(null);
+      if (autoListenAfter && isJarvisMode) {
+        setTimeout(() => {
+          toggleMic();
+        }, 600);
+      }
+    };
+
+    utterance.onerror = () => {
+      setIsSpeaking(false);
+      setSpeakingMsgId(null);
+    };
+
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const toggleJarvisMode = () => {
+    const next = !isJarvisMode;
+    setIsJarvisMode(next);
+    localStorage.setItem('agy_jarvis_voice_mode', String(next));
+    if (next) {
+      speakText("Jarvis Mode Activated. I am listening! Ask me anything about your South Indian diet, Fastrack watch steps, or gym workouts.", null, true);
+    } else {
+      stopSpeaking();
+    }
+  };
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -269,6 +362,9 @@ export default function CoachChat({ profile, selectedDate }) {
       const res = await api.sendCoachMessage(text);
       if (res.success && res.message) {
         setMessages(prev => [...prev, res.message]);
+        if (isJarvisMode) {
+          speakText(res.message.text, res.message.id, true);
+        }
       }
     } catch (err) {
       if (typeof window !== 'undefined' && window.showToast) {
@@ -319,6 +415,44 @@ export default function CoachChat({ profile, selectedDate }) {
         </div>
 
         <div className="flex items-center space-x-2">
+          {/* JARVIS TWO-WAY VOICE TOGGLE */}
+          <button
+            onClick={toggleJarvisMode}
+            className={`px-3 py-1.5 rounded-xl border text-xs font-black flex items-center space-x-1.5 transition-all shadow-md cursor-pointer ${
+              isJarvisMode 
+                ? 'bg-gradient-to-r from-cyan-500 to-indigo-500 text-white border-cyan-400 shadow-cyan-500/30 animate-pulse' 
+                : 'bg-slate-950 text-slate-300 border-slate-800 hover:border-cyan-500/50 hover:text-cyan-300'
+            }`}
+            title="Toggle Continuous Hands-Free Two-Way Voice (Jarvis Mode)"
+          >
+            {isSpeaking ? (
+              <>
+                <Volume2 className="w-3.5 h-3.5 text-cyan-200 animate-bounce" />
+                <span className="hidden sm:inline">Speaking...</span>
+              </>
+            ) : isJarvisMode ? (
+              <>
+                <Radio className="w-3.5 h-3.5 text-yellow-300" />
+                <span>Jarvis Voice Active</span>
+              </>
+            ) : (
+              <>
+                <Zap className="w-3.5 h-3.5 text-cyan-400" />
+                <span className="hidden sm:inline">Jarvis Hands-Free</span>
+              </>
+            )}
+          </button>
+
+          {isSpeaking && (
+            <button
+              onClick={stopSpeaking}
+              className="p-1.5 bg-red-950/60 border border-red-500/50 text-red-300 rounded-xl text-xs font-bold hover:bg-red-900/60 transition-all cursor-pointer"
+              title="Stop Speaking"
+            >
+              <VolumeX className="w-4 h-4" />
+            </button>
+          )}
+
           <button
             onClick={loadHistory}
             className="p-2 text-slate-400 hover:text-white bg-slate-950 border border-slate-800 rounded-xl transition-colors cursor-pointer"
@@ -416,12 +550,34 @@ export default function CoachChat({ profile, selectedDate }) {
                 >
                   <FormattedMessage content={msg.text} isUser={isUser} />
                   <div
-                    className={`text-[9px] mt-2 pt-1 border-t ${
+                    className={`text-[9px] mt-2 pt-1 border-t flex items-center justify-between ${
                       isUser ? 'text-slate-900/70 border-emerald-600/30 text-right' : 'text-slate-500 border-slate-900'
                     }`}
                   >
-                    {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    {!isUser && msg.source && ` • ${msg.source}`}
+                    <span>
+                      {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {!isUser && msg.source && ` • ${msg.source}`}
+                    </span>
+
+                    {!isUser && (
+                      <button
+                        onClick={() => speakingMsgId === msg.id ? stopSpeaking() : speakText(msg.text, msg.id, false)}
+                        className="text-[10px] text-cyan-400 hover:text-cyan-300 flex items-center space-x-1 cursor-pointer transition-colors ml-3"
+                        title="Listen to this response"
+                      >
+                        {speakingMsgId === msg.id ? (
+                          <>
+                            <VolumeX className="w-3 h-3 text-red-400" />
+                            <span className="text-red-400">Stop</span>
+                          </>
+                        ) : (
+                          <>
+                            <Volume2 className="w-3 h-3" />
+                            <span>Listen</span>
+                          </>
+                        )}
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>

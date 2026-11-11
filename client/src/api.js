@@ -454,5 +454,18 @@ export const api = {
     return safeFetch(`${BASE_URL}/database/migrate-to-supabase`, {
       method: 'POST'
     });
+  },
+
+  // Solo Leveling Hunter System
+  getHunterStats: async (date) => {
+    const q = date ? `?date=${encodeURIComponent(date)}` : '';
+    return safeFetch(`${BASE_URL}/hunter/stats${q}`);
+  },
+  claimHunterQuest: async (questId, date) => {
+    return safeFetch(`${BASE_URL}/hunter/claim-quest`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ questId, date })
+    });
   }
 };

@@ -7,6 +7,7 @@ import FastrackWatch from './components/FastrackWatch';
 import CoachChat from './components/CoachChat';
 import MealPlanner from './components/MealPlanner';
 import ProgressAnalytics from './components/ProgressAnalytics';
+import HunterSystem from './components/HunterSystem';
 import OnboardingModal from './components/OnboardingModal';
 import SettingsModal from './components/SettingsModal';
 import UniversalVoiceAssistant from './components/UniversalVoiceAssistant';
@@ -209,6 +210,7 @@ export default function App() {
             onNavigateToWorkouts={() => setActiveTab('workouts')}
             onNavigateToFastrack={() => setActiveTab('fastrack')}
             onNavigateToProgress={() => setActiveTab('progress')}
+            onNavigateToHunter={() => setActiveTab('hunter')}
             onOpenCoach={() => setActiveTab('coach')}
             onOpenProfile={() => setIsOnboardingOpen(true)}
           />
@@ -247,6 +249,14 @@ export default function App() {
             onProfileUpdate={handleProfileSaved}
             onNavigateToDiet={() => setActiveTab('diet')}
             onNavigateToWorkouts={() => setActiveTab('workouts')}
+          />
+        )}
+
+        {activeTab === 'hunter' && (
+          <HunterSystem
+            key={`hunter-${selectedDate}-${refreshKey}`}
+            selectedDate={selectedDate}
+            currentUser={currentUser}
           />
         )}
 

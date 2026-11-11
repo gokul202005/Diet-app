@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { api } from '../api';
 import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
+import AnatomicalMuscleHeatmap from './AnatomicalMuscleHeatmap';
 
 // Safe native Android & mobile web haptic vibration trigger
 const triggerHapticFeedback = async (isWarning = false) => {
@@ -280,6 +281,22 @@ Day 7 - Rest: 8,000 steps active recovery walk & stretching`);
 
     setExercises(imported);
     setViewMode('logger');
+  };
+
+  const handleAddExerciseFromHeatmap = (ex) => {
+    const newEx = {
+      name: ex.name,
+      sets: Array.from({ length: ex.sets || 3 }).map(() => ({
+        reps: ex.reps || 10,
+        weight: ex.weight || 20,
+        done: false
+      }))
+    };
+    setExercises(prev => [...prev, newEx]);
+    setViewMode('logger');
+    if (typeof window !== 'undefined' && window.showToast) {
+      window.showToast(`Added ${ex.name} to today's workout!`, 'success', 'Exercise Added');
+    }
   };
 
   // Workout Logger state
@@ -631,9 +648,28 @@ Day 7 - Rest: Mobility & Meal Prep`);
               <Activity className="w-3.5 h-3.5" />
               <span>Analyzer</span>
             </button>
+            <button
+              onClick={() => setViewMode('heatmap')}
+              className={`px-3 py-1.5 text-xs font-bold rounded-xl flex items-center space-x-1.5 transition-all ${
+                viewMode === 'heatmap'
+                  ? 'bg-gradient-to-r from-cyan-500 to-indigo-500 text-white shadow-md shadow-cyan-500/20 font-black'
+                  : 'text-cyan-400 hover:text-cyan-300 bg-cyan-950/40 border border-cyan-800/40'
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5 text-cyan-400" />
+              <span>3D Muscle Heatmap</span>
+            </button>
           </div>
         </div>
       </div>
+
+      {/* VIEW: 3D ANATOMICAL MUSCLE HEATMAP */}
+      {viewMode === 'heatmap' && (
+        <AnatomicalMuscleHeatmap
+          workouts={workouts}
+          onAddExerciseToToday={handleAddExerciseFromHeatmap}
+        />
+      )}
 
       {/* VIEW: AI DYNAMIC WORKOUT SPLIT GENERATOR */}
       {viewMode === 'ai-generator' && (
