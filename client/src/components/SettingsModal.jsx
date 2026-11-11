@@ -170,26 +170,42 @@ export default function SettingsModal({ isOpen, onClose, onEditProfile }) {
                 <Key className="w-4 h-4 text-emerald-400" />
                 <span>Google Gemini API Key</span>
               </label>
-              <a
-                href="https://aistudio.google.com/app/apikey"
-                target="_blank"
-                rel="noreferrer"
-                className="text-[11px] text-emerald-400 hover:underline flex items-center space-x-1"
-              >
-                <span>Get Free Gemini Key</span>
-                <ExternalLink className="w-3 h-3" />
-              </a>
+              <div className="flex items-center space-x-2">
+                {settings?.hasApiKey && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center space-x-1">
+                    <Check className="w-3 h-3" />
+                    <span>Saved & Active ({settings.maskedKey})</span>
+                  </span>
+                )}
+                <a
+                  href="https://aistudio.google.com/app/apikey"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[11px] text-emerald-400 hover:underline flex items-center space-x-1"
+                >
+                  <span>Get Free Key</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
             </div>
 
             <input
               type="password"
               value={apiKeyInput}
               onChange={(e) => setApiKeyInput(e.target.value)}
-              placeholder={settings?.hasApiKey ? `Configured (${settings.maskedKey}) - Paste to replace` : "AIzaSy..."}
-              className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 placeholder-slate-600 focus:outline-none focus:border-emerald-500 text-xs font-mono"
+              placeholder={settings?.hasApiKey ? `Key is saved (${settings.maskedKey}) - Type to replace` : "AIzaSy..."}
+              className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500 text-xs font-mono"
             />
-            <p className="text-[11px] text-slate-500">
-              Powered by Gemini 1.5/2.5 Flash for multimodal food plate recognition and custom biomechanical workout splits.
+            <p className="text-[11px] text-slate-400">
+              {settings?.hasApiKey ? (
+                <span className="text-emerald-400 font-semibold">
+                  ✓ Your Gemini API key is securely saved on the server. For security, secret keys are masked so they cannot be exposed in the browser.
+                </span>
+              ) : (
+                <span>
+                  Powers Gemini 1.5/2.5 Flash for South Indian meal planning, food plate recognition, and AI Coach.
+                </span>
+              )}
             </p>
           </div>
 
