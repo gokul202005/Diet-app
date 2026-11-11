@@ -1,73 +1,7 @@
 {
-  "users": [
-    {
-      "id": "user-1794326427954",
-      "name": "Gokul Krishna",
-      "email": "jn.gokulkrishna@gmail.com",
-      "password": "gokul@2k05",
-      "provider": "email",
-      "createdAt": "2026-11-10T16:00:27.955Z",
-      "geminiApiKey": "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a",
-      "apiKey": "",
-      "picture": "https://lh3.googleusercontent.com/a/ACg8ocLRZRfLuZEzw1tLbTqySyGi50w9k6HSSOVAw--gwFiiSwhOnvCZ=s96-c"
-    }
-  ],
+  "users": [],
   "currentUser": null,
   "profiles": {
-    "user-1794309303113": {
-      "isConfigured": false,
-      "name": "",
-      "age": "",
-      "gender": "male",
-      "heightCm": "",
-      "weightKg": "",
-      "goal": "recomp",
-      "activityLevel": "moderately_active",
-      "dailyTargetCalories": 2100,
-      "dailyTargetProtein": 140,
-      "dailyTargetCarbs": 220,
-      "dailyTargetFat": 60,
-      "dailyTargetWater": 3000,
-      "dailyTargetSteps": 10000,
-      "recalculateTargets": true,
-      "dietaryTags": [
-        "🍗 Non-Veg"
-      ],
-      "focusAreas": [
-        "🛡️ Full Body Balance"
-      ],
-      "goals": [
-        "recomp"
-      ]
-    },
-    "user-1794326427954": {
-      "isConfigured": true,
-      "name": "GOKUL KRISHNA JN",
-      "age": "21",
-      "gender": "male",
-      "heightCm": "207.264",
-      "weightKg": "111.5",
-      "goal": "recomp",
-      "activityLevel": "moderately_active",
-      "dailyTargetCalories": 3331,
-      "dailyTargetProtein": 234,
-      "dailyTargetCarbs": 390,
-      "dailyTargetFat": 93,
-      "dailyTargetWater": 4200,
-      "dailyTargetSteps": 10000,
-      "recalculateTargets": false,
-      "dietaryTags": [
-        "🍗 Non-Veg"
-      ],
-      "focusAreas": [
-        "🛡️ Full Body Balance"
-      ],
-      "goals": [
-        "recomp",
-        "cutting"
-      ],
-      "geminiApiKey": "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a"
-    },
     "default_guest": {
       "isConfigured": false,
       "name": "",
@@ -96,21 +30,20 @@
     }
   },
   "profile": {
-    "isConfigured": true,
-    "name": "GOKUL KRISHNA JN",
-    "age": "21",
+    "isConfigured": false,
+    "name": "",
+    "age": 23,
     "gender": "male",
-    "heightCm": "207.264",
-    "weightKg": "111.5",
+    "heightCm": 175,
+    "weightKg": 70,
     "goal": "recomp",
     "activityLevel": "moderately_active",
-    "dailyTargetCalories": 3331,
-    "dailyTargetProtein": 234,
-    "dailyTargetCarbs": 390,
-    "dailyTargetFat": 93,
-    "dailyTargetWater": 4200,
+    "dailyTargetCalories": 2100,
+    "dailyTargetProtein": 140,
+    "dailyTargetCarbs": 220,
+    "dailyTargetFat": 60,
+    "dailyTargetWater": 3000,
     "dailyTargetSteps": 10000,
-    "recalculateTargets": false,
     "dietaryTags": [
       "🍗 Non-Veg"
     ],
@@ -118,17 +51,95 @@
       "🛡️ Full Body Balance"
     ],
     "goals": [
-      "recomp",
-      "cutting"
-    ],
-    "geminiApiKey": "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a"
+      "recomp"
+    ]
   },
   "meals": [],
   "workouts": [],
-  "workoutPlans": [],
+  "workoutPlans": [
+    {
+      "id": "default-ppl",
+      "name": "Push Pull Legs (PPL) - 6 Day Split",
+      "daysPerWeek": 6,
+      "split": [
+        {
+          "day": "Day 1 - Push A",
+          "focus": "Chest, Shoulders, Triceps",
+          "exercises": [
+            "Barbell Bench Press 4x8",
+            "Incline DB Press 3x10",
+            "DB Lateral Raises 4x15",
+            "Overhead Tricep Extension 3x12",
+            "Cable Flyes 3x15"
+          ]
+        },
+        {
+          "day": "Day 2 - Pull A",
+          "focus": "Back, Rear Delts, Biceps",
+          "exercises": [
+            "Deadlift 3x5",
+            "Lat Pulldown 4x10",
+            "Chest Supported Row 3x10",
+            "Face Pulls 4x15",
+            "Barbell Bicep Curl 3x10"
+          ]
+        },
+        {
+          "day": "Day 3 - Legs A",
+          "focus": "Quads, Calves, Abs",
+          "exercises": [
+            "Barbell Squats 4x8",
+            "Leg Press 3x12",
+            "Leg Extensions 3x15",
+            "Standing Calf Raises 4x15",
+            "Hanging Knee Raises 3x15"
+          ]
+        },
+        {
+          "day": "Day 4 - Push B",
+          "focus": "Shoulders, Upper Chest, Triceps",
+          "exercises": [
+            "Overhead Overhead Press 4x8",
+            "Dips 3x10",
+            "Cable Lateral Raises 4x15",
+            "Skull Crushers 3x12"
+          ]
+        },
+        {
+          "day": "Day 5 - Pull B",
+          "focus": "Upper Back, Lats, Biceps",
+          "exercises": [
+            "Pull-ups 4x8",
+            "Barbell Bent Over Row 3x8",
+            "Seated Cable Row 3x10",
+            "Incline DB Curl 3x10",
+            "Hammer Curls 3x12"
+          ]
+        },
+        {
+          "day": "Day 6 - Legs B",
+          "focus": "Hamstrings, Glutes, Calves",
+          "exercises": [
+            "Romanian Deadlift (RDL) 4x8",
+            "Bulgarian Split Squats 3x10",
+            "Lying Hamstring Curls 4x12",
+            "Seated Calf Raises 4x15"
+          ]
+        },
+        {
+          "day": "Day 7 - Rest",
+          "focus": "Active Recovery & Mobility",
+          "exercises": [
+            "8,000 steps brisk walk",
+            "Mobility & stretching"
+          ]
+        }
+      ]
+    }
+  ],
   "fastrackLogs": [
     {
-      "id": "fastrack-1794387797314",
+      "id": "fastrack-1794388335831",
       "userId": "default_guest",
       "date": "2026-11-11",
       "deviceName": "Android Health Connect / Google Fit",
@@ -142,1068 +153,27 @@
       "sleepHours": 7,
       "batteryLevel": null,
       "isAutoSynced": true,
-      "lastAutoSyncAt": "2026-11-11T09:09:15.262Z",
-      "syncedAt": "2026-11-11T09:09:15.262Z"
-    },
-    {
-      "id": "fastrack-1794378647318",
-      "userId": "user-1794326427954",
-      "date": "2026-11-11",
-      "deviceName": "Android Health Connect / Google Fit",
-      "steps": 1362,
-      "activeCalories": 1104,
-      "restingCalories": 2310,
-      "totalBurned": 3414,
-      "distanceKm": 1.02,
-      "avgHeartRate": 72,
-      "peakHeartRate": 72,
-      "sleepHours": 7,
-      "batteryLevel": null,
-      "isAutoSynced": true,
-      "lastAutoSyncAt": "2026-11-11T08:26:57.966Z",
-      "syncedAt": "2026-11-11T08:26:57.966Z"
+      "lastAutoSyncAt": "2026-11-11T09:12:15.831Z",
+      "syncedAt": "2026-11-11T09:12:15.831Z"
     }
   ],
   "waterLogs": [],
   "weightLogs": [],
-  "photoVault": [],
-  "chatHistory": [],
-  "savedMealPlan": {
-    "preference": "south_indian_mixed",
-    "targetCalories": 3331,
-    "targetProtein": 234,
-    "days": [
-      {
-        "dayNumber": 1,
-        "dayName": "Day 1 (Monday)",
-        "meals": [
-          {
-            "mealType": "Breakfast",
-            "title": "Podi Dosa (with Gingelly Oil) with Sambar & Boiled Eggs",
-            "time": "08:30 AM",
-            "foods": [
-              {
-                "name": "Podi Dosa (with Gingelly Oil)",
-                "portion": "3 dosas",
-                "calories": 462,
-                "protein": 12.6,
-                "carbs": 67.2,
-                "fat": 15.4
-              },
-              {
-                "name": "Drumstick Sambar",
-                "portion": "1.1 bowl (200ml)",
-                "calories": 154,
-                "protein": 7.2,
-                "carbs": 24.2,
-                "fat": 3.1
-              },
-              {
-                "name": "Boiled Eggs",
-                "portion": "3 large eggs",
-                "calories": 245,
-                "protein": 21.4,
-                "carbs": 1.4,
-                "fat": 17
-              }
-            ],
-            "mealCalories": 861,
-            "mealProtein": 41.2,
-            "mealCarbs": 92.8,
-            "mealFat": 35.5
-          },
-          {
-            "mealType": "Lunch",
-            "title": "South Indian Thakkali Sadam (Tomato Rice) with Egg Podimas & Thayir",
-            "time": "01:30 PM",
-            "foods": [
-              {
-                "name": "South Indian Tomato Rice (Thakkali Sadam)",
-                "portion": "3 cups (300g)",
-                "calories": 720,
-                "protein": 15,
-                "carbs": 138,
-                "fat": 13.5
-              },
-              {
-                "name": "Muttai Podimas (Egg Scramble)",
-                "portion": "4 eggs scramble",
-                "calories": 333,
-                "protein": 25.9,
-                "carbs": 7.4,
-                "fat": 22.2
-              },
-              {
-                "name": "Fresh Curd (Thayir)",
-                "portion": "1.5 bowl (150g)",
-                "calories": 143,
-                "protein": 7.5,
-                "carbs": 9.8,
-                "fat": 8.3
-              }
-            ],
-            "mealCalories": 1196,
-            "mealProtein": 48.4,
-            "mealCarbs": 155.2,
-            "mealFat": 44
-          },
-          {
-            "mealType": "Evening Snack",
-            "title": "Marie Gold Biscuits with Elaichi Tea & Boiled Egg Whites",
-            "time": "05:00 PM",
-            "foods": [
-              {
-                "name": "Britannia Marie Gold Biscuits",
-                "portion": "6.9 biscuits",
-                "calories": 193,
-                "protein": 4.1,
-                "carbs": 38.6,
-                "fat": 3.5
-              },
-              {
-                "name": "Elaichi Chai (Cardamom Tea)",
-                "portion": "1.7 cup (150ml)",
-                "calories": 116,
-                "protein": 5.1,
-                "carbs": 15.3,
-                "fat": 3.1
-              },
-              {
-                "name": "Boiled Egg Whites",
-                "portion": "5.2 egg whites",
-                "calories": 88,
-                "protein": 18.7,
-                "carbs": 1,
-                "fat": 0.5
-              }
-            ],
-            "mealCalories": 397,
-            "mealProtein": 27.9,
-            "mealCarbs": 54.9,
-            "mealFat": 7.1
-          },
-          {
-            "mealType": "Dinner",
-            "title": "Kerala Appam with South Indian Egg Curry & Rasam",
-            "time": "08:30 PM",
-            "foods": [
-              {
-                "name": "Appam (Soft fermented rice hopper)",
-                "portion": "4 pieces",
-                "calories": 380,
-                "protein": 8,
-                "carbs": 80,
-                "fat": 4
-              },
-              {
-                "name": "South Indian Muttai Kuzhambu (Egg Curry)",
-                "portion": "1.6 bowls",
-                "calories": 416,
-                "protein": 25.6,
-                "carbs": 14.4,
-                "fat": 27.2
-              },
-              {
-                "name": "Tomato Garlic Rasam",
-                "portion": "1.3 cup (180ml)",
-                "calories": 59,
-                "protein": 2,
-                "carbs": 9.1,
-                "fat": 1.3
-              }
-            ],
-            "mealCalories": 855,
-            "mealProtein": 35.6,
-            "mealCarbs": 103.5,
-            "mealFat": 32.5
-          }
-        ],
-        "dayTotalCalories": 3309,
-        "dayTotalProtein": 153.1,
-        "dayTotalCarbs": 406.4,
-        "dayTotalFat": 119.1,
-        "hydrationGoal": "4.2 Liters",
-        "dieticianTip": "Keep dinner 2.5 hours before sleeping for optimal digestion and growth hormone release."
-      },
-      {
-        "dayNumber": 2,
-        "dayName": "Day 2 (Tuesday)",
-        "meals": [
-          {
-            "mealType": "Breakfast",
-            "title": "Ragi Dosa (Finger Millet Dosa) with Tomato Thokku & Boiled Eggs",
-            "time": "08:30 AM",
-            "foods": [
-              {
-                "name": "Ragi Dosa (Finger Millet Dosa)",
-                "portion": "4 dosas",
-                "calories": 468,
-                "protein": 13.7,
-                "carbs": 79.2,
-                "fat": 10.8
-              },
-              {
-                "name": "Tomato Onion Thokku",
-                "portion": "1.4 serving (60g)",
-                "calories": 84,
-                "protein": 2.1,
-                "carbs": 9.8,
-                "fat": 4.2
-              },
-              {
-                "name": "Boiled Eggs",
-                "portion": "4 large eggs",
-                "calories": 310,
-                "protein": 27.1,
-                "carbs": 1.7,
-                "fat": 21.5
-              }
-            ],
-            "mealCalories": 862,
-            "mealProtein": 42.9,
-            "mealCarbs": 90.7,
-            "mealFat": 36.5
-          },
-          {
-            "mealType": "Lunch",
-            "title": "Simple Home Chicken Biryani (Veetu Chicken Biryani) with Thayir Raitha & Boiled Egg",
-            "time": "01:30 PM",
-            "foods": [
-              {
-                "name": "Simple Home Chicken Biryani (Veetu Chicken Biryani)",
-                "portion": "2.8 cups (320g)",
-                "calories": 896,
-                "protein": 61.6,
-                "carbs": 106.4,
-                "fat": 30.8
-              },
-              {
-                "name": "Onion Pachadi (Thayir Raitha)",
-                "portion": "1.4 bowl (150g)",
-                "calories": 119,
-                "protein": 4.9,
-                "carbs": 9.8,
-                "fat": 6.3
-              },
-              {
-                "name": "Boiled Egg",
-                "portion": "3 large eggs",
-                "calories": 202,
-                "protein": 17.6,
-                "carbs": 1.1,
-                "fat": 14
-              }
-            ],
-            "mealCalories": 1217,
-            "mealProtein": 84.1,
-            "mealCarbs": 117.3,
-            "mealFat": 51.1
-          },
-          {
-            "mealType": "Evening Snack",
-            "title": "Pattani (White Peas) Sundal & Degree Filter Coffee",
-            "time": "05:00 PM",
-            "foods": [
-              {
-                "name": "Pattani Sundal (Green / White Peas Sundal)",
-                "portion": "1.5 cups (150g)",
-                "calories": 308,
-                "protein": 17.3,
-                "carbs": 51,
-                "fat": 3.8
-              },
-              {
-                "name": "Degree Filter Coffee",
-                "portion": "1.3 davarah (150ml)",
-                "calories": 85,
-                "protein": 4.5,
-                "carbs": 10.4,
-                "fat": 2
-              }
-            ],
-            "mealCalories": 393,
-            "mealProtein": 21.8,
-            "mealCarbs": 61.4,
-            "mealFat": 5.8
-          },
-          {
-            "mealType": "Dinner",
-            "title": "Pesarattu (Green Moong Dosa) with Allam Chutney & Boiled Eggs",
-            "time": "08:30 PM",
-            "foods": [
-              {
-                "name": "Pesarattu (Whole Green Gram Dosa)",
-                "portion": "3 medium dosas",
-                "calories": 510,
-                "protein": 27.2,
-                "carbs": 74.8,
-                "fat": 11.9
-              },
-              {
-                "name": "Allam (Ginger) Chutney",
-                "portion": "1.3 serving (50g)",
-                "calories": 72,
-                "protein": 1.3,
-                "carbs": 10.4,
-                "fat": 3.3
-              },
-              {
-                "name": "Boiled Eggs",
-                "portion": "4 large eggs",
-                "calories": 288,
-                "protein": 25.2,
-                "carbs": 1.6,
-                "fat": 20
-              }
-            ],
-            "mealCalories": 870,
-            "mealProtein": 53.7,
-            "mealCarbs": 86.8,
-            "mealFat": 35.2
-          }
-        ],
-        "dayTotalCalories": 3342,
-        "dayTotalProtein": 202.5,
-        "dayTotalCarbs": 356.2,
-        "dayTotalFat": 128.6,
-        "hydrationGoal": "4.2 Liters",
-        "dieticianTip": "Keep dinner 2.5 hours before sleeping for optimal digestion and growth hormone release."
-      },
-      {
-        "dayNumber": 3,
-        "dayName": "Day 3 (Wednesday)",
-        "meals": [
-          {
-            "mealType": "Breakfast",
-            "title": "Kal Dosa (Soft Sponge Dosa) with Drumstick Sambar & Boiled Eggs",
-            "time": "08:30 AM",
-            "foods": [
-              {
-                "name": "Kal Dosa (Soft Sponge Dosa)",
-                "portion": "3 dosas",
-                "calories": 396,
-                "protein": 9.9,
-                "carbs": 72.6,
-                "fat": 6.6
-              },
-              {
-                "name": "Drumstick Sambar",
-                "portion": "1.3 bowl (200ml)",
-                "calories": 182,
-                "protein": 8.5,
-                "carbs": 28.6,
-                "fat": 3.6
-              },
-              {
-                "name": "Boiled Eggs",
-                "portion": "4 large eggs",
-                "calories": 288,
-                "protein": 25.2,
-                "carbs": 1.6,
-                "fat": 20
-              }
-            ],
-            "mealCalories": 866,
-            "mealProtein": 43.6,
-            "mealCarbs": 102.8,
-            "mealFat": 30.2
-          },
-          {
-            "mealType": "Lunch",
-            "title": "Ponni Rice with Poondu Kara Kuzhambu (Garlic Karakolambu) & Muttai Podimas",
-            "time": "01:30 PM",
-            "foods": [
-              {
-                "name": "Cooked Ponni Rice",
-                "portion": "2.7 cups (280g)",
-                "calories": 540,
-                "protein": 11.3,
-                "carbs": 121.5,
-                "fat": 1.1
-              },
-              {
-                "name": "Poondu Kara Kuzhambu / Karakolambu (Garlic Tamarind Curry)",
-                "portion": "1.8 bowls (200ml)",
-                "calories": 270,
-                "protein": 5.4,
-                "carbs": 28.8,
-                "fat": 15.3
-              },
-              {
-                "name": "Muttai Podimas (Simple Home Egg Scramble with Onions & Chillies)",
-                "portion": "4 eggs scramble",
-                "calories": 396,
-                "protein": 30.8,
-                "carbs": 8.8,
-                "fat": 26.4
-              }
-            ],
-            "mealCalories": 1206,
-            "mealProtein": 47.5,
-            "mealCarbs": 159.1,
-            "mealFat": 42.8
-          },
-          {
-            "mealType": "Evening Snack",
-            "title": "White Chana (Chole) Sundal & Inji (Ginger) Tea",
-            "time": "05:00 PM",
-            "foods": [
-              {
-                "name": "White Chana Sundal (Sundal with Grated Coconut)",
-                "portion": "1.6 cup (140g)",
-                "calories": 304,
-                "protein": 17.6,
-                "carbs": 49.6,
-                "fat": 4.8
-              },
-              {
-                "name": "Inji Tea (Ginger Milk Tea)",
-                "portion": "1.6 cup (150ml)",
-                "calories": 104,
-                "protein": 4.8,
-                "carbs": 13.6,
-                "fat": 2.9
-              }
-            ],
-            "mealCalories": 408,
-            "mealProtein": 22.4,
-            "mealCarbs": 63.2,
-            "mealFat": 7.7
-          },
-          {
-            "mealType": "Dinner",
-            "title": "Crispy Plain Dosa with South Indian Tomato Chutney & Boiled Eggs",
-            "time": "08:30 PM",
-            "foods": [
-              {
-                "name": "Crispy Plain Dosa",
-                "portion": "4 medium dosas",
-                "calories": 479,
-                "protein": 11.5,
-                "carbs": 82.8,
-                "fat": 10.8
-              },
-              {
-                "name": "South Indian Tomato Chutney",
-                "portion": "1.4 serving (60g)",
-                "calories": 84,
-                "protein": 2.1,
-                "carbs": 9.8,
-                "fat": 4.2
-              },
-              {
-                "name": "Boiled Eggs",
-                "portion": "4 large eggs",
-                "calories": 310,
-                "protein": 27.1,
-                "carbs": 1.7,
-                "fat": 21.5
-              }
-            ],
-            "mealCalories": 873,
-            "mealProtein": 40.7,
-            "mealCarbs": 94.3,
-            "mealFat": 36.5
-          }
-        ],
-        "dayTotalCalories": 3353,
-        "dayTotalProtein": 154.2,
-        "dayTotalCarbs": 419.4,
-        "dayTotalFat": 117.2,
-        "hydrationGoal": "4.2 Liters",
-        "dieticianTip": "Keep dinner 2.5 hours before sleeping for optimal digestion and growth hormone release."
-      },
-      {
-        "dayNumber": 4,
-        "dayName": "Day 4 (Thursday)",
-        "meals": [
-          {
-            "mealType": "Breakfast",
-            "title": "Vegetable Rava Upma with Coconut Chutney & Boiled Eggs",
-            "time": "08:30 AM",
-            "foods": [
-              {
-                "name": "Vegetable Rava Upma (Semolina & Veggies)",
-                "portion": "1.9 cups (250g)",
-                "calories": 494,
-                "protein": 12.3,
-                "carbs": 79.8,
-                "fat": 14.3
-              },
-              {
-                "name": "South Indian Coconut Chutney",
-                "portion": "1.3 serving (50g)",
-                "calories": 111,
-                "protein": 2,
-                "carbs": 5.2,
-                "fat": 9.8
-              },
-              {
-                "name": "Boiled Eggs",
-                "portion": "4 large eggs",
-                "calories": 274,
-                "protein": 23.9,
-                "carbs": 1.5,
-                "fat": 19
-              }
-            ],
-            "mealCalories": 879,
-            "mealProtein": 38.2,
-            "mealCarbs": 86.5,
-            "mealFat": 43.1
-          },
-          {
-            "mealType": "Lunch",
-            "title": "Ponni Rice with Nei Paruppu (Ghee Dal), Poondu Rasam & Muttai Podimas",
-            "time": "01:30 PM",
-            "foods": [
-              {
-                "name": "Cooked Ponni Rice",
-                "portion": "2.6 cups (280g)",
-                "calories": 520,
-                "protein": 10.9,
-                "carbs": 117,
-                "fat": 1
-              },
-              {
-                "name": "Nei Paruppu (Toor Dal with Ghee)",
-                "portion": "1.5 bowl (180g)",
-                "calories": 285,
-                "protein": 14.3,
-                "carbs": 36,
-                "fat": 9.8
-              },
-              {
-                "name": "Poondu Rasam (Garlic Tamarind Broth)",
-                "portion": "1.5 cup (180ml)",
-                "calories": 60,
-                "protein": 2.3,
-                "carbs": 9,
-                "fat": 1.5
-              },
-              {
-                "name": "Muttai Podimas (Simple Home Egg Scramble)",
-                "portion": "4 eggs scramble",
-                "calories": 333,
-                "protein": 25.9,
-                "carbs": 7.4,
-                "fat": 22.2
-              }
-            ],
-            "mealCalories": 1198,
-            "mealProtein": 53.4,
-            "mealCarbs": 169.4,
-            "mealFat": 34.5
-          },
-          {
-            "mealType": "Evening Snack",
-            "title": "Pachai Payaru (Green Gram) Sundal & Masala Tea",
-            "time": "05:00 PM",
-            "foods": [
-              {
-                "name": "Pachai Payaru Sundal (Green Moong Sundal)",
-                "portion": "1.5 cups (150g)",
-                "calories": 315,
-                "protein": 19.5,
-                "carbs": 51,
-                "fat": 3.8
-              },
-              {
-                "name": "Masala Chai (with Toned Milk)",
-                "portion": "1.3 cup (150ml)",
-                "calories": 85,
-                "protein": 4.2,
-                "carbs": 11.1,
-                "fat": 2.3
-              }
-            ],
-            "mealCalories": 400,
-            "mealProtein": 23.7,
-            "mealCarbs": 62.1,
-            "mealFat": 6.1
-          },
-          {
-            "mealType": "Dinner",
-            "title": "2 Muttai Dosas (Egg Dosa with Pepper & Curry Leaves) with Tomato Chutney",
-            "time": "08:30 PM",
-            "foods": [
-              {
-                "name": "Egg Dosa (Muttai Dosa with Pepper & Curry Leaves)",
-                "portion": "3 egg dosas",
-                "calories": 651,
-                "protein": 35.6,
-                "carbs": 68.2,
-                "fat": 26.4
-              },
-              {
-                "name": "South Indian Tomato Chutney",
-                "portion": "1.5 serving (60g)",
-                "calories": 90,
-                "protein": 2.3,
-                "carbs": 10.5,
-                "fat": 4.5
-              },
-              {
-                "name": "Fresh Curd (Thayir)",
-                "portion": "1.5 cup (120g)",
-                "calories": 120,
-                "protein": 6,
-                "carbs": 8.3,
-                "fat": 6.8
-              }
-            ],
-            "mealCalories": 861,
-            "mealProtein": 43.9,
-            "mealCarbs": 87,
-            "mealFat": 37.7
-          }
-        ],
-        "dayTotalCalories": 3338,
-        "dayTotalProtein": 159.2,
-        "dayTotalCarbs": 405,
-        "dayTotalFat": 121.4,
-        "hydrationGoal": "4.2 Liters",
-        "dieticianTip": "Keep dinner 2.5 hours before sleeping for optimal digestion and growth hormone release."
-      },
-      {
-        "dayNumber": 5,
-        "dayName": "Day 5 (Friday)",
-        "meals": [
-          {
-            "mealType": "Breakfast",
-            "title": "Steamed Idlis with Drumstick Sambar & Boiled Eggs",
-            "time": "08:30 AM",
-            "foods": [
-              {
-                "name": "Steamed Idli",
-                "portion": "6 pieces",
-                "calories": 364,
-                "protein": 12.9,
-                "carbs": 72.8,
-                "fat": 1.7
-              },
-              {
-                "name": "Drumstick Sambar",
-                "portion": "1.4 bowl (200ml)",
-                "calories": 196,
-                "protein": 9.1,
-                "carbs": 30.8,
-                "fat": 3.9
-              },
-              {
-                "name": "Boiled Eggs",
-                "portion": "4 large eggs",
-                "calories": 302,
-                "protein": 26.5,
-                "carbs": 1.7,
-                "fat": 21
-              }
-            ],
-            "mealCalories": 862,
-            "mealProtein": 48.5,
-            "mealCarbs": 105.3,
-            "mealFat": 26.6
-          },
-          {
-            "mealType": "Lunch",
-            "title": "Ponni Rice with Kollu Rasam (Horse Gram Fat-Loss Soup) & Muttai Podimas",
-            "time": "01:30 PM",
-            "foods": [
-              {
-                "name": "Cooked Ponni Rice",
-                "portion": "3.1 cups (280g)",
-                "calories": 620,
-                "protein": 13,
-                "carbs": 139.5,
-                "fat": 1.2
-              },
-              {
-                "name": "Kollu Rasam (Horse Gram Fat-Loss & Endurance Soup)",
-                "portion": "2.1 bowls (220ml)",
-                "calories": 116,
-                "protein": 7.4,
-                "carbs": 16.8,
-                "fat": 2.1
-              },
-              {
-                "name": "Muttai Podimas (Simple Home Egg Scramble)",
-                "portion": "5 eggs scramble",
-                "calories": 468,
-                "protein": 36.4,
-                "carbs": 10.4,
-                "fat": 31.2
-              }
-            ],
-            "mealCalories": 1204,
-            "mealProtein": 56.8,
-            "mealCarbs": 166.7,
-            "mealFat": 34.5
-          },
-          {
-            "mealType": "Evening Snack",
-            "title": "Masala Neer Mor (Buttermilk) & Roasted Bengal Gram (Pottukadalai)",
-            "time": "05:00 PM",
-            "foods": [
-              {
-                "name": "Masala Neer Mor (Buttermilk with Ginger & Curry Leaves)",
-                "portion": "2 glasses (350ml)",
-                "calories": 100,
-                "protein": 7,
-                "carbs": 10,
-                "fat": 3
-              },
-              {
-                "name": "Roasted Bengal Gram (Pottukadalai)",
-                "portion": "1.4 cup (60g)",
-                "calories": 308,
-                "protein": 17.5,
-                "carbs": 47.6,
-                "fat": 4.9
-              }
-            ],
-            "mealCalories": 408,
-            "mealProtein": 24.5,
-            "mealCarbs": 57.6,
-            "mealFat": 7.9
-          },
-          {
-            "mealType": "Dinner",
-            "title": "Soft Whole Wheat Phulkas with South Indian Egg Curry & Thayir",
-            "time": "08:30 PM",
-            "foods": [
-              {
-                "name": "Whole Wheat Phulka / Chapati",
-                "portion": "4 phulkas",
-                "calories": 332,
-                "protein": 11.7,
-                "carbs": 66.3,
-                "fat": 1.9
-              },
-              {
-                "name": "South Indian Muttai Kuzhambu (Egg Curry)",
-                "portion": "1.6 bowls",
-                "calories": 416,
-                "protein": 25.6,
-                "carbs": 14.4,
-                "fat": 27.2
-              },
-              {
-                "name": "Fresh Curd (Thayir)",
-                "portion": "1.3 bowl (150g)",
-                "calories": 124,
-                "protein": 6.5,
-                "carbs": 8.5,
-                "fat": 7.2
-              }
-            ],
-            "mealCalories": 872,
-            "mealProtein": 43.8,
-            "mealCarbs": 89.2,
-            "mealFat": 36.3
-          }
-        ],
-        "dayTotalCalories": 3346,
-        "dayTotalProtein": 173.6,
-        "dayTotalCarbs": 418.8,
-        "dayTotalFat": 105.3,
-        "hydrationGoal": "4.2 Liters",
-        "dieticianTip": "Keep dinner 2.5 hours before sleeping for optimal digestion and growth hormone release."
-      },
-      {
-        "dayNumber": 6,
-        "dayName": "Day 6 (Saturday)",
-        "meals": [
-          {
-            "mealType": "Breakfast",
-            "title": "Chettinad Kuzhi Paniyaram with Kara Chutney & Boiled Eggs",
-            "time": "08:30 AM",
-            "foods": [
-              {
-                "name": "Chettinad Kuzhi Paniyaram (Rice & Dal Dumplings)",
-                "portion": "10 pieces",
-                "calories": 437,
-                "protein": 10.5,
-                "carbs": 68.4,
-                "fat": 13.3
-              },
-              {
-                "name": "Kara Chutney (Spicy Onion Garlic Chutney)",
-                "portion": "1.6 serving (60g)",
-                "calories": 88,
-                "protein": 2.4,
-                "carbs": 9.6,
-                "fat": 4.8
-              },
-              {
-                "name": "Boiled Eggs",
-                "portion": "5 large eggs",
-                "calories": 338,
-                "protein": 29.6,
-                "carbs": 1.9,
-                "fat": 23.5
-              }
-            ],
-            "mealCalories": 863,
-            "mealProtein": 42.5,
-            "mealCarbs": 79.9,
-            "mealFat": 41.6
-          },
-          {
-            "mealType": "Lunch",
-            "title": "Ponni Rice with South Indian Fish Curry (Meen Kuzhambu) & Beans Poriyal",
-            "time": "01:30 PM",
-            "foods": [
-              {
-                "name": "Cooked Ponni Rice",
-                "portion": "2.7 cups (280g)",
-                "calories": 540,
-                "protein": 11.3,
-                "carbs": 121.5,
-                "fat": 1.1
-              },
-              {
-                "name": "South Indian Fish Curry (Meen Kuzhambu)",
-                "portion": "1.8 bowls (220g)",
-                "calories": 504,
-                "protein": 50.4,
-                "carbs": 10.8,
-                "fat": 21.6
-              },
-              {
-                "name": "Beans & Carrot Poriyal",
-                "portion": "1.5 cup (120g)",
-                "calories": 135,
-                "protein": 4.5,
-                "carbs": 15,
-                "fat": 6.8
-              }
-            ],
-            "mealCalories": 1179,
-            "mealProtein": 66.2,
-            "mealCarbs": 147.3,
-            "mealFat": 29.5
-          },
-          {
-            "mealType": "Evening Snack",
-            "title": "Kala Chana Sundal & Degree Filter Coffee",
-            "time": "05:00 PM",
-            "foods": [
-              {
-                "name": "Black Chickpea Sundal (Kala Chana Sundal)",
-                "portion": "1.5 cups (150g)",
-                "calories": 330,
-                "protein": 18,
-                "carbs": 52.5,
-                "fat": 5.3
-              },
-              {
-                "name": "Degree Filter Coffee (with Toned Milk)",
-                "portion": "1.2 davarah (150ml)",
-                "calories": 78,
-                "protein": 4.2,
-                "carbs": 9.6,
-                "fat": 1.8
-              }
-            ],
-            "mealCalories": 408,
-            "mealProtein": 22.2,
-            "mealCarbs": 62.1,
-            "mealFat": 7.1
-          },
-          {
-            "mealType": "Dinner",
-            "title": "Soft Chapatis with Vegetable Coconut Kurma & Boiled Eggs",
-            "time": "08:30 PM",
-            "foods": [
-              {
-                "name": "Whole Wheat Chapati",
-                "portion": "4 chapatis",
-                "calories": 340,
-                "protein": 12,
-                "carbs": 68,
-                "fat": 2
-              },
-              {
-                "name": "South Indian Vegetable Coconut Kurma",
-                "portion": "1.3 bowl (200g)",
-                "calories": 234,
-                "protein": 5.9,
-                "carbs": 23.4,
-                "fat": 13
-              },
-              {
-                "name": "Boiled Eggs",
-                "portion": "4 large eggs",
-                "calories": 288,
-                "protein": 25.2,
-                "carbs": 1.6,
-                "fat": 20
-              }
-            ],
-            "mealCalories": 862,
-            "mealProtein": 43.1,
-            "mealCarbs": 93,
-            "mealFat": 35
-          }
-        ],
-        "dayTotalCalories": 3312,
-        "dayTotalProtein": 174,
-        "dayTotalCarbs": 382.3,
-        "dayTotalFat": 113.2,
-        "hydrationGoal": "4.2 Liters",
-        "dieticianTip": "Keep dinner 2.5 hours before sleeping for optimal digestion and growth hormone release."
-      },
-      {
-        "dayNumber": 7,
-        "dayName": "Day 7 (Sunday)",
-        "meals": [
-          {
-            "mealType": "Breakfast",
-            "title": "Pesarattu (Green Moong Dal Dosa) with Allam Chutney & Boiled Eggs",
-            "time": "08:30 AM",
-            "foods": [
-              {
-                "name": "Pesarattu (Whole Green Gram Dosa)",
-                "portion": "3 medium dosas",
-                "calories": 510,
-                "protein": 27.2,
-                "carbs": 74.8,
-                "fat": 11.9
-              },
-              {
-                "name": "Allam (Ginger) Chutney",
-                "portion": "1.3 serving (50g)",
-                "calories": 72,
-                "protein": 1.3,
-                "carbs": 10.4,
-                "fat": 3.3
-              },
-              {
-                "name": "Boiled Eggs",
-                "portion": "4 large eggs",
-                "calories": 288,
-                "protein": 25.2,
-                "carbs": 1.6,
-                "fat": 20
-              }
-            ],
-            "mealCalories": 870,
-            "mealProtein": 53.7,
-            "mealCarbs": 86.8,
-            "mealFat": 35.2
-          },
-          {
-            "mealType": "Lunch",
-            "title": "Ponni Rice with Simple Home Chicken Curry (Veetu Kozhi Curry) & Fresh Thayir",
-            "time": "01:30 PM",
-            "foods": [
-              {
-                "name": "Cooked Ponni Rice",
-                "portion": "2.6 cups (280g)",
-                "calories": 520,
-                "protein": 10.9,
-                "carbs": 117,
-                "fat": 1
-              },
-              {
-                "name": "Simple Home Chicken Curry (Veetu Kozhi Curry)",
-                "portion": "1.7 bowls (240g)",
-                "calories": 527,
-                "protein": 54.4,
-                "carbs": 11.9,
-                "fat": 27.2
-              },
-              {
-                "name": "Fresh Curd (Thayir)",
-                "portion": "1.4 bowl (150g)",
-                "calories": 133,
-                "protein": 7,
-                "carbs": 9.1,
-                "fat": 7.7
-              }
-            ],
-            "mealCalories": 1180,
-            "mealProtein": 72.3,
-            "mealCarbs": 138,
-            "mealFat": 35.9
-          },
-          {
-            "mealType": "Evening Snack",
-            "title": "Karamani (Black-eyed Pea) Sundal & Degree Filter Coffee",
-            "time": "05:00 PM",
-            "foods": [
-              {
-                "name": "Karamani Sundal (Cowpea Sundal)",
-                "portion": "1.6 cups (150g)",
-                "calories": 320,
-                "protein": 19.2,
-                "carbs": 52.8,
-                "fat": 4
-              },
-              {
-                "name": "Degree Filter Coffee",
-                "portion": "1.3 davarah (150ml)",
-                "calories": 85,
-                "protein": 4.5,
-                "carbs": 10.4,
-                "fat": 2
-              }
-            ],
-            "mealCalories": 405,
-            "mealProtein": 23.7,
-            "mealCarbs": 63.2,
-            "mealFat": 6
-          },
-          {
-            "mealType": "Dinner",
-            "title": "Steamed Idlis with Spicy Kara Chutney & Boiled Eggs",
-            "time": "08:30 PM",
-            "foods": [
-              {
-                "name": "Steamed Idli",
-                "portion": "7 pieces",
-                "calories": 423,
-                "protein": 14.9,
-                "carbs": 84.5,
-                "fat": 1.9
-              },
-              {
-                "name": "Kara Chutney (Spicy Onion Garlic Chutney)",
-                "portion": "1.6 serving (60g)",
-                "calories": 88,
-                "protein": 2.4,
-                "carbs": 9.6,
-                "fat": 4.8
-              },
-              {
-                "name": "Boiled Eggs",
-                "portion": "5 large eggs",
-                "calories": 353,
-                "protein": 30.9,
-                "carbs": 2,
-                "fat": 24.5
-              }
-            ],
-            "mealCalories": 864,
-            "mealProtein": 48.2,
-            "mealCarbs": 96.1,
-            "mealFat": 31.2
-          }
-        ],
-        "dayTotalCalories": 3319,
-        "dayTotalProtein": 197.9,
-        "dayTotalCarbs": 384.1,
-        "dayTotalFat": 108.3,
-        "hydrationGoal": "4.2 Liters",
-        "dieticianTip": "Keep dinner 2.5 hours before sleeping for optimal digestion and growth hormone release."
-      }
-    ],
-    "source": "south-indian-smart-engine",
-    "generatedAt": "2026-11-11T07:15:08.221Z"
-  },
+  "physiqueVault": [],
+  "aiCache": {},
+  "chatHistory": [
+    {
+      "id": "welcome-msg",
+      "sender": "assistant",
+      "text": "Vanakkam! Welcome to your AI Diet & Fitness tracker. I specialize in South Indian & global nutrition, workout plan biomechanics, and Fastrack watch energy tracking. Once you set up your profile, I will tailor your daily calories and macros precisely to your body!",
+      "timestamp": "2026-11-11T10:00:00.000Z"
+    }
+  ],
   "settings": {
-    "fastrackDeviceName": "Fastrack Reflex Curve",
+    "geminiApiKey": "",
+    "preferredModel": "gemini-2.0-flash-lite-preview-02-05",
     "useHeuristicFallback": true,
-    "geminiApiKey": "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a"
+    "cacheTokens": true,
+    "fastrackDeviceName": "Fastrack Reflex Curve"
   }
 }
