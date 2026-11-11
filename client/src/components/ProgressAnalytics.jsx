@@ -26,7 +26,8 @@ import {
   Sliders,
   RefreshCw,
   Maximize2,
-  Grid
+  Grid,
+  Folder
 } from 'lucide-react';
 import { api } from '../api';
 
@@ -67,7 +68,7 @@ export default function ProgressAnalytics({ profile, selectedDate, onProfileUpda
 
   const [sliderPosition, setSliderPosition] = useState(50); // For Before/After slider
   const [selectedZoomPhoto, setSelectedZoomPhoto] = useState(null);
-  const [albumViewMode, setAlbumViewMode] = useState('album'); // 'album' | 'compare'
+  const [albumViewMode, setAlbumViewMode] = useState('by-date'); // 'by-date' (default: separate date folders) | 'album' | 'compare'
   const [albumTagFilter, setAlbumTagFilter] = useState('all'); // 'all' | 'before' | 'after' | 'checkin'
 
   // Sync date and weight when props change
@@ -298,9 +299,11 @@ export default function ProgressAnalytics({ profile, selectedDate, onProfileUpda
   const maxProtein = useMemo(() => Math.max(...trendList.map(d => Math.max(d.protein, d.targetProtein, 160))), [trendList]);
   const maxSteps = useMemo(() => Math.max(...trendList.map(d => Math.max(d.steps, 10000))), [trendList]);
 
-  // Group photos by date into cohesive Day Check-In Sessions (Front, Side, Back together)
+  // Group photos by date into cohesive Day Check-In Sessions (Front, Left Side, Right Side, Back together)
   const daySessions = useMemo(() => {
     const map = {};
+    const poseOrder = { 'front': 1, 'left_side': 2, 'left': 2, 'side': 2, 'right_side': 3, 'right': 3, 'back': 4 };
+
     (photos || []).forEach(p => {
       const d = p.date || 'Unknown Date';
       if (!map[d]) {
@@ -317,7 +320,17 @@ export default function ProgressAnalytics({ profile, selectedDate, onProfileUpda
       if (p.notes && !map[d].notes) map[d].notes = p.notes;
       if (p.type === 'before' || p.type === 'after') map[d].type = p.type;
     });
-    return Object.values(map).sort((a, b) => b.date.localeCompare(a.date));
+
+    return Object.values(map)
+      .map(session => ({
+        ...session,
+        photos: [...session.photos].sort((a, b) => {
+          const orderA = poseOrder[String(a.pose).toLowerCase()] || 99;
+          const orderB = poseOrder[String(b.pose).toLowerCase()] || 99;
+          return orderA - orderB;
+        })
+      }))
+      .sort((a, b) => b.date.localeCompare(a.date));
   }, [photos]);
 
   const selectedBeforePhoto = photos.find(p => p.id === beforePhotoId) || photos[photos.length - 1];
@@ -1134,35 +1147,35 @@ export default function ProgressAnalytics({ profile, selectedDate, onProfileUpda
                 )}
               </div>
 
-              {/* View Mode Toggle: Single Unified Album (Default) vs By Date vs Compare */}
+              {/* View Mode Toggle: Date Folders (Default) vs All Photos Grid vs Compare */}
               <div className="flex items-center space-x-1 shrink-0 bg-slate-900 p-1 rounded-xl border border-slate-800 self-start sm:self-auto">
                 <button
                   type="button"
-                  onClick={() => setAlbumViewMode('album')}
-                  className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    albumViewMode === 'album' ? 'bg-emerald-500 text-slate-950 shadow-sm' : 'text-slate-400 hover:text-white'
+                  onClick={() => setAlbumViewMode('by-date')}
+                  className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    albumViewMode === 'by-date' ? 'bg-emerald-500 text-slate-950 shadow-sm' : 'text-slate-400 hover:text-white'
                   }`}
-                  title="Single Unified Continuous Album Grid"
+                  title="Separate folder for each check-in date"
                 >
-                  <Grid className="w-3.5 h-3.5" />
-                  <span>Single Album</span>
+                  <Folder className="w-3.5 h-3.5" />
+                  <span>Date Folders</span>
                 </button>
                 <button
                   type="button"
-                  onClick={() => setAlbumViewMode('by-date')}
-                  className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    albumViewMode === 'by-date' ? 'bg-emerald-500 text-slate-950 shadow-sm' : 'text-slate-400 hover:text-white'
+                  onClick={() => setAlbumViewMode('album')}
+                  className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    albumViewMode === 'album' ? 'bg-emerald-500 text-slate-950 shadow-sm' : 'text-slate-400 hover:text-white'
                   }`}
-                  title="Grouped by Check-in Date"
+                  title="View all photos in continuous grid"
                 >
-                  <Calendar className="w-3.5 h-3.5" />
-                  <span>By Date</span>
+                  <Grid className="w-3.5 h-3.5" />
+                  <span>All Photos</span>
                 </button>
                 {photos.length >= 2 && (
                   <button
                     type="button"
                     onClick={() => setAlbumViewMode('compare')}
-                    className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                       albumViewMode === 'compare' ? 'bg-emerald-500 text-slate-950 shadow-sm' : 'text-slate-400 hover:text-white'
                     }`}
                     title="Split Before / After Compare Slider"
@@ -1383,65 +1396,94 @@ export default function ProgressAnalytics({ profile, selectedDate, onProfileUpda
                   .map((session) => {
                     const isBefore = session.type === 'before';
                     const isAfter = session.type === 'after';
+                    const sessionPhotos = session.photos.filter((p) => {
+                      if (albumTagFilter === 'all') return true;
+                      if (albumTagFilter === 'before') return p.type === 'before';
+                      if (albumTagFilter === 'after') return p.type === 'after';
+                      if (albumTagFilter === 'front') return p.pose === 'front';
+                      if (albumTagFilter === 'left_side') return p.pose === 'left_side' || p.pose === 'left' || p.pose === 'side';
+                      if (albumTagFilter === 'right_side') return p.pose === 'right_side' || p.pose === 'right';
+                      if (albumTagFilter === 'back') return p.pose === 'back';
+                      return true;
+                    });
+
+                    if (sessionPhotos.length === 0) return null;
 
                     return (
                       <div 
                         key={session.date}
-                        className="bg-slate-950 border border-slate-800 hover:border-emerald-500/30 rounded-3xl p-5 shadow-xl transition-all space-y-4"
+                        className="bg-slate-900/90 border border-slate-800 hover:border-emerald-500/40 rounded-3xl p-5 shadow-2xl transition-all space-y-4 relative"
                       >
-                        {/* Day Session Header */}
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-3 border-b border-slate-900">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <div className="flex items-center space-x-2 text-white font-black text-sm">
-                              <Calendar className="w-4 h-4 text-emerald-400" />
-                              <span>{session.date}</span>
+                        {/* Day Session Folder Header */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800/80">
+                          <div className="flex flex-wrap items-center gap-2.5">
+                            <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0 shadow-sm">
+                              <Folder className="w-5 h-5" />
                             </div>
 
-                            <span className={`px-2.5 py-0.5 rounded-lg text-[10px] font-bold uppercase border ${
-                              isBefore
-                                ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
-                                : isAfter
-                                ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
-                                : 'bg-slate-900 text-slate-300 border-slate-800'
-                            }`}>
-                              {isBefore ? 'Baseline' : isAfter ? 'Current Progress' : 'Day Check-in'}
-                            </span>
+                            <div>
+                              <div className="flex items-center space-x-2">
+                                <span className="text-white font-black text-sm tracking-tight">
+                                  {session.date === new Date().toISOString().split('T')[0] ? `Today's Entry (${session.date})` : `Date Folder: ${session.date}`}
+                                </span>
 
-                            {session.weightKg && (
-                              <span className="px-2 py-0.5 rounded-lg bg-slate-900 border border-slate-800 text-emerald-400 font-mono text-xs font-bold">
-                                {session.weightKg} kg
-                              </span>
-                            )}
+                                <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider border ${
+                                  isBefore
+                                    ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                                    : isAfter
+                                    ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                                    : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                                }`}>
+                                  {isBefore ? 'Baseline' : isAfter ? 'Current' : 'Day Check-in'}
+                                </span>
+                              </div>
 
-                            <span className="text-[11px] text-slate-500">
-                              • {session.photos.length} {session.photos.length === 1 ? 'pose' : 'poses'} ({session.photos.map(p => formatPoseLabel(p.pose)).join(', ')})
-                            </span>
+                              <div className="flex items-center space-x-2 text-[11px] text-slate-400 mt-0.5">
+                                <span>{sessionPhotos.length} {sessionPhotos.length === 1 ? 'photo' : 'photos'} in this folder</span>
+                                {session.weightKg && (
+                                  <>
+                                    <span>•</span>
+                                    <span className="text-emerald-400 font-bold font-mono">{session.weightKg} kg</span>
+                                  </>
+                                )}
+                                {session.notes && (
+                                  <>
+                                    <span>•</span>
+                                    <span className="text-slate-400 italic truncate max-w-[220px]">"{session.notes}"</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
                           </div>
 
                           <button
                             type="button"
                             onClick={() => setDayToDelete(session)}
-                            className="self-end sm:self-auto p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-xl transition-all cursor-pointer text-xs flex items-center space-x-1"
-                            title="Delete all photos for this day"
+                            className="self-end sm:self-auto px-3 py-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 border border-slate-800 hover:border-rose-500/30 rounded-xl transition-all cursor-pointer text-xs flex items-center space-x-1.5"
+                            title={`Delete all photos in folder ${session.date}`}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
-                            <span className="text-[11px]">Delete Day</span>
+                            <span className="text-[11px] font-semibold">Delete Date Folder</span>
                           </button>
                         </div>
 
-                        {/* Poses Side-by-Side Grid for this Date */}
+                        {/* Poses Side-by-Side Grid strictly for this Date Folder */}
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
-                          {session.photos.map((p) => (
+                          {sessionPhotos.map((p) => (
                             <div
                               key={p.id}
                               onClick={() => setSelectedZoomPhoto(p)}
-                              className="group relative bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 hover:border-emerald-500/50 aspect-[3/4] cursor-pointer shadow-lg transition-all"
+                              className="group relative bg-slate-950 rounded-2xl overflow-hidden border border-slate-800/80 hover:border-emerald-500/50 aspect-[3/4] cursor-pointer shadow-lg hover:shadow-emerald-500/10 transition-all duration-200"
                             >
                               <img 
                                 src={api.resolvePhotoUrl(p.photoUrl)} 
                                 alt={`${session.date} - ${p.pose}`}
                                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
+                                loading="lazy"
                               />
+
+                              {/* Gradient Vignette for clear readability */}
+                              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-transparent to-slate-950/40 pointer-events-none" />
 
                               {/* Top Pose Badge */}
                               <div className="absolute top-2.5 left-2.5 flex items-center space-x-1.5 pointer-events-none">
@@ -1451,11 +1493,11 @@ export default function ProgressAnalytics({ profile, selectedDate, onProfileUpda
                               </div>
 
                               {/* Hover Actions */}
-                              <div className="absolute top-2.5 right-2.5 flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <div className="absolute top-2.5 right-2.5 flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                                 <button
                                   type="button"
                                   onClick={(e) => { e.stopPropagation(); setSelectedZoomPhoto(p); }}
-                                  className="p-1.5 bg-black/80 hover:bg-black text-white rounded-lg cursor-pointer"
+                                  className="p-1.5 bg-black/80 hover:bg-black text-white rounded-lg cursor-pointer transition-all shadow-md"
                                   title="Inspect fullscreen"
                                 >
                                   <Maximize2 className="w-3.5 h-3.5" />
@@ -1463,11 +1505,25 @@ export default function ProgressAnalytics({ profile, selectedDate, onProfileUpda
                                 <button
                                   type="button"
                                   onClick={(e) => { e.stopPropagation(); setPhotoToDelete(p); }}
-                                  className="p-1.5 bg-rose-500/90 hover:bg-rose-600 text-white rounded-lg cursor-pointer"
+                                  className="p-1.5 bg-rose-500/90 hover:bg-rose-600 text-white rounded-lg cursor-pointer transition-all shadow-md"
                                   title="Delete this pose"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </button>
+                              </div>
+
+                              {/* Bottom Info Bar */}
+                              <div className="absolute bottom-2.5 left-2.5 right-2.5 pointer-events-none flex items-end justify-between">
+                                <div className="space-y-0.5">
+                                  <span className="text-[11px] font-bold text-white block drop-shadow-sm">
+                                    {p.date}
+                                  </span>
+                                </div>
+                                {p.weightKg && (
+                                  <span className="px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold bg-slate-900/90 text-emerald-400 border border-slate-700 backdrop-blur-sm">
+                                    {p.weightKg} kg
+                                  </span>
+                                )}
                               </div>
                             </div>
                           ))}
@@ -1475,7 +1531,7 @@ export default function ProgressAnalytics({ profile, selectedDate, onProfileUpda
 
                         {/* Notes reflection if available */}
                         {session.notes && (
-                          <div className="text-xs text-slate-400 italic bg-slate-900/60 p-2.5 rounded-xl border border-slate-900">
+                          <div className="text-xs text-slate-400 italic bg-slate-950/60 p-2.5 rounded-xl border border-slate-900">
                             "{session.notes}"
                           </div>
                         )}

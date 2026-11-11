@@ -72,7 +72,8 @@ export async function uploadPhotoToSupabase(imageData, { userId, date, pose, fil
     const cleanDate = date || new Date().toISOString().split('T')[0];
     const timestamp = Date.now();
     const finalFilename = filename || `${cleanDate}_${pose ? String(pose).replace(/\s+/g, '_').toLowerCase() : 'photo'}_${timestamp}.${ext}`;
-    const storagePath = `${cleanUserId}/${finalFilename}`;
+    // Store in a dedicated date folder per entry in Supabase Storage: <userId>/<date>/<filename>
+    const storagePath = `${cleanUserId}/${cleanDate}/${finalFilename}`;
     const finalPhotoId = photoId || id || `photo-${cleanUserId}-${timestamp}`;
 
     // 1. Upload binary buffer to Supabase Storage ('physique_vault' bucket)
