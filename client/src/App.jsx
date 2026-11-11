@@ -11,6 +11,7 @@ import OnboardingModal from './components/OnboardingModal';
 import SettingsModal from './components/SettingsModal';
 import UniversalVoiceAssistant from './components/UniversalVoiceAssistant';
 import AuthScreen from './components/AuthScreen';
+import PWAInstallBanner from './components/PWAInstallBanner';
 import { api } from './api';
 
 export default function App() {
@@ -112,6 +113,9 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col selection:bg-emerald-500 selection:text-slate-950">
       
+      {/* PWA 1-Tap Direct Install Banner (Android / iOS / Chrome) */}
+      <PWAInstallBanner />
+
       {/* Navigation Header & Mobile Bottom Bar */}
       <Navbar
         activeTab={activeTab}

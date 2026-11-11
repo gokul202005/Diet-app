@@ -1,16 +1,53 @@
 {
+  "id": "/",
+  "name": "AGY Fit • AI Diet & Fitness Tracker",
   "short_name": "AGY Fit",
-  "name": "AGY Fit - AI Diet & Fitness Tracker",
+  "description": "AI Diet Tracking, South Indian Nutrition, Biomechanics & Automatic Health Sync",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#020617",
+  "theme_color": "#020617",
+  "categories": ["health", "fitness", "lifestyle"],
   "icons": [
+    {
+      "src": "/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "maskable"
+    },
     {
       "src": "/icon.svg",
       "type": "image/svg+xml",
-      "sizes": "512x512 192x192 any"
+      "sizes": "512x512 192x192 any",
+      "purpose": "any"
     }
   ],
-  "start_url": "/",
-  "background_color": "#020617",
-  "theme_color": "#10b981",
-  "display": "standalone",
-  "orientation": "portrait"
+  "shortcuts": [
+    {
+      "name": "Log Meal",
+      "url": "/?tab=diet",
+      "description": "Log food and track calories",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Health Sync",
+      "url": "/?tab=watch",
+      "description": "View automatic health connect steps and watch sync",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
 }

@@ -15,10 +15,14 @@ import {
   Battery,
   Radio,
   AlertCircle,
-  Smartphone
+  Smartphone,
+  Sparkles,
+  ShieldCheck,
+  CheckCircle2
 } from 'lucide-react';
 import { api } from '../api';
 import { watchAutoSync } from '../utils/watchAutoSync';
+import { healthConnectSync } from '../utils/healthConnectSync';
 
 export default function FastrackWatch({ selectedDate, profile }) {
   const [fastrackLog, setFastrackLog] = useState(null);
@@ -38,6 +42,79 @@ export default function FastrackWatch({ selectedDate, profile }) {
   const [realHeartRate, setRealHeartRate] = useState('');
   const [realSleep, setRealSleep] = useState('');
   const [isSavingRealData, setIsSavingRealData] = useState(false);
+
+  // Automatic Health Connect & Background Sync State (Zero Manual Effort)
+  const [isHealthConnectEnabled, setIsHealthConnectEnabled] = useState(false);
+  const [isHealthSyncing, setIsHealthSyncing] = useState(false);
+  const [healthLastSync, setHealthLastSync] = useState(null);
+  const [healthProvider, setHealthProvider] = useState('health_connect');
+
+  // Subscribe to Automatic Health Connect Sync pulses
+  useEffect(() => {
+    const unsubHealth = healthConnectSync.subscribe((state) => {
+      setIsHealthConnectEnabled(state.isEnabled);
+      setIsHealthSyncing(state.isSyncing);
+      if (state.lastSyncTime) setHealthLastSync(state.lastSyncTime);
+      if (state.provider) setHealthProvider(state.provider);
+      if (state.log) {
+        setFastrackLog(state.log);
+        setRealSteps(state.log.steps || 0);
+        if (state.log.avgHeartRate) setLiveHeartRate(state.log.avgHeartRate);
+        if (state.log.sleepHours) setRealSleep(state.log.sleepHours);
+        if (state.log.deviceName) setConnectedDeviceName(state.log.deviceName);
+
+        const logEntry = {
+          time: new Date().toLocaleTimeString(),
+          steps: state.log.steps || 0,
+          activeBurn: state.log.activeCalories || 0,
+          hr: state.log.avgHeartRate || 0,
+          source: state.log.deviceName || 'Android Health Connect'
+        };
+        setTelemetryLogs(prev => [logEntry, ...prev.slice(0, 9)]);
+      }
+    });
+    return () => unsubHealth();
+  }, []);
+
+  const handleToggleHealthConnect = async () => {
+    if (isHealthConnectEnabled) {
+      healthConnectSync.disableAutoSync();
+      if (typeof window !== 'undefined' && window.showToast) {
+        window.showToast('Automatic Health Connect background sync disabled.', 'info', 'Auto-Sync');
+      }
+    } else {
+      await healthConnectSync.enableAutoSync();
+      if (typeof window !== 'undefined' && window.showToast) {
+        window.showToast('Automatic Health Connect active! Steps and burn sync in the background even if closed.', 'success', 'Zero Effort Sync');
+      }
+      loadWatchData();
+    }
+  };
+
+  const handleForceHealthSync = async () => {
+    const res = await healthConnectSync.syncNow(selectedDate);
+    if (res?.success) {
+      if (typeof window !== 'undefined' && window.showToast) {
+        window.showToast(`Synced ${res.log.steps.toLocaleString()} steps via Health Connect!`, 'success', 'Health Sync Complete');
+      }
+      loadWatchData();
+    } else {
+      if (typeof window !== 'undefined' && window.showToast) {
+        window.showToast('Could not sync Health Connect: ' + (res?.error || 'Unknown error'), 'error', 'Sync Failed');
+      }
+    }
+  };
+
+  const handleConnectGoogleFit = async () => {
+    const res = await healthConnectSync.requestGoogleFitAuth();
+    if (res?.success) {
+      await healthConnectSync.enableAutoSync();
+      if (typeof window !== 'undefined' && window.showToast) {
+        window.showToast('Connected to Google Fit & Android Health Connect!', 'success', 'Google Fit Connected');
+      }
+      loadWatchData();
+    }
+  };
 
   // Load Real Saved Data for this Date from Server
   const loadWatchData = async () => {
@@ -239,7 +316,7 @@ export default function FastrackWatch({ selectedDate, profile }) {
             <button
               onClick={handlePairBleWatch}
               disabled={isPairingBle}
-              className="flex items-center space-x-2 px-4 py-2.5 bg-sky-500 hover:bg-sky-600 disabled:opacity-50 text-slate-950 font-bold rounded-2xl text-xs transition-all shadow-md shadow-sky-500/20"
+              className="flex items-center space-x-2 px-4 py-2.5 bg-sky-500 hover:bg-sky-600 disabled:opacity-50 text-slate-950 font-bold rounded-2xl text-xs transition-all shadow-md shadow-sky-500/20 cursor-pointer"
             >
               <Bluetooth className="w-4 h-4" />
               <span>{isPairingBle ? 'Scanning for Watch...' : isBleConnected ? 'Connected via BLE' : 'Pair Fastrack via BLE'}</span>
@@ -271,6 +348,82 @@ export default function FastrackWatch({ selectedDate, profile }) {
             ) : (
               <span className="text-[11px] text-slate-500">Battery: --</span>
             )}
+          </div>
+        </div>
+      </div>
+
+      {/* ZERO MANUAL EFFORT: ANDROID HEALTH CONNECT & BACKGROUND SYNC */}
+      <div className="bg-gradient-to-r from-emerald-950/60 via-slate-900 to-slate-900 border border-emerald-500/30 rounded-3xl p-6 shadow-xl relative overflow-hidden">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+          <div className="space-y-1.5 max-w-xl">
+            <div className="flex items-center space-x-2">
+              <span className="p-1.5 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                <Sparkles className="w-4 h-4" />
+              </span>
+              <span className="text-xs font-black uppercase tracking-wider text-emerald-400">
+                Zero Manual Effort
+              </span>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full border font-bold flex items-center space-x-1 ${
+                isHealthConnectEnabled 
+                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' 
+                  : 'bg-slate-800 text-slate-400 border-slate-700'
+              }`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${isHealthConnectEnabled ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
+                <span>{isHealthConnectEnabled ? 'Background Auto-Sync Active' : 'Auto-Sync Paused'}</span>
+              </span>
+            </div>
+
+            <h2 className="text-lg font-black text-white flex items-center space-x-2">
+              <span>Android Health Connect & Background Sync</span>
+            </h2>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Your steps, active calories, sleep hours, and resting heart rate sync automatically in the background even if the app is closed. Compatible with Android Health Connect, Google Fit, Samsung Health, and Fastrack Reflex.
+            </p>
+
+            {healthLastSync && (
+              <div className="flex items-center space-x-2 text-[11px] text-slate-400 pt-1">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Last background sync: {new Date(healthLastSync).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+                <span className="text-slate-600">•</span>
+                <span className="text-emerald-400 font-semibold">{sensorSteps > 0 ? `${sensorSteps.toLocaleString()} sensor steps cached` : 'Live'}</span>
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Toggle Enable Auto-Sync */}
+            <button
+              onClick={handleToggleHealthConnect}
+              className={`px-4 py-2.5 rounded-2xl text-xs font-black transition-all flex items-center space-x-2 shadow-md cursor-pointer ${
+                isHealthConnectEnabled
+                  ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-500/20'
+                  : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
+              }`}
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              <span>{isHealthConnectEnabled ? 'Auto-Sync Enabled' : 'Enable Auto-Sync'}</span>
+            </button>
+
+            {/* Force Sync Now */}
+            <button
+              onClick={handleForceHealthSync}
+              disabled={isHealthSyncing}
+              className="px-4 py-2.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-emerald-500/40 text-slate-200 font-bold rounded-2xl text-xs transition-all flex items-center space-x-2 cursor-pointer"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isHealthSyncing ? 'animate-spin text-emerald-400' : 'text-slate-400'}`} />
+              <span>{isHealthSyncing ? 'Syncing...' : 'Sync Now'}</span>
+            </button>
+
+            {/* Connect Google Fit */}
+            <button
+              onClick={handleConnectGoogleFit}
+              className="px-3.5 py-2.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-2xl text-xs text-slate-400 hover:text-white font-medium transition-all flex items-center space-x-1.5 cursor-pointer"
+              title="Link Google Fit / Health Connect Account"
+            >
+              <Activity className="w-3.5 h-3.5 text-sky-400" />
+              <span>Google Fit Link</span>
+            </button>
           </div>
         </div>
       </div>

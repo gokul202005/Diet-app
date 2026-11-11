@@ -18,8 +18,10 @@ import {
   X,
   Activity,
   Layers,
-  ChevronDown
+  ChevronDown,
+  Download
 } from 'lucide-react';
+import { pwaManager } from '../utils/pwaService';
 
 export default function Navbar({ 
   activeTab, 
@@ -35,8 +37,15 @@ export default function Navbar({
   onLogout
 }) {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [canInstall, setCanInstall] = useState(false);
   const userMenuRef = useRef(null);
   const isToday = selectedDate === new Date().toISOString().split('T')[0];
+
+  useEffect(() => {
+    return pwaManager.subscribeToInstall((state) => {
+      setCanInstall(state.canInstall && !state.isInstalled);
+    });
+  }, []);
 
   // Close user dropdown when clicking outside
   useEffect(() => {
@@ -164,6 +173,18 @@ export default function Navbar({
                 <ServerStatusWidget variant="pill" />
               </div>
 
+              {/* Install App Quick Button (Visible when PWA install is ready) */}
+              {canInstall && (
+                <button
+                  onClick={() => pwaManager.promptInstall()}
+                  className="hidden sm:flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/40 rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer"
+                  title="Install App directly on your device"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Install App</span>
+                </button>
+              )}
+
               {/* Unified User Avatar & Dropdown Menu */}
               <div className="relative" ref={userMenuRef}>
                 <button
@@ -202,6 +223,22 @@ export default function Navbar({
                       >
                         <Settings className="w-4 h-4 text-slate-400" />
                         <span>Settings & API Key</span>
+                      </button>
+
+                      {/* 1-Tap PWA Install in Dropdown */}
+                      <button
+                        onClick={async () => {
+                          setIsUserMenuOpen(false);
+                          if (pwaManager.isStandalone()) {
+                            window.showToast?.('App is already installed on this device!', 'info', 'AGY Fit PWA');
+                          } else {
+                            await pwaManager.promptInstall();
+                          }
+                        }}
+                        className="w-full flex items-center space-x-2.5 px-3 py-2 rounded-xl text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 transition-colors cursor-pointer text-left font-medium"
+                      >
+                        <Download className="w-4 h-4 text-emerald-400" />
+                        <span>Install App (PWA)</span>
                       </button>
 
                       {/* Server Status Trigger inside Dropdown */}
