@@ -12,6 +12,7 @@ import SettingsModal from './components/SettingsModal';
 import UniversalVoiceAssistant from './components/UniversalVoiceAssistant';
 import AuthScreen from './components/AuthScreen';
 import { api } from './api';
+import { healthConnectSync } from './utils/healthConnectSync';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -31,6 +32,7 @@ export default function App() {
         const authData = await api.getCurrentUser().catch(() => null);
         if (authData?.success && authData?.user?.id) {
           setCurrentUser(authData.user);
+          healthConnectSync.setUser(authData.user.id);
           localStorage.setItem('agy_current_user', JSON.stringify(authData.user));
           const profileData = await api.getProfile().catch(() => null);
 
@@ -100,6 +102,7 @@ export default function App() {
     if (!user) return;
     localStorage.setItem('agy_current_user', JSON.stringify(user));
     setCurrentUser(user);
+    healthConnectSync.setUser(user.id);
 
     const cachedProfile = localStorage.getItem(`agy_profile_${user.id}`);
     let parsedCached = null;
@@ -134,11 +137,17 @@ export default function App() {
     try {
       await api.logout();
     } catch (e) {}
+    try {
+      healthConnectSync.disconnectGoogleFit();
+      healthConnectSync.setUser(null);
+    } catch (e) {}
     setCurrentUser(null);
     setProfile(null);
     setIsOnboardingOpen(false);
     if (typeof window !== 'undefined') {
       localStorage.removeItem('agy_current_user');
+      localStorage.removeItem('agy_google_fit_token');
+      localStorage.removeItem('agy_google_client_id');
       sessionStorage.removeItem('onboarding_wizard_dismissed');
       try {
         Object.keys(localStorage).forEach(key => {
@@ -289,6 +298,7 @@ export default function App() {
       {/* Settings & Token Guard Modal */}
       <SettingsModal
         isOpen={isSettingsOpen}
+        currentUser={currentUser}
         onClose={() => setIsSettingsOpen(false)}
         onEditProfile={() => setIsOnboardingOpen(true)}
       />

@@ -18,6 +18,7 @@ class HealthConnectSyncEngine {
     this.isEnabled = false;
     this.provider = 'health_connect';
     this.googleFitToken = null;
+    this.currentUserId = null;
     this.syncIntervalId = null;
     this.listeners = new Set();
     this.isSyncing = false;
@@ -33,13 +34,27 @@ class HealthConnectSyncEngine {
     this.initFromStorage();
   }
 
+  setUser(userId) {
+    this.currentUserId = userId || null;
+    if (typeof window !== 'undefined' && userId) {
+      this.googleFitToken = localStorage.getItem(`agy_google_fit_token_${userId}`) || null;
+    } else {
+      this.googleFitToken = null;
+    }
+    this.notify({ googleFitConnected: Boolean(this.googleFitToken) });
+  }
+
   initFromStorage() {
     if (typeof window === 'undefined') return;
 
     try {
+      const storedUser = localStorage.getItem('agy_current_user');
+      const uid = storedUser ? JSON.parse(storedUser)?.id : null;
+      this.currentUserId = uid;
+
       this.isEnabled = localStorage.getItem(STORAGE_KEYS.HEALTH_CONNECT_ENABLED) === 'true';
       this.provider = localStorage.getItem(STORAGE_KEYS.PROVIDER) || 'health_connect';
-      this.googleFitToken = localStorage.getItem(STORAGE_KEYS.GOOGLE_FIT_TOKEN) || null;
+      this.googleFitToken = (uid ? localStorage.getItem(`agy_google_fit_token_${uid}`) : null) || null;
       this.lastSyncTime = localStorage.getItem(STORAGE_KEYS.LAST_SYNC) || null;
 
       // Restore daily hardware steps
@@ -140,10 +155,18 @@ class HealthConnectSyncEngine {
   async requestGoogleFitAuth(options = {}) {
     if (typeof window === 'undefined') return { success: false };
 
-    const customClientId = 
-      (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GOOGLE_CLIENT_ID) || 
-      (typeof window !== 'undefined' ? localStorage.getItem('agy_google_client_id') : '') || 
-      '';
+    let customClientId = options.clientId || (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GOOGLE_CLIENT_ID) || '';
+    const uid = options.userId || this.currentUserId;
+    if (!customClientId && typeof window !== 'undefined') {
+      try {
+        if (uid) {
+          customClientId = localStorage.getItem(`agy_google_client_id_${uid}`) || '';
+        }
+        if (!customClientId) {
+          customClientId = localStorage.getItem('agy_google_client_id') || '';
+        }
+      } catch (e) {}
+    }
 
     if (!customClientId) {
       return { 
@@ -152,8 +175,14 @@ class HealthConnectSyncEngine {
       };
     }
 
-    return new Promise((resolve) => {
+    return new Promise(async (resolve) => {
       try {
+        let attempts = 0;
+        while (!window.google?.accounts?.oauth2 && attempts < 10) {
+          await new Promise(r => setTimeout(r, 200));
+          attempts++;
+        }
+
         if (!window.google?.accounts?.oauth2) {
           throw new Error('Google Identity Services SDK is loading. Please try again in 2 seconds.');
         }
@@ -170,9 +199,12 @@ class HealthConnectSyncEngine {
           callback: async (response) => {
             if (response.error) {
               console.warn('[GoogleFit] Auth error:', response.error);
-              resolve({ success: false, error: response.error });
+              resolve({ success: false, error: response.error_description || response.error });
             } else {
               this.googleFitToken = response.access_token;
+              if (uid) {
+                localStorage.setItem(`agy_google_fit_token_${uid}`, response.access_token);
+              }
               localStorage.setItem(STORAGE_KEYS.GOOGLE_FIT_TOKEN, response.access_token);
               this.notify({ googleFitConnected: true });
               await this.syncNow();
@@ -202,7 +234,14 @@ class HealthConnectSyncEngine {
 
   disconnectGoogleFit() {
     this.googleFitToken = null;
-    localStorage.removeItem(STORAGE_KEYS.GOOGLE_FIT_TOKEN);
+    if (typeof window !== 'undefined') {
+      try {
+        if (this.currentUserId) {
+          localStorage.removeItem(`agy_google_fit_token_${this.currentUserId}`);
+        }
+        localStorage.removeItem(STORAGE_KEYS.GOOGLE_FIT_TOKEN);
+      } catch (e) {}
+    }
     this.notify({ googleFitConnected: false });
   }
 
@@ -413,11 +452,10 @@ class HealthConnectSyncEngine {
       // If no Google Fit OAuth token and no hardware motion sensor steps have been detected,
       // do not transmit an empty 0-step payload that overwrites the user's diary!
       if (!this.googleFitToken && metrics.steps === 0) {
-        const msg = 'Google Fit cloud link requires Google Cloud API authorization. Please pair via Fastrack BLE or enter your watch screen steps below!';
+        const msg = 'Google Fit authorization required. Tap "Authorize Google Fit" above to pull your live watch steps!';
         this.notify({
           isSyncing: false,
-          needsOAuth: true,
-          message: msg
+          needsOAuth: true
         });
         return { 
           success: false, 

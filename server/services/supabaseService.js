@@ -95,14 +95,17 @@ export async function uploadPhotoToSupabase(imageData, { userId, date, pose, fil
 
     const publicUrl = publicData?.publicUrl || null;
 
-    // 2. Ensure foreign key exists in public.users table
+    // 2. Ensure foreign key exists in public.users table (never overwrite real user data)
     try {
-      await supabase.from('users').upsert({
-        id: cleanUserId,
-        email: `${cleanUserId}@agyfit.local`,
-        name: 'Athlete',
-        provider: 'local'
-      }, { onConflict: 'id' });
+      const { data: existingUser } = await supabase.from('users').select('id').eq('id', cleanUserId).maybeSingle();
+      if (!existingUser) {
+        await supabase.from('users').insert({
+          id: cleanUserId,
+          email: `${cleanUserId}@agyfit.local`,
+          name: 'Athlete',
+          provider: 'local'
+        });
+      }
     } catch (e) {}
 
     // 3. Save entry into Supabase 'vault_photos' table
@@ -241,14 +244,17 @@ export async function saveProfileToSupabase(userId, p) {
   try {
     const cleanUserId = String(userId).replace(/[^a-zA-Z0-9_-]/g, '_');
 
-    // Ensure user row exists first (foreign key check)
+    // Ensure user row exists first (foreign key check - never overwrite real user email)
     try {
-      await supabase.from('users').upsert({
-        id: cleanUserId,
-        email: `${cleanUserId}@agyfit.local`,
-        name: p.name || 'User',
-        provider: 'local'
-      }, { onConflict: 'id' });
+      const { data: existingUser } = await supabase.from('users').select('id, email').eq('id', cleanUserId).maybeSingle();
+      if (!existingUser) {
+        await supabase.from('users').insert({
+          id: cleanUserId,
+          email: p.email || `${cleanUserId}@agyfit.local`,
+          name: p.name || 'User',
+          provider: 'local'
+        });
+      }
     } catch (e) {}
 
     const { error } = await supabase.from('profiles').upsert({
@@ -314,16 +320,33 @@ export async function migrateLocalDataToSupabase(localDb) {
       if (!uid) continue;
       const matched = (localDb.users || []).find(u => u.id === uid);
       const profileName = localDb.profiles?.[uid]?.name;
-      const { error } = await supabase.from('users').upsert({
-        id: uid,
-        email: matched?.email || `${uid}@agyfit.local`,
-        password_hash: matched?.password || null,
-        name: matched?.name || profileName || 'User',
-        avatar_url: matched?.avatarUrl || null,
-        provider: matched?.provider || 'local'
-      }, { onConflict: 'id' });
-      if (error) results.errors.push(`User ${uid}: ${error.message}`);
-      else results.usersMigrated++;
+      const realEmail = matched?.email || (uid.includes('@') ? uid : null);
+
+      if (realEmail) {
+        const { error } = await supabase.from('users').upsert({
+          id: uid,
+          email: realEmail,
+          password_hash: matched?.password || null,
+          name: matched?.name || profileName || realEmail.split('@')[0],
+          avatar_url: matched?.picture || matched?.avatarUrl || null,
+          provider: matched?.provider || (matched?.googleId ? 'google' : 'local'),
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'id' });
+        if (error) results.errors.push(`User ${uid}: ${error.message}`);
+        else results.usersMigrated++;
+      } else {
+        const { data: existingUser } = await supabase.from('users').select('id').eq('id', uid).maybeSingle();
+        if (!existingUser) {
+          await supabase.from('users').insert({
+            id: uid,
+            email: `${uid}@agyfit.local`,
+            password_hash: matched?.password || null,
+            name: matched?.name || profileName || 'User',
+            provider: 'local'
+          });
+          results.usersMigrated++;
+        }
+      }
     }
 
     // 2. Migrate Profiles
@@ -542,5 +565,140 @@ export async function resetSupabaseAllData() {
       error: err.message,
       ...results
     };
+  }
+}
+
+/**
+ * Live Cloud Sync Helpers: Immediate Supabase persistence for Users, Meals, Workouts, and Watch Logs
+ */
+export async function syncUserToSupabase(user) {
+  if (!isSupabaseReady() || !user || !user.id) return null;
+  try {
+    const { error } = await supabase.from('users').upsert({
+      id: user.id,
+      email: user.email,
+      name: user.name || user.email.split('@')[0],
+      password_hash: user.password || null,
+      avatar_url: user.picture || user.avatarUrl || null,
+      provider: user.provider || 'local',
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'id' });
+    if (error) console.error('[Supabase syncUser Error]:', error.message);
+    return !error;
+  } catch (e) {
+    console.error('[Supabase syncUser Exception]:', e.message);
+    return false;
+  }
+}
+
+export async function syncMealToSupabase(m) {
+  if (!isSupabaseReady() || !m || !m.id) return null;
+  try {
+    const foodName = m.name || (Array.isArray(m.foods) ? m.foods.map(f => f.name).join(', ') : 'Meal');
+    const { error } = await supabase.from('meals').upsert({
+      id: m.id,
+      user_id: m.userId || 'guest',
+      date: m.date,
+      meal_type: m.mealType || 'snack',
+      food_name: foodName,
+      calories: m.totalCalories || 0,
+      protein: m.totalProtein || 0,
+      carbs: m.totalCarbs || 0,
+      fats: m.totalFat || 0,
+      portion: Array.isArray(m.foods) ? `${m.foods.length} items` : '1 serving',
+      time: m.time || new Date().toLocaleTimeString(),
+      photo_url: m.photoUrl || null,
+      is_ai_estimated: Boolean(m.isAiEstimated)
+    }, { onConflict: 'id' });
+    if (error) console.warn('[Supabase syncMeal Error]:', error.message);
+    return !error;
+  } catch (e) {
+    return false;
+  }
+}
+
+export async function deleteMealFromSupabase(mealId) {
+  if (!isSupabaseReady() || !mealId) return false;
+  try {
+    const { error } = await supabase.from('meals').delete().eq('id', mealId);
+    return !error;
+  } catch (e) {
+    return false;
+  }
+}
+
+export async function syncWorkoutToSupabase(w) {
+  if (!isSupabaseReady() || !w || !w.id) return null;
+  try {
+    const { error } = await supabase.from('workouts').upsert({
+      id: w.id,
+      user_id: w.userId || 'guest',
+      date: w.date,
+      exercise_name: w.name || w.exerciseName || 'Exercise',
+      sets: w.sets || 3,
+      reps: w.reps || 10,
+      weight_kg: w.weight || w.weightKg || 0,
+      rest_seconds: w.restSeconds || 60,
+      muscle_group: w.muscleGroup || null,
+      is_completed: Boolean(w.isCompleted)
+    }, { onConflict: 'id' });
+    if (error) console.warn('[Supabase syncWorkout Error]:', error.message);
+    return !error;
+  } catch (e) {
+    return false;
+  }
+}
+
+export async function deleteWorkoutFromSupabase(workoutId) {
+  if (!isSupabaseReady() || !workoutId) return false;
+  try {
+    const { error } = await supabase.from('workouts').delete().eq('id', workoutId);
+    return !error;
+  } catch (e) {
+    return false;
+  }
+}
+
+export async function syncWatchLogToSupabase(wl) {
+  if (!isSupabaseReady() || !wl || !wl.date) return null;
+  try {
+    const logId = wl.id || `watch_${wl.userId || 'guest'}_${wl.date}`;
+    const { error } = await supabase.from('watch_logs').upsert({
+      id: logId,
+      user_id: wl.userId || 'guest',
+      date: wl.date,
+      steps: wl.steps || 0,
+      active_calories: wl.activeCalories || 0,
+      avg_heart_rate: wl.avgHeartRate || null,
+      sleep_hours: wl.sleepHours || null,
+      battery_level: wl.batteryLevel || null,
+      source: wl.deviceName || wl.source || 'Health Connect',
+      is_auto_synced: wl.isAutoSynced !== false,
+      last_auto_sync_at: wl.lastAutoSyncAt || null,
+      synced_at: wl.syncedAt || new Date().toISOString()
+    }, { onConflict: 'id' });
+    if (error) console.warn('[Supabase syncWatchLog Error]:', error.message);
+    return !error;
+  } catch (e) {
+    return false;
+  }
+}
+
+export async function fetchUsersFromSupabase() {
+  if (!isSupabaseReady()) return [];
+  try {
+    const { data, error } = await supabase.from('users').select('*');
+    if (error || !data) return [];
+    return data.map(u => ({
+      id: u.id,
+      email: u.email,
+      name: u.name,
+      password: u.password_hash,
+      picture: u.avatar_url,
+      provider: u.provider || 'local',
+      createdAt: u.created_at
+    }));
+  } catch (e) {
+    return [];
   }
 }

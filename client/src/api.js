@@ -430,13 +430,15 @@ export const api = {
   },
 
   // Settings
-  getSettings: async () => {
-    return safeFetch(`${BASE_URL}/settings`);
+  getSettings: async (userId) => {
+    const customHeaders = userId ? { 'x-user-id': userId } : {};
+    return safeFetch(`${BASE_URL}/settings`, { headers: customHeaders });
   },
-  updateSettings: async (settings) => {
+  updateSettings: async (settings, userId) => {
+    const customHeaders = userId ? { 'x-user-id': userId } : {};
     return safeFetch(`${BASE_URL}/settings`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...customHeaders },
       body: JSON.stringify(settings)
     });
   },

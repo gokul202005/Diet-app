@@ -1,47 +1,125 @@
 {
-  "users": [],
+  "users": [
+    {
+      "id": "user-google-1794396847352",
+      "name": "Gokul Krishna",
+      "email": "jn.gokulkrishna@gmail.com",
+      "picture": "https://lh3.googleusercontent.com/a/ACg8ocLRZRfLuZEzw1tLbTqySyGi50w9k6HSSOVAw--gwFiiSwhOnvCZ=s96-c",
+      "googleId": "110927726677822108966",
+      "provider": "google",
+      "createdAt": "2026-11-11T11:34:07.352Z"
+    },
+    {
+      "id": "user-1794397071692",
+      "name": "123456789",
+      "email": "231801041@rajalakshmi.edu.in",
+      "password": "gokul@2k05",
+      "provider": "email",
+      "createdAt": "2026-11-11T11:37:51.692Z"
+    }
+  ],
   "currentUser": null,
-  "profiles": {},
+  "profiles": {
+    "user-google-1794396847352": {
+      "isConfigured": true,
+      "name": "Gokul Krishna",
+      "age": "21",
+      "gender": "male",
+      "heightCm": "207.204",
+      "weightKg": "111.5",
+      "goal": "recomp",
+      "activityLevel": "moderately_active",
+      "dailyTargetCalories": 3331,
+      "dailyTargetProtein": 234,
+      "dailyTargetCarbs": 390,
+      "dailyTargetFat": 93,
+      "dailyTargetWater": 4200,
+      "dailyTargetSteps": 10000,
+      "recalculateTargets": false,
+      "dietaryTags": [
+        "🍗 Non-Veg",
+        "🥗 Pure Veg",
+        "🥚 Eggetarian"
+      ],
+      "focusAreas": [
+        "🛡️ Full Body Balance"
+      ],
+      "goals": [
+        "recomp",
+        "cutting"
+      ]
+    },
+    "user-1794397071692": {
+      "isConfigured": true,
+      "name": "123456789",
+      "age": "21",
+      "gender": "male",
+      "heightCm": "200.25",
+      "weightKg": "54",
+      "goal": "rapid_cut",
+      "activityLevel": "moderately_active",
+      "dailyTargetCalories": 1973,
+      "dailyTargetProtein": 124,
+      "dailyTargetCarbs": 261,
+      "dailyTargetFat": 48,
+      "dailyTargetWater": 2100,
+      "dailyTargetSteps": 10000,
+      "recalculateTargets": false,
+      "dietaryTags": [
+        "🍗 Non-Veg"
+      ],
+      "focusAreas": [
+        "🦵 Glutes & Legs",
+        "💪 Chest & Arms",
+        "🛡️ Full Body Balance"
+      ],
+      "goals": [
+        "rapid_cut"
+      ]
+    },
+    "null": {
+      "isConfigured": false,
+      "name": "",
+      "age": "",
+      "gender": "",
+      "heightCm": "",
+      "weightKg": "",
+      "goal": "",
+      "activityLevel": "",
+      "dailyTargetCalories": 2000,
+      "dailyTargetProtein": 130,
+      "dailyTargetCarbs": 200,
+      "dailyTargetFat": 55,
+      "dailyTargetWater": 3000,
+      "dailyTargetSteps": 10000,
+      "recalculateTargets": true,
+      "dietaryTags": [],
+      "focusAreas": [],
+      "goals": []
+    }
+  },
   "meals": [],
   "workouts": [],
   "workoutPlans": [],
-  "fastrackLogs": [
-    {
-      "id": "fastrack-1794388814211",
-      "userId": "user-google-1794388402462",
-      "date": "2026-11-11",
-      "deviceName": "Health Connect (Hardware Fallback)",
-      "steps": 0,
-      "activeCalories": 0,
-      "restingCalories": 5,
-      "totalBurned": 5,
-      "distanceKm": 0,
-      "avgHeartRate": 72,
-      "peakHeartRate": 72,
-      "sleepHours": 7,
-      "batteryLevel": null,
-      "isAutoSynced": true,
-      "lastAutoSyncAt": "2026-11-11T09:44:45.395Z",
-      "syncedAt": "2026-11-11T09:44:45.395Z"
-    }
-  ],
+  "fastrackLogs": [],
   "waterLogs": [],
   "weightLogs": [],
   "physiqueVault": [],
+  "photoVault": [],
   "aiCache": {},
   "chatHistory": [],
-  "settings": {},
+  "settings": {
+    "useHeuristicFallback": true
+  },
   "profile": {
     "isConfigured": false,
-    "name": "",
-    "age": null,
+    "name": "Cloud Verification Test",
+    "age": "",
     "gender": "",
-    "heightCm": null,
-    "weightKg": null,
-    "targetWeightKg": null,
+    "heightCm": "",
+    "weightKg": "",
     "goal": "",
     "activityLevel": "",
-    "dietPreference": "",
     "dailyTargetCalories": 2000,
     "dailyTargetProtein": 130,
     "dailyTargetCarbs": 200,

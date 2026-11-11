@@ -11,7 +11,21 @@ import { FastrackService } from './services/fastrackService.js';
 import { searchFoodDatabase } from './data/foodDatabase.js';
 import { calculateNutritionTargets } from './services/profileCalculator.js';
 import { uploadImageToOnlineStorage, deleteImageFromOnlineStorage } from './services/cloudStorage.js';
-import { isSupabaseReady, migrateLocalDataToSupabase, getSupabase, getPhotosFromSupabase, getProfileFromSupabase, saveProfileToSupabase, resetSupabaseAllData } from './services/supabaseService.js';
+import { 
+  isSupabaseReady, 
+  migrateLocalDataToSupabase, 
+  getSupabase, 
+  getPhotosFromSupabase, 
+  getProfileFromSupabase, 
+  saveProfileToSupabase, 
+  resetSupabaseAllData,
+  syncUserToSupabase,
+  syncMealToSupabase,
+  deleteMealFromSupabase,
+  syncWorkoutToSupabase,
+  deleteWorkoutFromSupabase,
+  syncWatchLogToSupabase
+} from './services/supabaseService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -120,21 +134,17 @@ function getUserProfile(db, userId, fallbackName = '') {
   return db.profiles[userId];
 }
 
-// Helper: Retrieve isolated Gemini API Key unique for every user, with fallback to global settings/.env
+// Helper: Retrieve isolated Gemini API Key unique for every user (NO cross-user leaking)
 function getUserApiKey(db, userId) {
+  if (!userId) return '';
   const profile = db.profiles && db.profiles[userId];
   const user = (db.users || []).find(u => u.id === userId);
-  return (
-    profile?.geminiApiKey || 
-    user?.geminiApiKey || 
-    db.settings?.geminiApiKey || 
-    process.env.GEMINI_API_KEY || 
-    ''
-  );
+  const userSettings = (db.userSettings && db.userSettings[userId]) || {};
+  return profile?.geminiApiKey || user?.geminiApiKey || userSettings.geminiApiKey || '';
 }
 
 // --- USER AUTHENTICATION & CLOUD SYNC ---
-app.post('/api/auth/signup', (req, res) => {
+app.post('/api/auth/signup', async (req, res) => {
   try {
     const { name, email, password } = req.body;
     if (!email || !password) {
@@ -187,11 +197,21 @@ app.post('/api/auth/signup', (req, res) => {
 
     writeDB(db);
 
+    // Save directly to Supabase Cloud PostgreSQL immediately!
+    if (isSupabaseReady()) {
+      try {
+        await syncUserToSupabase(newUser);
+        await saveProfileToSupabase(newUser.id, { ...db.profiles[newUser.id], email: newUser.email });
+      } catch (cloudErr) {
+        console.warn('[Supabase Cloud Signup Sync Warning]:', cloudErr.message);
+      }
+    }
+
     res.status(201).json({
       success: true,
       user: db.currentUser,
       profile: db.profiles[newUser.id],
-      message: 'Account created successfully'
+      message: 'Account created successfully and synced to Supabase'
     });
   } catch (err) {
     res.status(500).json({ error: 'Signup error', details: err.message });
@@ -385,11 +405,21 @@ app.post('/api/auth/google', async (req, res) => {
     db.profile = db.profiles[user.id];
     writeDB(db);
 
+    // Save directly to Supabase Cloud PostgreSQL immediately!
+    if (isSupabaseReady()) {
+      try {
+        await syncUserToSupabase(user);
+        await saveProfileToSupabase(user.id, { ...db.profiles[user.id], email: user.email });
+      } catch (cloudErr) {
+        console.warn('[Supabase Cloud Google Sync Warning]:', cloudErr.message);
+      }
+    }
+
     res.json({
       success: true,
       user: db.currentUser,
       profile: db.profile,
-      message: 'Google authentication successful'
+      message: 'Google authentication successful and synced to Supabase'
     });
   } catch (err) {
     res.status(500).json({ error: 'Google auth error', details: err.message });
@@ -551,7 +581,8 @@ app.post('/api/profile', async (req, res) => {
 
   // Auto-sync profile to Supabase PostgreSQL table
   if (isSupabaseReady()) {
-    saveProfileToSupabase(userId, db.profiles[userId]).catch(() => {});
+    const matchedUser = (db.users || []).find(u => u.id === userId);
+    saveProfileToSupabase(userId, { ...db.profiles[userId], email: matchedUser?.email }).catch(() => {});
   }
 
   res.json({ success: true, profile: db.profiles[userId] });
@@ -632,6 +663,10 @@ app.post('/api/meals', (req, res) => {
   db.meals.unshift(newMeal);
   writeDB(db);
 
+  if (isSupabaseReady()) {
+    syncMealToSupabase(newMeal).catch(e => console.warn('[Supabase meal sync notice]:', e.message));
+  }
+
   res.status(201).json({ success: true, meal: newMeal });
 });
 
@@ -647,6 +682,11 @@ app.delete('/api/meals/:id', (req, res) => {
   }
 
   writeDB(db);
+
+  if (isSupabaseReady()) {
+    deleteMealFromSupabase(id).catch(e => console.warn('[Supabase meal delete notice]:', e.message));
+  }
+
   res.json({ success: true, message: 'Meal deleted' });
 });
 
@@ -1337,6 +1377,10 @@ app.post('/api/workouts', (req, res) => {
   db.workouts.unshift(newWorkout);
   writeDB(db);
 
+  if (isSupabaseReady()) {
+    syncWorkoutToSupabase(newWorkout).catch(e => console.warn('[Supabase workout sync notice]:', e.message));
+  }
+
   res.status(201).json({ success: true, workout: newWorkout });
 });
 
@@ -1346,6 +1390,11 @@ app.delete('/api/workouts/:id', (req, res) => {
   const id = req.params.id;
   db.workouts = (db.workouts || []).filter(w => !(w.id === id && (!w.userId || w.userId === userId)));
   writeDB(db);
+
+  if (isSupabaseReady()) {
+    deleteWorkoutFromSupabase(id).catch(e => console.warn('[Supabase workout delete notice]:', e.message));
+  }
+
   res.json({ success: true, message: 'Workout deleted' });
 });
 
@@ -1617,6 +1666,11 @@ app.post('/api/fastrack/auto-sync', (req, res) => {
   }
 
   writeDB(db);
+
+  if (isSupabaseReady()) {
+    syncWatchLogToSupabase(autoRecord).catch(e => console.warn('[Supabase watch log sync notice]:', e.message));
+  }
+
   res.json({ success: true, log: autoRecord, autoSync: true });
 });
 
@@ -2080,51 +2134,88 @@ app.post('/api/coach/chat', async (req, res) => {
   }
 });
 
-// --- SETTINGS & TOKEN TRACKER ---
+// --- SETTINGS & TOKEN TRACKER (USER ISOLATED - ZERO DATA LEAKS) ---
 app.get('/api/settings', (req, res) => {
   const db = readDB();
   const userId = getAuthUserId(req, db);
-  const key = getUserApiKey(db, userId);
-  const settings = { ...(db.settings || {}) };
-  settings.geminiApiKey = key;
+  const userSettings = (userId && db.userSettings && db.userSettings[userId]) || {};
+  const user = (db.users || []).find(u => u.id === userId);
+  const profile = db.profiles && db.profiles[userId];
 
-  // Mask API key for security
-  if (key) {
-    settings.hasApiKey = true;
-    settings.maskedKey = `${key.slice(0, 4)}...${key.slice(-4)}`;
-  } else {
-    settings.hasApiKey = false;
-    settings.maskedKey = '';
-  }
+  // Strictly user-scoped key: NEVER fall back to global db.settings or another user's key!
+  const key = profile?.geminiApiKey || user?.geminiApiKey || userSettings.geminiApiKey || '';
+  const fastrackDeviceName = userSettings.fastrackDeviceName || profile?.fastrackDeviceName || '';
+  const googleClientId = userSettings.googleClientId || profile?.googleClientId || '';
+
+  const settings = {
+    hasApiKey: Boolean(key),
+    maskedKey: key ? `${key.slice(0, 4)}...${key.slice(-4)}` : '',
+    fastrackDeviceName: fastrackDeviceName || 'Fastrack Reflex Curve',
+    googleClientId,
+    useHeuristicFallback: userSettings.useHeuristicFallback !== false
+  };
+
   res.json(settings);
 });
 
-app.post('/api/settings', (req, res) => {
+app.post('/api/settings', async (req, res) => {
   const db = readDB();
   const userId = getAuthUserId(req, db);
   const userProfile = getUserProfile(db, userId);
-  const { geminiApiKey, fastrackDeviceName, useHeuristicFallback, cacheTokens } = req.body;
+  const { geminiApiKey, fastrackDeviceName, googleClientId, useHeuristicFallback, cacheTokens } = req.body;
 
-  db.settings = db.settings || {};
-  if (typeof geminiApiKey === 'string') {
-    const cleanKey = geminiApiKey.trim();
-    userProfile.geminiApiKey = cleanKey;
-    if (db.profiles && db.profiles[userId]) {
-      db.profiles[userId].geminiApiKey = cleanKey;
+  if (userId) {
+    db.userSettings = db.userSettings || {};
+    db.userSettings[userId] = db.userSettings[userId] || {};
+
+    if (typeof geminiApiKey === 'string') {
+      const cleanKey = geminiApiKey.trim();
+      userProfile.geminiApiKey = cleanKey;
+      if (db.profiles && db.profiles[userId]) {
+        db.profiles[userId].geminiApiKey = cleanKey;
+      }
+      const matchedUser = (db.users || []).find(u => u.id === userId);
+      if (matchedUser) {
+        matchedUser.geminiApiKey = cleanKey;
+      }
+      db.userSettings[userId].geminiApiKey = cleanKey;
+      aiService.setApiKey(cleanKey);
     }
-    const matchedUser = (db.users || []).find(u => u.id === userId);
-    if (matchedUser) {
-      matchedUser.geminiApiKey = cleanKey;
+
+    if (typeof googleClientId === 'string') {
+      const cleanId = googleClientId.trim();
+      db.userSettings[userId].googleClientId = cleanId;
+      if (db.profiles && db.profiles[userId]) {
+        db.profiles[userId].googleClientId = cleanId;
+      }
     }
-    db.settings.geminiApiKey = cleanKey;
-    aiService.setApiKey(cleanKey);
+
+    if (typeof fastrackDeviceName === 'string') {
+      db.userSettings[userId].fastrackDeviceName = fastrackDeviceName;
+    }
+
+    if (typeof useHeuristicFallback === 'boolean') {
+      db.userSettings[userId].useHeuristicFallback = useHeuristicFallback;
+    }
+
+    // Save profile with keys to Supabase Cloud if ready
+    if (isSupabaseReady() && db.profiles && db.profiles[userId]) {
+      try {
+        const userObj = (db.users || []).find(u => u.id === userId);
+        await saveProfileToSupabase(userId, { ...db.profiles[userId], email: userObj?.email });
+      } catch (e) {}
+    }
   }
-  if (fastrackDeviceName) db.settings.fastrackDeviceName = fastrackDeviceName;
-  if (typeof useHeuristicFallback === 'boolean') db.settings.useHeuristicFallback = useHeuristicFallback;
-  if (typeof cacheTokens === 'boolean') db.settings.cacheTokens = cacheTokens;
+
+  // Purge any legacy global keys from db.settings so they never leak
+  if (db.settings) {
+    delete db.settings.geminiApiKey;
+    delete db.settings.googleClientId;
+    delete db.settings.fastrackDeviceName;
+  }
 
   writeDB(db);
-  res.json({ success: true, message: 'Settings saved' });
+  res.json({ success: true, message: 'Settings saved securely for your account' });
 });
 
 // --- CLOUD DATABASE (SUPABASE / POSTGRESQL) STATUS & MIGRATION ---

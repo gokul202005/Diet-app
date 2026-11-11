@@ -15,12 +15,16 @@ import {
 } from 'lucide-react';
 import { api } from '../api';
 
-export default function SettingsModal({ isOpen, onClose, onEditProfile }) {
+export default function SettingsModal({ isOpen, onClose, onEditProfile, currentUser }) {
   const [settings, setSettings] = useState(null);
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [deviceName, setDeviceName] = useState('Fastrack Reflex Curve');
+  const userStorageKey = currentUser?.id ? `agy_google_client_id_${currentUser.id}` : null;
   const [googleClientId, setGoogleClientId] = useState(() => {
-    return localStorage.getItem('agy_google_client_id') || '';
+    if (userStorageKey && typeof window !== 'undefined') {
+      return localStorage.getItem(userStorageKey) || '';
+    }
+    return '';
   });
   const [useFallback, setUseFallback] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -30,16 +34,26 @@ export default function SettingsModal({ isOpen, onClose, onEditProfile }) {
 
   useEffect(() => {
     if (isOpen) {
-      api.getSettings().then((data) => {
+      // Remove any legacy leaking global key from localStorage
+      try { localStorage.removeItem('agy_google_client_id'); } catch (e) {}
+
+      api.getSettings(currentUser?.id).then((data) => {
         setSettings(data);
         if (data.fastrackDeviceName) setDeviceName(data.fastrackDeviceName);
         if (data.useHeuristicFallback !== undefined) setUseFallback(data.useHeuristicFallback);
+        if (data.googleClientId !== undefined && data.googleClientId) {
+          setGoogleClientId(data.googleClientId);
+        } else if (userStorageKey) {
+          setGoogleClientId(localStorage.getItem(userStorageKey) || '');
+        } else {
+          setGoogleClientId('');
+        }
       });
       api.getDatabaseStatus().then((data) => {
         if (data) setDbStatus(data);
       }).catch(() => null);
     }
-  }, [isOpen]);
+  }, [isOpen, currentUser?.id]);
 
   const handleMigrateToSupabase = async () => {
     setIsMigrating(true);
@@ -73,22 +87,26 @@ export default function SettingsModal({ isOpen, onClose, onEditProfile }) {
     try {
       const payload = {
         fastrackDeviceName: deviceName,
-        useHeuristicFallback: useFallback
+        useHeuristicFallback: useFallback,
+        googleClientId: googleClientId.trim()
       };
       if (apiKeyInput.trim()) {
         payload.geminiApiKey = apiKeyInput.trim();
       }
 
-      if (googleClientId.trim()) {
-        localStorage.setItem('agy_google_client_id', googleClientId.trim());
-      } else {
-        localStorage.removeItem('agy_google_client_id');
+      if (userStorageKey) {
+        if (googleClientId.trim()) {
+          localStorage.setItem(userStorageKey, googleClientId.trim());
+        } else {
+          localStorage.removeItem(userStorageKey);
+        }
       }
+      localStorage.removeItem('agy_google_client_id'); // Ensure leaking legacy key is wiped
 
-      const res = await api.updateSettings(payload);
+      const res = await api.updateSettings(payload, currentUser?.id);
       if (res.success) {
         if (typeof window !== 'undefined' && window.showToast) {
-          window.showToast('Settings and preferences saved successfully!', 'success', 'Settings Saved');
+          window.showToast('Settings and preferences saved securely for your account!', 'success', 'Settings Saved');
         }
         setApiKeyInput('');
         onClose();
@@ -237,6 +255,7 @@ export default function SettingsModal({ isOpen, onClose, onEditProfile }) {
                     type="button"
                     onClick={() => {
                       setGoogleClientId('');
+                      if (userStorageKey) localStorage.removeItem(userStorageKey);
                       localStorage.removeItem('agy_google_client_id');
                       localStorage.removeItem('agy_google_fit_token');
                     }}
