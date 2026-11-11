@@ -33,12 +33,28 @@ export default function App() {
           setCurrentUser(authData.user);
           localStorage.setItem('agy_current_user', JSON.stringify(authData.user));
           const profileData = await api.getProfile().catch(() => null);
-          if (profileData) setProfile(profileData);
 
-          // Only trigger onboarding setup wizard if user is brand new and has never configured or dismissed
+          const cachedProfile = localStorage.getItem(`agy_profile_${authData.user.id}`);
+          let parsedCached = null;
+          try { if (cachedProfile) parsedCached = JSON.parse(cachedProfile); } catch (e) {}
+
+          const effectiveProfile = (profileData && profileData.isConfigured)
+            ? profileData
+            : (parsedCached && parsedCached.isConfigured ? parsedCached : profileData);
+
+          if (effectiveProfile) {
+            setProfile(effectiveProfile);
+            if (effectiveProfile.isConfigured) {
+              localStorage.setItem(`agy_profile_${authData.user.id}`, JSON.stringify(effectiveProfile));
+            }
+          }
+
+          // Only trigger onboarding setup wizard if user is brand new (never configured)
           const isDismissed = sessionStorage.getItem('onboarding_wizard_dismissed');
-          if (profileData && !profileData.isConfigured && !isDismissed) {
+          if ((!effectiveProfile || !effectiveProfile.isConfigured) && !isDismissed) {
             setIsOnboardingOpen(true);
+          } else {
+            setIsOnboardingOpen(false);
           }
         } else {
           setCurrentUser(null);
@@ -59,22 +75,42 @@ export default function App() {
 
   const handleProfileSaved = (updatedProfile) => {
     setProfile(updatedProfile);
+    if (currentUser?.id && updatedProfile?.isConfigured) {
+      localStorage.setItem(`agy_profile_${currentUser.id}`, JSON.stringify(updatedProfile));
+    }
   };
 
   const handleAuthSuccess = async (user, initialProfile) => {
     if (!user) return;
     localStorage.setItem('agy_current_user', JSON.stringify(user));
     setCurrentUser(user);
-    setProfile(initialProfile || null);
 
-    try {
-      const p = initialProfile || await api.getProfile();
-      if (p) setProfile(p);
-      if (!p || !p.isConfigured || !p.heightCm || !p.weightKg) {
-        setIsOnboardingOpen(true);
+    const cachedProfile = localStorage.getItem(`agy_profile_${user.id}`);
+    let parsedCached = null;
+    try { if (cachedProfile) parsedCached = JSON.parse(cachedProfile); } catch (e) {}
+
+    let effectiveProfile = (initialProfile && initialProfile.isConfigured) ? initialProfile : parsedCached;
+    if (!effectiveProfile || !effectiveProfile.isConfigured) {
+      try {
+        const p = await api.getProfile();
+        if (p && p.isConfigured) {
+          effectiveProfile = p;
+        }
+      } catch (e) {}
+    }
+
+    if (effectiveProfile) {
+      setProfile(effectiveProfile);
+      if (effectiveProfile.isConfigured) {
+        localStorage.setItem(`agy_profile_${user.id}`, JSON.stringify(effectiveProfile));
       }
-    } catch {
+    }
+
+    // Only prompt wizard if user has NEVER configured their profile
+    if (!effectiveProfile || !effectiveProfile.isConfigured) {
       setIsOnboardingOpen(true);
+    } else {
+      setIsOnboardingOpen(false);
     }
   };
 
@@ -187,6 +223,7 @@ export default function App() {
             key={`fastrack-${selectedDate}-${refreshKey}`}
             selectedDate={selectedDate}
             profile={profile}
+            currentUser={currentUser}
           />
         )}
 

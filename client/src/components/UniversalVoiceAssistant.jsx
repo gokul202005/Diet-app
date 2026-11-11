@@ -29,7 +29,7 @@ function deduplicateSpeechRepetitions(text) {
   let clean = text.replace(/\b([a-zA-Z0-9]+)(\s+\1\b)+/gi, (m, p) => p);
 
   // 2. Token-level duplicate phrase remover (e.g. repeated sentence halves)
-  const words = clean.split(/\s+/);
+  let words = clean.split(/\s+/).filter(Boolean);
   if (words.length > 3) {
     for (let phraseLen = Math.floor(words.length / 2); phraseLen >= 2; phraseLen--) {
       for (let i = 0; i <= words.length - (phraseLen * 2); i++) {
@@ -37,12 +37,79 @@ function deduplicateSpeechRepetitions(text) {
         const s2 = words.slice(i + phraseLen, i + phraseLen * 2).join(' ').toLowerCase();
         if (s1 === s2) {
           words.splice(i + phraseLen, phraseLen);
+          i--;
         }
       }
     }
     clean = words.join(' ');
   }
+
+  // 3. Remove prefix stutter repetition: "I ate I ate 3" -> "I ate 3"
+  words = clean.split(/\s+/).filter(Boolean);
+  if (words.length >= 4) {
+    for (let k = 1; k <= Math.floor(words.length / 2); k++) {
+      const p1 = words.slice(0, k).join(' ').toLowerCase();
+      const p2 = words.slice(k, k * 2).join(' ').toLowerCase();
+      if (p1 === p2) {
+        words.splice(0, k);
+        clean = words.join(' ');
+        break;
+      }
+    }
+  }
+
   return clean.replace(/\s+/g, ' ').trim();
+}
+
+function combineSpeechBuffers(committed, currentFinal, currentInterim) {
+  const normCommitted = (committed || '').trim();
+  const normFinal = (currentFinal || '').trim();
+  const normInterim = (currentInterim || '').trim();
+
+  let base = normCommitted;
+  if (normFinal) {
+    if (!base) {
+      base = normFinal;
+    } else if (normFinal.toLowerCase().startsWith(base.toLowerCase())) {
+      base = normFinal;
+    } else if (base.toLowerCase().endsWith(normFinal.toLowerCase())) {
+      base = base;
+    } else {
+      const baseWords = base.split(/\s+/).filter(Boolean);
+      const finalWords = normFinal.split(/\s+/).filter(Boolean);
+      let overlapCount = 0;
+      const maxOverlap = Math.min(baseWords.length, finalWords.length);
+      for (let k = maxOverlap; k >= 1; k--) {
+        const endWords = baseWords.slice(-k).join(' ').toLowerCase();
+        const startWords = finalWords.slice(0, k).join(' ').toLowerCase();
+        if (endWords === startWords) {
+          overlapCount = k;
+          break;
+        }
+      }
+      if (overlapCount > 0) {
+        base = baseWords.concat(finalWords.slice(overlapCount)).join(' ');
+      } else {
+        base = `${base} ${normFinal}`;
+      }
+    }
+  }
+
+  let full = base;
+  if (normInterim) {
+    if (!full) {
+      full = normInterim;
+    } else if (normInterim.toLowerCase().startsWith(full.toLowerCase())) {
+      full = normInterim;
+    } else {
+      full = `${full} ${normInterim}`;
+    }
+  }
+
+  return {
+    finalText: deduplicateSpeechRepetitions(base),
+    fullText: deduplicateSpeechRepetitions(full)
+  };
 }
 
 function normalizeFitnessSpeech(rawText) {
@@ -256,7 +323,7 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
         recognition.lang = speechLang || 'en-IN';
         recognition.maxAlternatives = 1;
 
-        let previousRestartsFinal = '';
+        let committedText = '';
 
         recognition.onstart = () => {
           setIsRecording(true);
@@ -269,7 +336,6 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
           let currentSessionFinal = '';
           let currentSessionInterim = '';
 
-          // Rebuild whole session cleanly from event.results (never compound past tokens into runaway stutters)
           for (let i = 0; i < event.results.length; ++i) {
             const item = event.results[i];
             const text = item[0]?.transcript || '';
@@ -280,17 +346,11 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
             }
           }
 
-          currentSessionFinal = currentSessionFinal.trim();
-          currentSessionInterim = currentSessionInterim.trim();
+          const { finalText, fullText } = combineSpeechBuffers(committedText, currentSessionFinal, currentSessionInterim);
 
-          const totalRaw = [previousRestartsFinal, currentSessionFinal, currentSessionInterim]
-            .filter(Boolean)
-            .join(' ')
-            .trim();
-
-          const cleanFinal = normalizeFitnessSpeech([previousRestartsFinal, currentSessionFinal].filter(Boolean).join(' '));
+          const cleanFinal = normalizeFitnessSpeech(finalText);
           const cleanInterim = normalizeFitnessSpeech(currentSessionInterim);
-          const fullDisplay = normalizeFitnessSpeech(totalRaw);
+          const fullDisplay = normalizeFitnessSpeech(fullText);
 
           setLiveFinalText(cleanFinal);
           setLiveInterimText(cleanInterim);
@@ -315,8 +375,9 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
         recognition.onend = () => {
           // If the user hasn't clicked stop and speech recognition times out, auto-restart to keep listening
           if (isRecordingRef.current) {
+            // Commit current clean speech so far
             if (recognizedTextRef.current.trim()) {
-              previousRestartsFinal = recognizedTextRef.current.trim();
+              committedText = recognizedTextRef.current.trim();
             }
             try {
               recognition.start();

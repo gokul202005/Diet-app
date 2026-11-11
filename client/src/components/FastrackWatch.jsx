@@ -20,7 +20,7 @@ import { api } from '../api';
 import { watchAutoSync } from '../utils/watchAutoSync';
 import { healthConnectSync } from '../utils/healthConnectSync';
 
-export default function FastrackWatch({ selectedDate, profile }) {
+export default function FastrackWatch({ selectedDate, profile, currentUser }) {
   const [fastrackLog, setFastrackLog] = useState(null);
   const [energyBalance, setEnergyBalance] = useState(null);
 
@@ -412,8 +412,16 @@ export default function FastrackWatch({ selectedDate, profile }) {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            {/* Google Fit Direct Connect / Disconnect */}
-            {isGoogleFitConnected ? (
+            {/* Google Fit Direct Connect / Auto-Linked Google Account */}
+            {currentUser?.provider === 'google' ? (
+              <div
+                className="px-4 py-2.5 bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 font-bold rounded-2xl text-xs flex items-center space-x-2 shadow-md"
+                title={`Google Fit is automatically linked to your logged-in Google account: ${currentUser.email}`}
+              >
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span className="truncate max-w-[220px]">Google Fit Linked ({currentUser.email})</span>
+              </div>
+            ) : isGoogleFitConnected ? (
               <button
                 onClick={handleDisconnectGoogleFit}
                 className="px-4 py-2.5 bg-emerald-500/20 hover:bg-rose-500/20 border border-emerald-500/40 hover:border-rose-500/40 text-emerald-300 hover:text-rose-300 font-bold rounded-2xl text-xs transition-all flex items-center space-x-2 cursor-pointer shadow-md"

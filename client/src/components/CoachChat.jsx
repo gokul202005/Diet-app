@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ConfirmModal from './ConfirmModal';
-import { Bot, Send, Sparkles, User, Flame, Dumbbell, Watch, RefreshCw, Trash2 } from 'lucide-react';
+import { Bot, Send, Sparkles, User, Flame, Dumbbell, Watch, RefreshCw, Trash2, Mic, MicOff } from 'lucide-react';
 import { api } from '../api';
 
 // Markdown text & inline parser for rich AI Coach responses (bold, italics, lists, code)
@@ -162,7 +162,9 @@ export default function CoachChat({ profile, selectedDate }) {
   const [inputText, setInputText] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [isConfirmClearOpen, setIsConfirmClearOpen] = useState(false);
+  const [isListening, setIsListening] = useState(false);
   const messagesEndRef = useRef(null);
+  const recognitionRef = useRef(null);
 
   const loadHistory = async () => {
     try {
@@ -178,12 +180,78 @@ export default function CoachChat({ profile, selectedDate }) {
   }, []);
 
   useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        try { recognitionRef.current.stop(); } catch (e) {}
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isSending]);
+
+  // Web Speech API Voice Dictation
+  const toggleMic = () => {
+    if (isListening) {
+      if (recognitionRef.current) {
+        try { recognitionRef.current.stop(); } catch (e) {}
+      }
+      setIsListening(false);
+      return;
+    }
+
+    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRec) {
+      if (typeof window !== 'undefined' && window.showToast) {
+        window.showToast('Voice speech recognition is not supported on this browser.', 'warning', 'Mic Unavailable');
+      }
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRec();
+      recognition.lang = 'en-IN';
+      recognition.continuous = false;
+      recognition.interimResults = true;
+
+      recognition.onstart = () => {
+        setIsListening(true);
+      };
+
+      recognition.onresult = (event) => {
+        let transcript = '';
+        for (let i = 0; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript;
+        }
+        setInputText(transcript);
+      };
+
+      recognition.onerror = (e) => {
+        console.warn('Coach mic error:', e.error);
+        setIsListening(false);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch (err) {
+      console.warn('Coach mic start error:', err);
+      setIsListening(false);
+    }
+  };
 
   const handleSend = async (textToSend) => {
     const text = (textToSend || inputText).trim();
     if (!text || isSending) return;
+
+    if (isListening && recognitionRef.current) {
+      try { recognitionRef.current.stop(); } catch (e) {}
+      setIsListening(false);
+    }
 
     // Optimistic user bubble
     const userMsg = {
@@ -231,20 +299,20 @@ export default function CoachChat({ profile, selectedDate }) {
   ];
 
   return (
-    <div className="space-y-4 pb-20 max-w-4xl mx-auto">
+    <div className="space-y-3 pb-20 max-w-4xl mx-auto">
       
       {/* Header */}
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-xl flex items-center justify-between">
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-5 shadow-xl flex items-center justify-between">
         <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center text-slate-950 shadow-md shadow-emerald-500/20">
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center text-slate-950 shadow-md shadow-emerald-500/20 shrink-0">
             <Bot className="w-6 h-6" />
           </div>
           <div>
-            <h2 className="text-base font-bold text-white flex items-center space-x-1.5">
+            <h2 className="text-sm sm:text-base font-bold text-white flex items-center space-x-1.5">
               <span>AGY Fitness & Nutrition AI Coach</span>
               <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
             </h2>
-            <p className="text-[11px] text-slate-400">
+            <p className="text-[10px] sm:text-[11px] text-slate-400">
               Personalized for your 100% South Indian diet, Fastrack watch, and bio targets.
             </p>
           </div>
@@ -253,7 +321,7 @@ export default function CoachChat({ profile, selectedDate }) {
         <div className="flex items-center space-x-2">
           <button
             onClick={loadHistory}
-            className="p-2 text-slate-400 hover:text-white bg-slate-950 border border-slate-800 rounded-xl transition-colors"
+            className="p-2 text-slate-400 hover:text-white bg-slate-950 border border-slate-800 rounded-xl transition-colors cursor-pointer"
             title="Refresh Conversation"
           >
             <RefreshCw className="w-4 h-4" />
@@ -269,46 +337,97 @@ export default function CoachChat({ profile, selectedDate }) {
       </div>
 
       {/* Chat Messages Container */}
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-xl h-[58vh] overflow-y-auto space-y-4 flex flex-col">
-        {messages.map((msg) => {
-          const isUser = msg.sender === 'user';
-          return (
-            <div
-              key={msg.id}
-              className={`flex items-start space-x-2.5 max-w-[85%] ${
-                isUser ? 'ml-auto flex-row-reverse space-x-reverse' : ''
-              }`}
-            >
-              <div
-                className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs font-bold shrink-0 ${
-                  isUser
-                    ? 'bg-emerald-500 text-slate-950'
-                    : 'bg-slate-800 text-emerald-400 border border-slate-700'
-                }`}
-              >
-                {isUser ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-5 shadow-xl h-[48vh] sm:h-[52vh] overflow-y-auto space-y-4 flex flex-col">
+        {messages.length === 0 ? (
+          <div className="flex flex-col items-center justify-center my-auto p-4 text-center space-y-3.5 max-w-md mx-auto animate-in fade-in zoom-in-95 duration-200">
+            <div className="relative">
+              <div className="w-14 h-14 rounded-3xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center text-slate-950 shadow-xl shadow-emerald-500/25">
+                <Bot className="w-8 h-8" />
               </div>
-
-              <div
-                className={`p-4 rounded-2xl text-xs leading-relaxed ${
-                  isUser
-                    ? 'bg-emerald-500 text-slate-950 font-medium rounded-tr-none'
-                    : 'bg-slate-950 border border-slate-800 text-slate-200 rounded-tl-none shadow-sm'
-                }`}
-              >
-                <FormattedMessage content={msg.text} isUser={isUser} />
-                <div
-                  className={`text-[9px] mt-2 pt-1 border-t ${
-                    isUser ? 'text-slate-900/70 border-emerald-600/30 text-right' : 'text-slate-500 border-slate-900'
-                  }`}
-                >
-                  {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  {!isUser && msg.source && ` • ${msg.source}`}
-                </div>
+              <div className="absolute -bottom-1 -right-1 p-1 bg-slate-900 rounded-full border border-slate-800">
+                <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
               </div>
             </div>
-          );
-        })}
+
+            <div className="space-y-1">
+              <h3 className="text-base font-extrabold text-white">
+                Namaste, {profile?.name || 'Athlete'}! 🙏
+              </h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                I'm your dedicated South Indian Nutrition & Biomechanics AI Coach. Ask me about high-protein meal swaps, dosa/idli calibrations, Fastrack burns, or workout splits.
+              </p>
+            </div>
+
+            {/* Target Snapshot Badges */}
+            <div className="grid grid-cols-3 gap-2 w-full pt-1">
+              <div className="bg-slate-950/70 border border-slate-800/80 p-2 rounded-2xl">
+                <div className="text-[10px] text-slate-500 uppercase font-bold flex items-center justify-center space-x-1">
+                  <Flame className="w-3 h-3 text-emerald-400" />
+                  <span>Target</span>
+                </div>
+                <div className="text-xs font-black text-white mt-0.5">{profile?.dailyTargetCalories || 2000} kcal</div>
+              </div>
+              <div className="bg-slate-950/70 border border-slate-800/80 p-2 rounded-2xl">
+                <div className="text-[10px] text-slate-500 uppercase font-bold flex items-center justify-center space-x-1">
+                  <Dumbbell className="w-3 h-3 text-sky-400" />
+                  <span>Protein</span>
+                </div>
+                <div className="text-xs font-black text-sky-300 mt-0.5">{profile?.dailyTargetProtein || 130}g</div>
+              </div>
+              <div className="bg-slate-950/70 border border-slate-800/80 p-2 rounded-2xl">
+                <div className="text-[10px] text-slate-500 uppercase font-bold flex items-center justify-center space-x-1">
+                  <Watch className="w-3 h-3 text-teal-400" />
+                  <span>Steps</span>
+                </div>
+                <div className="text-xs font-black text-teal-300 mt-0.5">{(profile?.dailyTargetSteps || 10000).toLocaleString()}</div>
+              </div>
+            </div>
+
+            <p className="text-[11px] text-emerald-400 font-medium">
+              💡 Tap a suggestion below or tap the mic to speak your query!
+            </p>
+          </div>
+        ) : (
+          messages.map((msg) => {
+            const isUser = msg.sender === 'user';
+            return (
+              <div
+                key={msg.id}
+                className={`flex items-start space-x-2.5 max-w-[85%] ${
+                  isUser ? 'ml-auto flex-row-reverse space-x-reverse' : ''
+                }`}
+              >
+                <div
+                  className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs font-bold shrink-0 ${
+                    isUser
+                      ? 'bg-emerald-500 text-slate-950'
+                      : 'bg-slate-800 text-emerald-400 border border-slate-700'
+                  }`}
+                >
+                  {isUser ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
+                </div>
+
+                <div
+                  className={`p-3.5 sm:p-4 rounded-2xl text-xs leading-relaxed ${
+                    isUser
+                      ? 'bg-emerald-500 text-slate-950 font-medium rounded-tr-none'
+                      : 'bg-slate-950 border border-slate-800 text-slate-200 rounded-tl-none shadow-sm'
+                  }`}
+                >
+                  <FormattedMessage content={msg.text} isUser={isUser} />
+                  <div
+                    className={`text-[9px] mt-2 pt-1 border-t ${
+                      isUser ? 'text-slate-900/70 border-emerald-600/30 text-right' : 'text-slate-500 border-slate-900'
+                    }`}
+                  >
+                    {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    {!isUser && msg.source && ` • ${msg.source}`}
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
 
         {isSending && (
           <div className="flex items-center space-x-2 text-xs text-emerald-400 bg-slate-950/60 p-3 rounded-2xl border border-slate-800 w-fit">
@@ -320,20 +439,20 @@ export default function CoachChat({ profile, selectedDate }) {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Suggested Quick Questions */}
-      <div className="flex flex-wrap gap-2">
+      {/* Suggested Quick Questions: Sleek Horizontal Ribbon (Never pushes typing box down) */}
+      <div className="flex items-center space-x-2 overflow-x-auto pb-1 no-scrollbar whitespace-nowrap">
         {quickPrompts.map((q) => (
           <button
             key={q}
             onClick={() => handleSend(q)}
-            className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-[11px] text-slate-300 transition-all text-left"
+            className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-emerald-500/40 rounded-full text-[11px] text-slate-300 transition-all shrink-0 cursor-pointer shadow-sm active:scale-95"
           >
             💬 {q}
           </button>
         ))}
       </div>
 
-      {/* Input Box */}
+      {/* Input Box with Voice Mic Button */}
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -341,17 +460,31 @@ export default function CoachChat({ profile, selectedDate }) {
         }}
         className="flex items-center space-x-2 bg-slate-900 border border-slate-800 p-2 rounded-2xl shadow-xl"
       >
+        <button
+          type="button"
+          onClick={toggleMic}
+          className={`p-2.5 rounded-xl transition-all cursor-pointer shrink-0 ${
+            isListening
+              ? 'bg-rose-500 text-white animate-pulse shadow-lg shadow-rose-500/30'
+              : 'bg-slate-950 text-slate-400 hover:text-emerald-400 border border-slate-800'
+          }`}
+          title={isListening ? 'Listening... Tap to stop' : 'Speak your query'}
+        >
+          {isListening ? <MicOff className="w-4 h-4 text-white" /> : <Mic className="w-4 h-4" />}
+        </button>
+
         <input
           type="text"
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
-          placeholder="Ask anything about South Indian foods, meal swaps, Fastrack burn, workout critique..."
-          className="flex-1 bg-transparent px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none"
+          placeholder={isListening ? 'Listening to your voice...' : 'Ask anything about South Indian foods, meal swaps, Fastrack burn...'}
+          className="flex-1 bg-transparent px-2.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none"
         />
+
         <button
           type="submit"
           disabled={!inputText.trim() || isSending}
-          className="p-2.5 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-slate-950 rounded-xl transition-all font-bold shadow-md shadow-emerald-500/20"
+          className="p-2.5 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-slate-950 rounded-xl transition-all font-bold shadow-md shadow-emerald-500/20 cursor-pointer shrink-0"
         >
           <Send className="w-4 h-4" />
         </button>

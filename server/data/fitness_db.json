@@ -35,29 +35,23 @@
     "isConfigured": false,
     "name": "",
     "age": null,
-    "gender": "male",
+    "gender": "",
     "heightCm": null,
     "weightKg": null,
     "targetWeightKg": null,
-    "goal": "recomposition",
-    "activityLevel": "moderately_active",
-    "dietPreference": "south_indian_mixed",
-    "dailyTargetCalories": 2100,
-    "dailyTargetProtein": 140,
-    "dailyTargetCarbs": 220,
-    "dailyTargetFat": 60,
+    "goal": "",
+    "activityLevel": "",
+    "dietPreference": "",
+    "dailyTargetCalories": 2000,
+    "dailyTargetProtein": 130,
+    "dailyTargetCarbs": 200,
+    "dailyTargetFat": 55,
     "dailyTargetWater": 3000,
     "dailyTargetSteps": 10000,
     "recalculateTargets": true,
-    "dietaryTags": [
-      "🍗 Non-Veg"
-    ],
-    "focusAreas": [
-      "🛡️ Full Body Balance"
-    ],
-    "goals": [
-      "recomp"
-    ]
+    "dietaryTags": [],
+    "focusAreas": [],
+    "goals": []
   },
   "progressPhotos": [],
   "dayCheckins": []

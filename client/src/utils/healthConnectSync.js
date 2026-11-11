@@ -137,7 +137,7 @@ class HealthConnectSyncEngine {
   };
 
   // --- GOOGLE FIT / HEALTH CONNECT OAUTH & REST API ---
-  async requestGoogleFitAuth() {
+  async requestGoogleFitAuth(options = {}) {
     if (typeof window === 'undefined') return { success: false };
 
     const customClientId = 
@@ -166,6 +166,7 @@ class HealthConnectSyncEngine {
             'https://www.googleapis.com/auth/fitness.heart_rate.read',
             'https://www.googleapis.com/auth/fitness.sleep.read'
           ].join(' '),
+          hint: options.hint || '',
           callback: async (response) => {
             if (response.error) {
               console.warn('[GoogleFit] Auth error:', response.error);
@@ -181,7 +182,14 @@ class HealthConnectSyncEngine {
         });
 
         if (client) {
-          client.requestAccessToken({ prompt: 'consent' });
+          const reqConfig = {};
+          if (options.hint) reqConfig.hint = options.hint;
+          if (options.prompt !== undefined) {
+            reqConfig.prompt = options.prompt;
+          } else if (!options.hint) {
+            reqConfig.prompt = 'consent';
+          }
+          client.requestAccessToken(reqConfig);
         } else {
           resolve({ success: false, error: 'Could not initialize Google token client' });
         }
@@ -221,6 +229,14 @@ class HealthConnectSyncEngine {
       const url = 'https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate';
       const body = {
         aggregateBy: [
+          { 
+            dataTypeName: 'com.google.step_count.delta',
+            dataSourceId: 'derived:com.google.step_count.delta:com.google.android.gms:merge_step_deltas'
+          },
+          { 
+            dataTypeName: 'com.google.calories.expended',
+            dataSourceId: 'derived:com.google.calories.expended:com.google.android.gms:merge_calories_expended'
+          },
           { dataTypeName: 'com.google.step_count.delta' },
           { dataTypeName: 'com.google.calories.expended' },
           { dataTypeName: 'com.google.heart_rate.bpm' },
@@ -268,7 +284,9 @@ class HealthConnectSyncEngine {
 
   parseGoogleFitResponse(data) {
     let totalSteps = 0;
+    let mergedSteps = 0;
     let totalCalories = 0;
+    let mergedCalories = 0;
     let heartRateVals = [];
     let sleepHours = 7.0;
 
@@ -282,23 +300,29 @@ class HealthConnectSyncEngine {
         for (const ds of bucket.dataset) {
           const type = (ds.dataSourceId || '').toLowerCase();
           
-          // Steps extraction (matches all Google Fit step data streams)
+          // Steps extraction (prioritizes official Google Fit merged deltas)
           if (type.includes('step') || type.includes('delta')) {
             const streamSum = ds.point?.reduce((acc, pt) => {
               const val = pt.value?.[0];
               const count = val?.intVal !== undefined ? Number(val.intVal) : (val?.fpVal !== undefined ? Math.round(Number(val.fpVal)) : 0);
               return acc + (isNaN(count) ? 0 : count);
             }, 0) || 0;
+            if (type.includes('merge_step_deltas')) {
+              mergedSteps = Math.max(mergedSteps, streamSum);
+            }
             bucketSteps = Math.max(bucketSteps, streamSum);
           }
 
-          // Calories extraction
+          // Calories extraction (prioritizes official merged calories)
           if (type.includes('calorie') || type.includes('expended')) {
             const streamCal = ds.point?.reduce((acc, pt) => {
               const val = pt.value?.[0];
               const cal = val?.fpVal !== undefined ? Number(val.fpVal) : (val?.intVal !== undefined ? Number(val.intVal) : 0);
               return acc + (isNaN(cal) ? 0 : cal);
             }, 0) || 0;
+            if (type.includes('merge_calories_expended')) {
+              mergedCalories = Math.max(mergedCalories, streamCal);
+            }
             bucketCalories = Math.max(bucketCalories, streamCal);
           }
 
@@ -321,8 +345,8 @@ class HealthConnectSyncEngine {
           }
         }
 
-        totalSteps += bucketSteps;
-        totalCalories += bucketCalories;
+        totalSteps = Math.max(totalSteps, mergedSteps > 0 ? mergedSteps : bucketSteps);
+        totalCalories = Math.max(totalCalories, mergedCalories > 0 ? mergedCalories : bucketCalories);
       }
     } catch (e) {
       console.warn('[GoogleFit] Parsing error:', e);

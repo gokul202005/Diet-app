@@ -11,7 +11,7 @@ import { FastrackService } from './services/fastrackService.js';
 import { searchFoodDatabase } from './data/foodDatabase.js';
 import { calculateNutritionTargets } from './services/profileCalculator.js';
 import { uploadImageToOnlineStorage, deleteImageFromOnlineStorage } from './services/cloudStorage.js';
-import { isSupabaseReady, migrateLocalDataToSupabase, getSupabase, getPhotosFromSupabase } from './services/supabaseService.js';
+import { isSupabaseReady, migrateLocalDataToSupabase, getSupabase, getPhotosFromSupabase, getProfileFromSupabase, saveProfileToSupabase } from './services/supabaseService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -94,26 +94,26 @@ function getUserProfile(db, userId, fallbackName = '') {
     const matchedUser = (db.users || []).find(u => u.id === userId);
     const name = matchedUser?.name || fallbackName || '';
 
-    // Clean slate for new user: isConfigured is FALSE, height & weight are blank!
+    // Clean slate for new user: isConfigured is FALSE, zero pre-filled values!
     db.profiles[userId] = {
       isConfigured: false,
       name: name,
       age: '',
-      gender: 'male',
+      gender: '',
       heightCm: '',
       weightKg: '',
-      goal: 'recomp',
-      activityLevel: 'moderately_active',
-      dailyTargetCalories: 2100,
-      dailyTargetProtein: 140,
-      dailyTargetCarbs: 220,
-      dailyTargetFat: 60,
+      goal: '',
+      activityLevel: '',
+      dailyTargetCalories: 2000,
+      dailyTargetProtein: 130,
+      dailyTargetCarbs: 200,
+      dailyTargetFat: 55,
       dailyTargetWater: 3000,
       dailyTargetSteps: 10000,
       recalculateTargets: true,
-      dietaryTags: ['🍗 Non-Veg'],
-      focusAreas: ['🛡️ Full Body Balance'],
-      goals: ['recomp']
+      dietaryTags: [],
+      focusAreas: [],
+      goals: []
     };
     writeDB(db);
   }
@@ -161,27 +161,27 @@ app.post('/api/auth/signup', (req, res) => {
     db.users.push(newUser);
     db.currentUser = { id: newUser.id, name: newUser.name, email: newUser.email, provider: newUser.provider };
 
-    // Initialize NEW user profile with clean slate (isConfigured: false)
+    // Initialize NEW user profile with clean slate (isConfigured: false, zero pre-filled values)
     db.profiles = db.profiles || {};
     db.profiles[newUser.id] = {
       isConfigured: false,
       name: newUser.name,
       age: '',
-      gender: 'male',
+      gender: '',
       heightCm: '',
       weightKg: '',
-      goal: 'recomp',
-      activityLevel: 'moderately_active',
-      dailyTargetCalories: 2100,
-      dailyTargetProtein: 140,
-      dailyTargetCarbs: 220,
-      dailyTargetFat: 60,
+      goal: '',
+      activityLevel: '',
+      dailyTargetCalories: 2000,
+      dailyTargetProtein: 130,
+      dailyTargetCarbs: 200,
+      dailyTargetFat: 55,
       dailyTargetWater: 3000,
       dailyTargetSteps: 10000,
       recalculateTargets: true,
-      dietaryTags: ['🍗 Non-Veg'],
-      focusAreas: ['🛡️ Full Body Balance'],
-      goals: ['recomp']
+      dietaryTags: [],
+      focusAreas: [],
+      goals: []
     };
     db.profile = db.profiles[newUser.id];
 
@@ -198,7 +198,7 @@ app.post('/api/auth/signup', (req, res) => {
   }
 });
 
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
     const db = readDB();
@@ -210,7 +210,23 @@ app.post('/api/auth/login', (req, res) => {
     }
 
     db.currentUser = { id: user.id, name: user.name, email: user.email, provider: user.provider };
-    db.profile = getUserProfile(db, user.id, user.name);
+    let userProfile = getUserProfile(db, user.id, user.name);
+
+    // If local profile is not configured, check Supabase Cloud PostgreSQL for returning user's saved profile
+    if (!userProfile.isConfigured && isSupabaseReady()) {
+      try {
+        const cloudProfile = await getProfileFromSupabase(user.id);
+        if (cloudProfile && cloudProfile.isConfigured) {
+          db.profiles = db.profiles || {};
+          db.profiles[user.id] = { ...userProfile, ...cloudProfile };
+          userProfile = db.profiles[user.id];
+        }
+      } catch (e) {
+        console.warn('Supabase profile check on login warning:', e.message);
+      }
+    }
+
+    db.profile = userProfile;
     writeDB(db);
 
     res.json({
@@ -224,7 +240,7 @@ app.post('/api/auth/login', (req, res) => {
   }
 });
 
-app.post('/api/auth/google', (req, res) => {
+app.post('/api/auth/google', async (req, res) => {
   try {
     let { email, name, picture, googleId, credential } = req.body;
 
@@ -278,23 +294,36 @@ app.post('/api/auth/google', (req, res) => {
         isConfigured: false,
         name: user.name,
         age: '',
-        gender: 'male',
+        gender: '',
         heightCm: '',
         weightKg: '',
-        goal: 'recomp',
-        activityLevel: 'moderately_active',
-        dailyTargetCalories: 2100,
-        dailyTargetProtein: 140,
-        dailyTargetCarbs: 220,
-        dailyTargetFat: 60,
+        goal: '',
+        activityLevel: '',
+        dailyTargetCalories: 2000,
+        dailyTargetProtein: 130,
+        dailyTargetCarbs: 200,
+        dailyTargetFat: 55,
         dailyTargetWater: 3000,
         dailyTargetSteps: 10000,
         recalculateTargets: true,
-        dietaryTags: ['🍗 Non-Veg'],
-        focusAreas: ['🛡️ Full Body Balance'],
-        goals: ['recomp']
+        dietaryTags: [],
+        focusAreas: [],
+        goals: []
       };
     }
+
+    // For returning Google users, check Supabase Cloud for saved configured profile
+    if (!isNewUser && !db.profiles[user.id]?.isConfigured && isSupabaseReady()) {
+      try {
+        const cloudProfile = await getProfileFromSupabase(user.id);
+        if (cloudProfile && cloudProfile.isConfigured) {
+          db.profiles[user.id] = { ...db.profiles[user.id], ...cloudProfile };
+        }
+      } catch (e) {
+        console.warn('Supabase Google profile check warning:', e.message);
+      }
+    }
+
     db.profile = db.profiles[user.id];
     writeDB(db);
 
@@ -372,13 +401,30 @@ app.post('/api/auth/reset-all', (req, res) => {
 });
 
 // --- USER PROFILE & GOALS ---
-app.get('/api/profile', (req, res) => {
+app.get('/api/profile', async (req, res) => {
   const db = readDB();
   const userId = getAuthUserId(req, db);
   if (!userId) {
     return res.status(401).json({ error: 'Authentication required', isConfigured: false });
   }
-  const profile = getUserProfile(db, userId);
+  let profile = getUserProfile(db, userId);
+
+  // If local profile is not configured, check Supabase Cloud PostgreSQL
+  if (!profile.isConfigured && isSupabaseReady()) {
+    try {
+      const cloudProfile = await getProfileFromSupabase(userId);
+      if (cloudProfile && cloudProfile.isConfigured) {
+        db.profiles = db.profiles || {};
+        db.profiles[userId] = { ...profile, ...cloudProfile };
+        db.profile = db.profiles[userId];
+        writeDB(db);
+        profile = db.profiles[userId];
+      }
+    } catch (e) {
+      console.warn('Error fetching profile from Supabase:', e.message);
+    }
+  }
+
   res.json(profile);
 });
 
@@ -387,7 +433,7 @@ app.post('/api/profile/calculate', (req, res) => {
   res.json({ success: true, targets: calculated });
 });
 
-app.post('/api/profile', (req, res) => {
+app.post('/api/profile', async (req, res) => {
   const db = readDB();
   const userId = getAuthUserId(req, db);
   const current = getUserProfile(db, userId);
@@ -409,6 +455,12 @@ app.post('/api/profile', (req, res) => {
   db.profile = db.profiles[userId];
 
   writeDB(db);
+
+  // Auto-sync profile to Supabase PostgreSQL table
+  if (isSupabaseReady()) {
+    saveProfileToSupabase(userId, db.profiles[userId]).catch(() => {});
+  }
+
   res.json({ success: true, profile: db.profiles[userId] });
 });
 

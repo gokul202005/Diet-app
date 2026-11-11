@@ -9,16 +9,14 @@ export default function OnboardingModal({ isOpen, onClose, currentProfile, curre
   const [formData, setFormData] = useState({
     name: resolvedName,
     age: isConfigured ? (currentProfile?.age || '') : '',
-    gender: currentProfile?.gender || 'male',
+    gender: isConfigured ? (currentProfile?.gender || '') : '',
     heightCm: isConfigured ? (currentProfile?.heightCm || '') : '',
     weightKg: isConfigured ? (currentProfile?.weightKg || '') : '',
-    goals: Array.isArray(currentProfile?.goals) && currentProfile.goals.length > 0
-      ? currentProfile.goals
-      : (currentProfile?.goal ? [currentProfile.goal] : ['recomp']),
-    goal: currentProfile?.goal || 'recomp',
-    activityLevel: currentProfile?.activityLevel || 'moderately_active',
-    dietaryTags: currentProfile?.dietaryTags || ['🍗 Non-Veg'],
-    focusAreas: currentProfile?.focusAreas || ['🛡️ Full Body Balance'],
+    goals: isConfigured && Array.isArray(currentProfile?.goals) ? currentProfile.goals : (isConfigured && currentProfile?.goal ? [currentProfile.goal] : []),
+    goal: isConfigured ? (currentProfile?.goal || '') : '',
+    activityLevel: isConfigured ? (currentProfile?.activityLevel || '') : '',
+    dietaryTags: isConfigured && Array.isArray(currentProfile?.dietaryTags) ? currentProfile.dietaryTags : [],
+    focusAreas: isConfigured && Array.isArray(currentProfile?.focusAreas) ? currentProfile.focusAreas : [],
     dailyTargetCalories: currentProfile?.dailyTargetCalories || 2100,
     dailyTargetProtein: currentProfile?.dailyTargetProtein || 140,
     dailyTargetCarbs: currentProfile?.dailyTargetCarbs || 220,
@@ -39,16 +37,14 @@ export default function OnboardingModal({ isOpen, onClose, currentProfile, curre
       setFormData({
         name: freshName,
         age: configured ? (currentProfile?.age || '') : '',
-        gender: currentProfile?.gender || 'male',
+        gender: configured ? (currentProfile?.gender || '') : '',
         heightCm: configured ? (currentProfile?.heightCm || '') : '',
         weightKg: configured ? (currentProfile?.weightKg || '') : '',
-        goals: Array.isArray(currentProfile?.goals) && currentProfile.goals.length > 0
-          ? currentProfile.goals
-          : (currentProfile?.goal ? [currentProfile.goal] : ['recomp']),
-        goal: currentProfile?.goal || 'recomp',
-        activityLevel: currentProfile?.activityLevel || 'moderately_active',
-        dietaryTags: currentProfile?.dietaryTags || ['🍗 Non-Veg'],
-        focusAreas: currentProfile?.focusAreas || ['🛡️ Full Body Balance'],
+        goals: configured && Array.isArray(currentProfile?.goals) ? currentProfile.goals : (configured && currentProfile?.goal ? [currentProfile.goal] : []),
+        goal: configured ? (currentProfile?.goal || '') : '',
+        activityLevel: configured ? (currentProfile?.activityLevel || '') : '',
+        dietaryTags: configured && Array.isArray(currentProfile?.dietaryTags) ? currentProfile.dietaryTags : [],
+        focusAreas: configured && Array.isArray(currentProfile?.focusAreas) ? currentProfile.focusAreas : [],
         dailyTargetCalories: currentProfile?.dailyTargetCalories || 2100,
         dailyTargetProtein: currentProfile?.dailyTargetProtein || 140,
         dailyTargetCarbs: currentProfile?.dailyTargetCarbs || 220,
@@ -58,25 +54,21 @@ export default function OnboardingModal({ isOpen, onClose, currentProfile, curre
       });
       setStep(1);
     }
-  }, [isOpen, currentUser?.id, currentProfile?.id]);
+  }, [isOpen, currentUser?.id]);
 
   // Toggle multi-select goals
   const toggleGoal = (goalId) => {
-    const currentGoals = Array.isArray(formData.goals) ? formData.goals : [formData.goal || 'cutting'];
+    const currentGoals = Array.isArray(formData.goals) ? formData.goals : [];
     let updated;
     if (currentGoals.includes(goalId)) {
-      if (currentGoals.length > 1) {
-        updated = currentGoals.filter(id => id !== goalId);
-      } else {
-        updated = currentGoals; // Keep at least 1 goal selected
-      }
+      updated = currentGoals.filter(id => id !== goalId);
     } else {
       updated = [...currentGoals, goalId];
     }
     setFormData(prev => ({
       ...prev,
       goals: updated,
-      goal: updated[0]
+      goal: updated[0] || ''
     }));
   };
 
@@ -250,6 +242,7 @@ export default function OnboardingModal({ isOpen, onClose, currentProfile, curre
                     value={formData.age}
                     onChange={(e) => setFormData({ ...formData, age: e.target.value })}
                     className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 focus:outline-none focus:border-emerald-500 text-sm"
+                    placeholder="e.g. 21"
                   />
                 </div>
               </div>
@@ -264,7 +257,7 @@ export default function OnboardingModal({ isOpen, onClose, currentProfile, curre
                     value={formData.heightCm}
                     onChange={(e) => setFormData({ ...formData, heightCm: e.target.value })}
                     className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 focus:outline-none focus:border-emerald-500 text-sm"
-                    placeholder="175"
+                    placeholder="e.g. 175"
                   />
                 </div>
                 <div>
@@ -277,7 +270,7 @@ export default function OnboardingModal({ isOpen, onClose, currentProfile, curre
                     value={formData.weightKg}
                     onChange={(e) => setFormData({ ...formData, weightKg: e.target.value })}
                     className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 focus:outline-none focus:border-emerald-500 text-sm"
-                    placeholder="70"
+                    placeholder="e.g. 70"
                   />
                 </div>
               </div>
@@ -573,11 +566,51 @@ export default function OnboardingModal({ isOpen, onClose, currentProfile, curre
             <button
               type="button"
               onClick={() => {
-                if (step === 1 && !formData.name.trim()) {
-                  if (typeof window !== 'undefined' && window.showToast) {
-                    window.showToast('Please enter your name to proceed', 'warning', 'Name Required');
+                if (step === 1) {
+                  if (!formData.name?.trim()) {
+                    if (typeof window !== 'undefined' && window.showToast) {
+                      window.showToast('Please enter your name to proceed', 'warning', 'Name Required');
+                    }
+                    return;
                   }
-                  return;
+                  if (!formData.gender) {
+                    if (typeof window !== 'undefined' && window.showToast) {
+                      window.showToast('Please select your gender (Male or Female)', 'warning', 'Gender Required');
+                    }
+                    return;
+                  }
+                  if (!formData.age || Number(formData.age) < 14) {
+                    if (typeof window !== 'undefined' && window.showToast) {
+                      window.showToast('Please enter your age (14+ years)', 'warning', 'Age Required');
+                    }
+                    return;
+                  }
+                  if (!formData.heightCm || Number(formData.heightCm) < 80) {
+                    if (typeof window !== 'undefined' && window.showToast) {
+                      window.showToast('Please enter your height in cm', 'warning', 'Height Required');
+                    }
+                    return;
+                  }
+                  if (!formData.weightKg || Number(formData.weightKg) < 30) {
+                    if (typeof window !== 'undefined' && window.showToast) {
+                      window.showToast('Please enter your weight in kg', 'warning', 'Weight Required');
+                    }
+                    return;
+                  }
+                }
+                if (step === 2) {
+                  if (!formData.goals || formData.goals.length === 0) {
+                    if (typeof window !== 'undefined' && window.showToast) {
+                      window.showToast('Please select at least one fitness goal', 'warning', 'Goal Required');
+                    }
+                    return;
+                  }
+                  if (!formData.activityLevel) {
+                    if (typeof window !== 'undefined' && window.showToast) {
+                      window.showToast('Please select your weekly activity level', 'warning', 'Activity Level Required');
+                    }
+                    return;
+                  }
                 }
                 setStep(step + 1);
               }}

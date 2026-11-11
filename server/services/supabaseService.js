@@ -191,6 +191,97 @@ export async function getPhotosFromSupabase(userId) {
 }
 
 /**
+ * Retrieves a user's profile from Supabase 'profiles' PostgreSQL table
+ */
+export async function getProfileFromSupabase(userId) {
+  if (!isSupabaseReady() || !userId) return null;
+  try {
+    const cleanUserId = String(userId).replace(/[^a-zA-Z0-9_-]/g, '_');
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('user_id', cleanUserId)
+      .maybeSingle();
+
+    if (error || !data) return null;
+
+    return {
+      name: data.name || '',
+      age: data.age || '',
+      gender: data.gender || '',
+      heightCm: data.height_cm || '',
+      weightKg: data.weight_kg || '',
+      targetWeightKg: data.target_weight_kg || '',
+      goal: data.goal || '',
+      activityLevel: data.activity_level || '',
+      dailyTargetCalories: data.daily_target_calories || 2000,
+      dailyTargetProtein: data.daily_target_protein || 130,
+      dailyTargetCarbs: data.daily_target_carbs || 200,
+      dailyTargetFat: data.daily_target_fat || 55,
+      dailyTargetWater: data.daily_target_water || 3000,
+      dailyTargetSteps: data.daily_target_steps || 10000,
+      dietaryTags: Array.isArray(data.dietary_tags) ? data.dietary_tags : [],
+      focusAreas: Array.isArray(data.focus_areas) ? data.focus_areas : [],
+      goals: Array.isArray(data.goals) ? data.goals : (data.goal ? [data.goal] : []),
+      recalculateTargets: Boolean(data.recalculate_targets),
+      isConfigured: Boolean(data.is_configured)
+    };
+  } catch (err) {
+    console.warn('[Supabase getProfile] Exception:', err.message);
+    return null;
+  }
+}
+
+/**
+ * Saves or updates a user's profile in Supabase 'profiles' PostgreSQL table
+ */
+export async function saveProfileToSupabase(userId, p) {
+  if (!isSupabaseReady() || !userId || !p) return null;
+  try {
+    const cleanUserId = String(userId).replace(/[^a-zA-Z0-9_-]/g, '_');
+
+    // Ensure user row exists first (foreign key check)
+    try {
+      await supabase.from('users').upsert({
+        id: cleanUserId,
+        email: `${cleanUserId}@agyfit.local`,
+        name: p.name || 'User',
+        provider: 'local'
+      }, { onConflict: 'id' });
+    } catch (e) {}
+
+    const { error } = await supabase.from('profiles').upsert({
+      user_id: cleanUserId,
+      name: p.name || 'User',
+      age: p.age ? parseInt(p.age) : null,
+      gender: p.gender || 'male',
+      height_cm: p.heightCm ? parseFloat(p.heightCm) : null,
+      weight_kg: p.weightKg ? parseFloat(p.weightKg) : null,
+      target_weight_kg: p.targetWeightKg ? parseFloat(p.targetWeightKg) : null,
+      goal: p.goal || 'recomp',
+      activity_level: p.activityLevel || 'moderately_active',
+      daily_target_calories: p.dailyTargetCalories || 2100,
+      daily_target_protein: p.dailyTargetProtein || 140,
+      daily_target_carbs: p.dailyTargetCarbs || 220,
+      daily_target_fat: p.dailyTargetFat || 60,
+      daily_target_water: p.dailyTargetWater || 3000,
+      daily_target_steps: p.dailyTargetSteps || 10000,
+      dietary_tags: p.dietaryTags || ['🍗 Non-Veg'],
+      focus_areas: p.focusAreas || ['🛡️ Full Body Balance'],
+      goals: p.goals || [p.goal || 'recomp'],
+      recalculate_targets: Boolean(p.recalculateTargets),
+      is_configured: Boolean(p.isConfigured !== false)
+    }, { onConflict: 'user_id' });
+
+    if (error) {
+      console.warn('[Supabase saveProfile] Error:', error.message);
+    }
+  } catch (err) {
+    console.warn('[Supabase saveProfile] Exception:', err.message);
+  }
+}
+
+/**
  * Migrates local fitness_db.json data into Supabase Cloud PostgreSQL tables
  */
 export async function migrateLocalDataToSupabase(localDb) {
