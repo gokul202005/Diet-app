@@ -2,7 +2,7 @@
   "users": [],
   "currentUser": null,
   "profiles": {
-    "default_guest": {
+    "user-google-1794388402462": {
       "isConfigured": false,
       "name": "",
       "age": "",
@@ -29,151 +29,33 @@
       ]
     }
   },
-  "profile": {
-    "isConfigured": false,
-    "name": "",
-    "age": 23,
-    "gender": "male",
-    "heightCm": 175,
-    "weightKg": 70,
-    "goal": "recomp",
-    "activityLevel": "moderately_active",
-    "dailyTargetCalories": 2100,
-    "dailyTargetProtein": 140,
-    "dailyTargetCarbs": 220,
-    "dailyTargetFat": 60,
-    "dailyTargetWater": 3000,
-    "dailyTargetSteps": 10000,
-    "dietaryTags": [
-      "🍗 Non-Veg"
-    ],
-    "focusAreas": [
-      "🛡️ Full Body Balance"
-    ],
-    "goals": [
-      "recomp"
-    ]
-  },
   "meals": [],
   "workouts": [],
-  "workoutPlans": [
-    {
-      "id": "default-ppl",
-      "name": "Push Pull Legs (PPL) - 6 Day Split",
-      "daysPerWeek": 6,
-      "split": [
-        {
-          "day": "Day 1 - Push A",
-          "focus": "Chest, Shoulders, Triceps",
-          "exercises": [
-            "Barbell Bench Press 4x8",
-            "Incline DB Press 3x10",
-            "DB Lateral Raises 4x15",
-            "Overhead Tricep Extension 3x12",
-            "Cable Flyes 3x15"
-          ]
-        },
-        {
-          "day": "Day 2 - Pull A",
-          "focus": "Back, Rear Delts, Biceps",
-          "exercises": [
-            "Deadlift 3x5",
-            "Lat Pulldown 4x10",
-            "Chest Supported Row 3x10",
-            "Face Pulls 4x15",
-            "Barbell Bicep Curl 3x10"
-          ]
-        },
-        {
-          "day": "Day 3 - Legs A",
-          "focus": "Quads, Calves, Abs",
-          "exercises": [
-            "Barbell Squats 4x8",
-            "Leg Press 3x12",
-            "Leg Extensions 3x15",
-            "Standing Calf Raises 4x15",
-            "Hanging Knee Raises 3x15"
-          ]
-        },
-        {
-          "day": "Day 4 - Push B",
-          "focus": "Shoulders, Upper Chest, Triceps",
-          "exercises": [
-            "Overhead Overhead Press 4x8",
-            "Dips 3x10",
-            "Cable Lateral Raises 4x15",
-            "Skull Crushers 3x12"
-          ]
-        },
-        {
-          "day": "Day 5 - Pull B",
-          "focus": "Upper Back, Lats, Biceps",
-          "exercises": [
-            "Pull-ups 4x8",
-            "Barbell Bent Over Row 3x8",
-            "Seated Cable Row 3x10",
-            "Incline DB Curl 3x10",
-            "Hammer Curls 3x12"
-          ]
-        },
-        {
-          "day": "Day 6 - Legs B",
-          "focus": "Hamstrings, Glutes, Calves",
-          "exercises": [
-            "Romanian Deadlift (RDL) 4x8",
-            "Bulgarian Split Squats 3x10",
-            "Lying Hamstring Curls 4x12",
-            "Seated Calf Raises 4x15"
-          ]
-        },
-        {
-          "day": "Day 7 - Rest",
-          "focus": "Active Recovery & Mobility",
-          "exercises": [
-            "8,000 steps brisk walk",
-            "Mobility & stretching"
-          ]
-        }
-      ]
-    }
-  ],
+  "workoutPlans": [],
   "fastrackLogs": [
     {
-      "id": "fastrack-1794388335831",
-      "userId": "default_guest",
+      "id": "fastrack-1794388814211",
+      "userId": "user-google-1794388402462",
       "date": "2026-11-11",
-      "deviceName": "Android Health Connect / Google Fit",
-      "steps": 1362,
-      "activeCalories": 1104,
+      "deviceName": "Health Connect (Hardware Fallback)",
+      "steps": 0,
+      "activeCalories": 0,
       "restingCalories": 5,
-      "totalBurned": 1109,
-      "distanceKm": 1.02,
+      "totalBurned": 5,
+      "distanceKm": 0,
       "avgHeartRate": 72,
       "peakHeartRate": 72,
       "sleepHours": 7,
       "batteryLevel": null,
       "isAutoSynced": true,
-      "lastAutoSyncAt": "2026-11-11T09:12:15.831Z",
-      "syncedAt": "2026-11-11T09:12:15.831Z"
+      "lastAutoSyncAt": "2026-11-11T09:20:14.211Z",
+      "syncedAt": "2026-11-11T09:20:14.211Z"
     }
   ],
   "waterLogs": [],
   "weightLogs": [],
   "physiqueVault": [],
   "aiCache": {},
-  "chatHistory": [
-    {
-      "id": "welcome-msg",
-      "sender": "assistant",
-      "text": "Vanakkam! Welcome to your AI Diet & Fitness tracker. I specialize in South Indian & global nutrition, workout plan biomechanics, and Fastrack watch energy tracking. Once you set up your profile, I will tailor your daily calories and macros precisely to your body!",
-      "timestamp": "2026-11-11T10:00:00.000Z"
-    }
-  ],
-  "settings": {
-    "geminiApiKey": "",
-    "preferredModel": "gemini-2.0-flash-lite-preview-02-05",
-    "useHeuristicFallback": true,
-    "cacheTokens": true,
-    "fastrackDeviceName": "Fastrack Reflex Curve"
-  }
+  "chatHistory": [],
+  "settings": {}
 }

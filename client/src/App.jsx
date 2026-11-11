@@ -17,14 +17,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [profile, setProfile] = useState(null);
-  const [currentUser, setCurrentUser] = useState(() => {
-    try {
-      const stored = localStorage.getItem('agy_current_user');
-      return stored ? JSON.parse(stored) : null;
-    } catch {
-      return null;
-    }
-  });
+  const [currentUser, setCurrentUser] = useState(null);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isVoiceOpen, setIsVoiceOpen] = useState(false);
@@ -35,27 +28,28 @@ export default function App() {
   useEffect(() => {
     async function initProfileAndAuth() {
       try {
-        const [profileData, authData] = await Promise.all([
-          api.getProfile().catch(() => null),
-          api.getCurrentUser().catch(() => null)
-        ]);
-
-        if (profileData) setProfile(profileData);
-        if (authData?.user) {
+        const authData = await api.getCurrentUser().catch(() => null);
+        if (authData?.success && authData?.user?.id) {
           setCurrentUser(authData.user);
           localStorage.setItem('agy_current_user', JSON.stringify(authData.user));
+          const profileData = await api.getProfile().catch(() => null);
+          if (profileData) setProfile(profileData);
+
+          // Only trigger onboarding setup wizard if user is brand new and has never configured or dismissed
+          const isDismissed = sessionStorage.getItem('onboarding_wizard_dismissed');
+          if (profileData && !profileData.isConfigured && !isDismissed) {
+            setIsOnboardingOpen(true);
+          }
         } else {
           setCurrentUser(null);
+          setProfile(null);
           localStorage.removeItem('agy_current_user');
-        }
-
-        // Only trigger onboarding setup wizard if user is brand new and has never configured or dismissed
-        const isDismissed = sessionStorage.getItem('onboarding_wizard_dismissed');
-        if (profileData && !profileData.isConfigured && !isDismissed) {
-          setIsOnboardingOpen(true);
         }
       } catch (err) {
         console.error('Failed to load profile or auth:', err);
+        setCurrentUser(null);
+        setProfile(null);
+        localStorage.removeItem('agy_current_user');
       } finally {
         setLoading(false);
       }

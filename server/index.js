@@ -85,10 +85,7 @@ function getAuthUserId(req, db) {
   if (bodyId && typeof bodyId === 'string' && bodyId.trim()) {
     return bodyId.trim();
   }
-  if (db?.currentUser?.id) {
-    return db.currentUser.id;
-  }
-  return 'default_guest';
+  return null;
 }
 
 function getUserProfile(db, userId, fallbackName = '') {
@@ -314,7 +311,13 @@ app.post('/api/auth/google', (req, res) => {
 app.get('/api/auth/me', (req, res) => {
   const db = readDB();
   const userId = getAuthUserId(req, db);
-  const user = (db.users || []).find(u => u.id === userId) || db.currentUser || null;
+  if (!userId) {
+    return res.status(401).json({ success: false, user: null, message: 'Unauthenticated' });
+  }
+  const user = (db.users || []).find(u => u.id === userId);
+  if (!user) {
+    return res.status(401).json({ success: false, user: null, message: 'User not found' });
+  }
   res.json({
     success: true,
     user
@@ -371,7 +374,10 @@ app.post('/api/auth/reset-all', (req, res) => {
 app.get('/api/profile', (req, res) => {
   const db = readDB();
   const userId = getAuthUserId(req, db);
-  const profile = getUserProfile(db, userId, db.currentUser?.name);
+  if (!userId) {
+    return res.status(401).json({ error: 'Authentication required', isConfigured: false });
+  }
+  const profile = getUserProfile(db, userId);
   res.json(profile);
 });
 
