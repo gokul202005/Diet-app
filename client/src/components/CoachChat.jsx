@@ -15,7 +15,10 @@ import {
   Volume2,
   VolumeX,
   Radio,
-  Zap
+  Zap,
+  Headphones,
+  ChevronDown,
+  Check
 } from 'lucide-react';
 import { api } from '../api';
 
@@ -185,10 +188,120 @@ export default function CoachChat({ profile, selectedDate }) {
     }
     return false;
   });
+  const [voicePersona, setVoicePersona] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('agy_jarvis_voice_persona') || 'jarvis';
+    }
+    return 'jarvis';
+  });
+  const [isVoiceMenuOpen, setIsVoiceMenuOpen] = useState(false);
+  const [availableVoices, setAvailableVoices] = useState([]);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [speakingMsgId, setSpeakingMsgId] = useState(null);
   const messagesEndRef = useRef(null);
   const recognitionRef = useRef(null);
+  const capturedSpeechRef = useRef('');
+  const isListeningRef = useRef(false);
+
+  // Available Voice Personas
+  const VOICE_PERSONAS = [
+    { id: 'jarvis', label: 'Jarvis (British AI)', flag: '🇬🇧', desc: 'Paul Bettany style British butler' },
+    { id: 'titan', label: 'Titan (US Athletic Coach)', flag: '🇺🇸', desc: 'Deep, commanding athletic tone' },
+    { id: 'nova', label: 'Nova (Studio AI)', flag: '⚡', desc: 'Futuristic crisp digital assistant' },
+    { id: 'aria', label: 'Aria (Natural Female)', flag: '🌸', desc: 'Smooth, friendly conversational tone' }
+  ];
+
+  // Load and cache SpeechSynthesis voices
+  useEffect(() => {
+    const updateVoices = () => {
+      if (typeof window !== 'undefined' && window.speechSynthesis) {
+        setAvailableVoices(window.speechSynthesis.getVoices());
+      }
+    };
+    updateVoices();
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.onvoiceschanged = updateVoices;
+    }
+    return () => {
+      if (typeof window !== 'undefined' && window.speechSynthesis) {
+        window.speechSynthesis.onvoiceschanged = null;
+      }
+    };
+  }, []);
+
+  const getVoiceForPersona = (persona) => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return null;
+    const all = window.speechSynthesis.getVoices();
+    if (!all || all.length === 0) return null;
+
+    if (persona === 'jarvis') {
+      // Prioritize natural British male voices (Ryan, George, Oliver, Google UK English Male)
+      const britishMale = all.find(v => 
+        (v.name.includes('Ryan') || v.name.includes('George') || v.name.includes('Oliver') || v.name.toLowerCase().includes('google uk english male')) && 
+        !v.name.includes('Female')
+      ) || all.find(v => (v.lang === 'en-GB' || v.lang.startsWith('en-GB')) && !v.name.includes('Female'))
+        || all.find(v => (v.name.includes('Guy') || v.name.includes('David') || v.name.includes('Christopher')) && !v.name.includes('Female'))
+        || all.find(v => v.lang.startsWith('en') && !v.name.includes('Heera'));
+      return britishMale || all[0];
+    }
+    if (persona === 'titan') {
+      const titan = all.find(v => 
+        (v.name.includes('Christopher') || v.name.includes('Guy') || v.name.toLowerCase().includes('google us english') || v.name.includes('David')) &&
+        !v.name.includes('Female')
+      ) || all.find(v => v.lang === 'en-US' && !v.name.includes('Female'))
+        || all.find(v => v.lang.startsWith('en'));
+      return titan || all[0];
+    }
+    if (persona === 'aria') {
+      const female = all.find(v => 
+        (v.name.includes('Sonia') || v.name.includes('Jenny') || v.name.includes('Zira') || v.name.toLowerCase().includes('female') || v.name.toLowerCase().includes('google uk english female'))
+      ) || all.find(v => (v.lang === 'en-GB' || v.lang === 'en-US') && v.name.includes('Female'))
+        || all.find(v => v.lang.startsWith('en'));
+      return female || all[0];
+    }
+    // 'nova' (Modern crisp AI studio)
+    const studio = all.find(v => v.name.toLowerCase().includes('natural') || v.name.toLowerCase().includes('google'))
+      || all.find(v => v.lang.startsWith('en') && !v.name.includes('Heera'))
+      || all[0];
+    return studio;
+  };
+
+  const handleSelectPersona = (id) => {
+    setVoicePersona(id);
+    localStorage.setItem('agy_jarvis_voice_persona', id);
+    setIsVoiceMenuOpen(false);
+    previewVoice(id);
+  };
+
+  const previewVoice = (personaId) => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const voice = getVoiceForPersona(personaId);
+    const sample = personaId === 'jarvis' 
+      ? "Jarvis online. All systems calibrated, Gokul."
+      : personaId === 'titan'
+        ? "Titan ready. Let's conquer the iron today."
+        : personaId === 'aria'
+          ? "Hello Gokul! How is your nutrition going today?"
+          : "Nova activated. Ready to assist your bio-tracking.";
+
+    const utt = new SpeechSynthesisUtterance(sample);
+    if (voice) {
+      utt.voice = voice;
+      utt.lang = voice.lang;
+    }
+    if (personaId === 'jarvis') {
+      utt.pitch = 0.92;
+      utt.rate = 1.02;
+    } else if (personaId === 'titan') {
+      utt.pitch = 0.88;
+      utt.rate = 1.05;
+    } else {
+      utt.pitch = 1.0;
+      utt.rate = 1.04;
+    }
+    window.speechSynthesis.speak(utt);
+  };
 
   const loadHistory = async () => {
     try {
@@ -238,13 +351,22 @@ export default function CoachChat({ profile, selectedDate }) {
     if (!cleanSpeech) return;
 
     const utterance = new SpeechSynthesisUtterance(cleanSpeech);
-    utterance.rate = 1.05;
-    utterance.pitch = 1.0;
-    utterance.lang = 'en-IN';
+    const voice = getVoiceForPersona(voicePersona);
+    if (voice) {
+      utterance.voice = voice;
+      utterance.lang = voice.lang;
+    }
 
-    const voices = window.speechSynthesis.getVoices();
-    const voice = voices.find(v => v.lang === 'en-IN') || voices.find(v => v.lang.startsWith('en'));
-    if (voice) utterance.voice = voice;
+    if (voicePersona === 'jarvis') {
+      utterance.pitch = 0.92;
+      utterance.rate = 1.02;
+    } else if (voicePersona === 'titan') {
+      utterance.pitch = 0.88;
+      utterance.rate = 1.05;
+    } else {
+      utterance.pitch = 1.0;
+      utterance.rate = 1.03;
+    }
 
     utterance.onstart = () => {
       setIsSpeaking(true);
@@ -256,8 +378,8 @@ export default function CoachChat({ profile, selectedDate }) {
       setSpeakingMsgId(null);
       if (autoListenAfter && isJarvisMode) {
         setTimeout(() => {
-          toggleMic();
-        }, 600);
+          startListeningSession();
+        }, 500);
       }
     };
 
@@ -277,6 +399,11 @@ export default function CoachChat({ profile, selectedDate }) {
       speakText("Jarvis Mode Activated. I am listening! Ask me anything about your South Indian diet, Fastrack watch steps, or gym workouts.", null, true);
     } else {
       stopSpeaking();
+      if (isListeningRef.current && recognitionRef.current) {
+        try { recognitionRef.current.stop(); } catch (e) {}
+      }
+      setIsListening(false);
+      isListeningRef.current = false;
     }
   };
 
@@ -284,17 +411,30 @@ export default function CoachChat({ profile, selectedDate }) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isSending]);
 
-  // Web Speech API Voice Dictation
-  const toggleMic = () => {
-    if (isListening) {
-      if (recognitionRef.current) {
-        try { recognitionRef.current.stop(); } catch (e) {}
+  // Robust Hands-Free Speech Recognition Session (PC & Mobile compatible)
+  const startListeningSession = async () => {
+    if (isListeningRef.current) return;
+
+    // Step 1: Explicit microphone device permission check for desktop PC Chrome/Edge
+    try {
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        // Release immediate test stream so SpeechRecognition can take over
+        stream.getTracks().forEach(t => t.stop());
       }
-      setIsListening(false);
-      return;
+    } catch (micErr) {
+      console.warn('Microphone permission check failed:', micErr);
+      if (micErr.name === 'NotAllowedError' || micErr.name === 'PermissionDeniedError') {
+        if (typeof window !== 'undefined' && window.showToast) {
+          window.showToast('Please allow Microphone access in your browser address bar to speak with Jarvis.', 'warning', 'Mic Blocked');
+        }
+        setIsListening(false);
+        isListeningRef.current = false;
+        return;
+      }
     }
 
-    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const SpeechRec = typeof window !== 'undefined' ? (window.SpeechRecognition || window.webkitSpeechRecognition) : null;
     if (!SpeechRec) {
       if (typeof window !== 'undefined' && window.showToast) {
         window.showToast('Voice speech recognition is not supported on this browser.', 'warning', 'Mic Unavailable');
@@ -303,13 +443,21 @@ export default function CoachChat({ profile, selectedDate }) {
     }
 
     try {
+      if (recognitionRef.current) {
+        try { recognitionRef.current.abort(); } catch (e) {}
+      }
+
       const recognition = new SpeechRec();
-      recognition.lang = 'en-IN';
+      // 'en-US' is universally supported on desktop PC Chromium without cloud network dropouts
+      recognition.lang = 'en-US';
       recognition.continuous = false;
       recognition.interimResults = true;
 
+      capturedSpeechRef.current = '';
+
       recognition.onstart = () => {
         setIsListening(true);
+        isListeningRef.current = true;
       };
 
       recognition.onresult = (event) => {
@@ -317,16 +465,28 @@ export default function CoachChat({ profile, selectedDate }) {
         for (let i = 0; i < event.results.length; i++) {
           transcript += event.results[i][0].transcript;
         }
+        capturedSpeechRef.current = transcript;
         setInputText(transcript);
       };
 
       recognition.onerror = (e) => {
-        console.warn('Coach mic error:', e.error);
+        console.warn('Coach mic notice:', e.error);
         setIsListening(false);
+        isListeningRef.current = false;
       };
 
       recognition.onend = () => {
         setIsListening(false);
+        isListeningRef.current = false;
+
+        const captured = capturedSpeechRef.current.trim();
+        capturedSpeechRef.current = '';
+
+        // HANDS-FREE AUTOMATION: If user spoke in Jarvis mode, automatically send the query!
+        if (captured.length > 1 && isJarvisMode) {
+          setInputText('');
+          handleSend(captured);
+        }
       };
 
       recognitionRef.current = recognition;
@@ -334,6 +494,19 @@ export default function CoachChat({ profile, selectedDate }) {
     } catch (err) {
       console.warn('Coach mic start error:', err);
       setIsListening(false);
+      isListeningRef.current = false;
+    }
+  };
+
+  const toggleMic = () => {
+    if (isListening || isListeningRef.current) {
+      if (recognitionRef.current) {
+        try { recognitionRef.current.stop(); } catch (e) {}
+      }
+      setIsListening(false);
+      isListeningRef.current = false;
+    } else {
+      startListeningSession();
     }
   };
 
@@ -442,6 +615,50 @@ export default function CoachChat({ profile, selectedDate }) {
               </>
             )}
           </button>
+
+          {/* VOICE PERSONA SELECTOR */}
+          <div className="relative">
+            <button
+              onClick={() => setIsVoiceMenuOpen(!isVoiceMenuOpen)}
+              className="px-2.5 py-1.5 bg-slate-950 border border-slate-800 hover:border-slate-700 text-slate-300 rounded-xl text-xs font-bold flex items-center space-x-1.5 cursor-pointer transition-all"
+              title="Change Voice Persona"
+            >
+              <Headphones className="w-3.5 h-3.5 text-cyan-400" />
+              <span className="hidden md:inline">
+                {VOICE_PERSONAS.find(p => p.id === voicePersona)?.flag} {VOICE_PERSONAS.find(p => p.id === voicePersona)?.label.split(' ')[0]}
+              </span>
+              <ChevronDown className="w-3 h-3 text-slate-400" />
+            </button>
+
+            {isVoiceMenuOpen && (
+              <div className="absolute right-0 top-full mt-2 w-64 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-2 z-50 space-y-1">
+                <div className="text-[10px] uppercase tracking-wider font-black text-slate-400 px-2 py-1 flex justify-between items-center">
+                  <span>Voice Persona</span>
+                  <span className="text-cyan-400">Natural Audio</span>
+                </div>
+                {VOICE_PERSONAS.map(p => (
+                  <button
+                    key={p.id}
+                    onClick={() => handleSelectPersona(p.id)}
+                    className={`w-full text-left px-2.5 py-2 rounded-xl text-xs flex items-center justify-between cursor-pointer transition-all ${
+                      voicePersona === p.id 
+                        ? 'bg-cyan-950/60 text-cyan-200 border border-cyan-800/60' 
+                        : 'text-slate-300 hover:bg-slate-800/60'
+                    }`}
+                  >
+                    <div className="space-y-0.5">
+                      <div className="font-bold flex items-center space-x-1.5">
+                        <span>{p.flag}</span>
+                        <span>{p.label}</span>
+                      </div>
+                      <div className="text-[10px] text-slate-400">{p.desc}</div>
+                    </div>
+                    {voicePersona === p.id && <Check className="w-3.5 h-3.5 text-cyan-400 shrink-0" />}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           {isSpeaking && (
             <button

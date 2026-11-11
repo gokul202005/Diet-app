@@ -144,11 +144,14 @@ function getUserProfile(db, userId, fallbackName = '') {
 
 // Helper: Retrieve isolated Gemini API Key unique for every user (NO cross-user leaking)
 function getUserApiKey(db, userId) {
-  if (!userId) return '';
-  const profile = db.profiles && db.profiles[userId];
-  const user = (db.users || []).find(u => u.id === userId);
-  const userSettings = (db.userSettings && db.userSettings[userId]) || {};
-  return profile?.geminiApiKey || user?.geminiApiKey || userSettings.geminiApiKey || '';
+  let userKey = '';
+  if (userId) {
+    const profile = db.profiles && db.profiles[userId];
+    const user = (db.users || []).find(u => u.id === userId);
+    const userSettings = (db.userSettings && db.userSettings[userId]) || {};
+    userKey = profile?.geminiApiKey || user?.geminiApiKey || userSettings.geminiApiKey || '';
+  }
+  return userKey || process.env.GEMINI_API_KEY || '';
 }
 
 // --- USER AUTHENTICATION & CLOUD SYNC ---
@@ -1540,27 +1543,29 @@ app.get('/api/hunter/stats', async (req, res) => {
 
   // 1. Gather today's metrics
   let meals = (db.meals || []).filter(m => (!m.userId || m.userId === userId) && m.date === today);
-  if (isSupabaseReady()) {
-    try {
-      const cloudMeals = await fetchMealsFromSupabase(userId, today);
-      if (Array.isArray(cloudMeals) && cloudMeals.length > 0) meals = cloudMeals;
-    } catch (e) {}
-  }
-
   let workouts = (db.workouts || []).filter(w => (!w.userId || w.userId === userId) && w.date === today);
-  if (isSupabaseReady()) {
-    try {
-      const cloudWorkouts = await fetchWorkoutsFromSupabase(userId, today);
-      if (Array.isArray(cloudWorkouts) && cloudWorkouts.length > 0) workouts = cloudWorkouts;
-    } catch (e) {}
-  }
-
   let watchLog = (db.fastrackLogs || []).find(l => (!l.userId || l.userId === userId) && l.date === today);
+
   if (isSupabaseReady()) {
     try {
-      const cloudWatch = await fetchWatchLogFromSupabase(userId, today);
-      if (cloudWatch) watchLog = cloudWatch;
-    } catch (e) {}
+      const timeoutPromise = new Promise(resolve => setTimeout(() => resolve(null), 2000));
+      const [cloudMealsRes, cloudWorkoutsRes, cloudWatchRes] = await Promise.allSettled([
+        Promise.race([fetchMealsFromSupabase(userId, today), timeoutPromise]),
+        Promise.race([fetchWorkoutsFromSupabase(userId, today), timeoutPromise]),
+        Promise.race([fetchWatchLogFromSupabase(userId, today), timeoutPromise])
+      ]);
+      if (cloudMealsRes.status === 'fulfilled' && Array.isArray(cloudMealsRes.value) && cloudMealsRes.value.length > 0) {
+        meals = cloudMealsRes.value;
+      }
+      if (cloudWorkoutsRes.status === 'fulfilled' && Array.isArray(cloudWorkoutsRes.value) && cloudWorkoutsRes.value.length > 0) {
+        workouts = cloudWorkoutsRes.value;
+      }
+      if (cloudWatchRes.status === 'fulfilled' && cloudWatchRes.value) {
+        watchLog = cloudWatchRes.value;
+      }
+    } catch (e) {
+      console.warn('[Hunter Stats] Supabase query fallback:', e.message);
+    }
   }
 
   const todayCalories = meals.reduce((a, m) => a + (Number(m.totalCalories) || 0), 0);

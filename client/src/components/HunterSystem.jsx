@@ -58,20 +58,88 @@ function playSound(type) {
 }
 
 export default function HunterSystem({ selectedDate, currentUser }) {
-  const [hunter, setHunter] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const getInitialHunter = () => {
+    try {
+      const cached = localStorage.getItem('agy_hunter_profile');
+      if (cached) return JSON.parse(cached);
+    } catch {}
+    return {
+      userId: currentUser?.id || '',
+      level: 1,
+      xp: 0,
+      xpToNextLevel: 100,
+      rank: 'E-Rank Hunter',
+      title: 'Awakened Novice',
+      totalQuestsCompleted: 0,
+      claimedQuests: [],
+      stats: { str: 40, agi: 45, vit: 35, int: 50, per: 40 },
+      quests: [
+        {
+          id: 'quest_agi_steps',
+          stat: 'AGI',
+          title: 'Agility Trial: 10,000 Steps',
+          description: 'Traverse the dungeon realm with 10k physical steps',
+          target: 10000,
+          current: 0,
+          isCompleted: false,
+          xp: 40
+        },
+        {
+          id: 'quest_vit_protein',
+          stat: 'VIT',
+          title: 'Vitality Trial: Hit Protein Target',
+          description: 'Consume daily target protein to regenerate muscle tissue',
+          target: 130,
+          current: 0,
+          isCompleted: false,
+          xp: 40
+        },
+        {
+          id: 'quest_str_gym',
+          stat: 'STR',
+          title: 'Strength Trial: Slay the Iron',
+          description: 'Complete at least 1 gym workout session today',
+          target: 1,
+          current: 0,
+          isCompleted: false,
+          xp: 40
+        },
+        {
+          id: 'quest_per_log',
+          stat: 'PER',
+          title: 'Perception Trial: Full Meal Logging',
+          description: 'Log all 3 daily South Indian meals with awareness',
+          target: 3,
+          current: 0,
+          isCompleted: false,
+          xp: 30
+        }
+      ],
+      isPenaltyActive: false,
+      penaltyDescription: '50 Push-Ups or 15-Minute Night Walk to evade the penalty zone!'
+    };
+  };
+
+  const [hunter, setHunter] = useState(getInitialHunter);
+  const [loading, setLoading] = useState(false);
+  const [syncError, setSyncError] = useState('');
   const [claimingId, setClaimingId] = useState(null);
   const [levelUpAlert, setLevelUpAlert] = useState(false);
 
   const fetchHunterData = async () => {
     try {
       setLoading(true);
+      setSyncError('');
       const res = await api.getHunterStats(selectedDate);
-      if (res.success && res.hunter) {
+      if (res && res.success && res.hunter) {
         setHunter(res.hunter);
+        try { localStorage.setItem('agy_hunter_profile', JSON.stringify(res.hunter)); } catch {}
+      } else if (res && res.error) {
+        setSyncError(res.error);
       }
     } catch (e) {
-      console.error('Failed to load hunter stats:', e);
+      console.warn('Hunter stats sync notice:', e);
+      setSyncError('Could not sync live Hunter stats from cloud.');
     } finally {
       setLoading(false);
     }
@@ -101,17 +169,6 @@ export default function HunterSystem({ selectedDate, currentUser }) {
       setClaimingId(null);
     }
   };
-
-  if (loading && !hunter) {
-    return (
-      <div className="flex flex-col items-center justify-center p-16 space-y-3">
-        <RefreshCw className="w-8 h-8 text-cyan-400 animate-spin" />
-        <div className="text-sm font-bold text-slate-400 tracking-wider uppercase">
-          Initializing Hunter Awakening Protocol...
-        </div>
-      </div>
-    );
-  }
 
   const stats = hunter?.stats || { str: 45, agi: 50, vit: 40, int: 55, per: 45 };
 
@@ -201,6 +258,15 @@ export default function HunterSystem({ selectedDate, currentUser }) {
               <span className="text-xs font-semibold text-slate-400">
                 Title: <strong className="text-cyan-300">{hunter?.title || 'Awakened Novice'}</strong>
               </span>
+              <button
+                onClick={fetchHunterData}
+                disabled={loading}
+                className="p-1 rounded-lg text-slate-500 hover:text-cyan-400 transition-colors ml-auto flex items-center space-x-1 text-xs"
+                title="Sync Hunter Stats"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-cyan-400' : ''}`} />
+                <span className="text-[10px] hidden sm:inline">{loading ? 'Syncing...' : 'Sync'}</span>
+              </button>
             </div>
 
             <h1 className="text-3xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-cyan-100 to-cyan-400 tracking-tight">

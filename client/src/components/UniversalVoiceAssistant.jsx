@@ -319,7 +319,7 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
     } catch (e) {}
   };
 
-  // Start Real-Time Google / Gemini Style Live Speech Recognition
+  // Start Dual-Engine Real-Time & Hardware Microphone Capture (PC & Mobile compatible)
   const startRecording = async () => {
     setErrorMsg('');
     setResult(null);
@@ -331,10 +331,63 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
     recognizedTextRef.current = '';
     audioChunksRef.current = [];
 
+    // Step 1: Ensure hardware microphone access via getUserMedia (Guarantees PC browser permission prompt & visualizer)
+    let userStream = null;
+    try {
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        userStream = await navigator.mediaDevices.getUserMedia({ 
+          audio: { 
+            echoCancellation: true, 
+            noiseSuppression: true, 
+            autoGainControl: true 
+          } 
+        });
+        mediaStreamRef.current = userStream;
+        setupAudioVisualizer(userStream);
+
+        // Start background MediaRecorder on the hardware stream
+        let mimeType = 'audio/webm';
+        if (typeof MediaRecorder !== 'undefined') {
+          if (!MediaRecorder.isTypeSupported('audio/webm')) {
+            if (MediaRecorder.isTypeSupported('audio/mp4')) mimeType = 'audio/mp4';
+            else if (MediaRecorder.isTypeSupported('audio/ogg')) mimeType = 'audio/ogg';
+            else mimeType = '';
+          }
+        }
+        const recorder = mimeType ? new MediaRecorder(userStream, { mimeType }) : new MediaRecorder(userStream);
+        mediaRecorderRef.current = recorder;
+        recorder.ondataavailable = (e) => {
+          if (e.data && e.data.size > 0) {
+            audioChunksRef.current.push(e.data);
+          }
+        };
+        recorder.start(100);
+      }
+    } catch (micErr) {
+      console.warn('Microphone permission check notice:', micErr);
+      if (micErr.name === 'NotAllowedError' || micErr.name === 'PermissionDeniedError') {
+        setErrorMsg('Microphone access was denied. Please click the lock or settings icon in your browser address bar and set Microphone to "Allow".');
+        setIsRecording(false);
+        isRecordingRef.current = false;
+        setStateMode('idle');
+        return;
+      } else if (micErr.name === 'NotFoundError' || micErr.name === 'DevicesNotFoundError') {
+        setErrorMsg('No microphone detected. Please plug in a headset or microphone and try again.');
+        setIsRecording(false);
+        isRecordingRef.current = false;
+        setStateMode('idle');
+        return;
+      }
+    }
+
+    setIsRecording(true);
+    isRecordingRef.current = true;
+    setStateMode('listening');
+    playBeep(700, 0.12);
+
+    // Step 2: Concurrently attach real-time Web Speech Recognition for instant word streaming
     const SpeechRecognition = typeof window !== 'undefined' ? (window.SpeechRecognition || window.webkitSpeechRecognition) : null;
 
-    // PRIMARY PIPELINE: Real-time Web Speech Recognition (Google / Gemini style instant word streaming)
-    // Run directly without opening conflicting getUserMedia stream so the microphone is never locked
     if (SpeechRecognition) {
       try {
         if (recognitionRef.current) {
@@ -351,10 +404,7 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
         let committedFinal = '';
 
         recognition.onstart = () => {
-          setIsRecording(true);
-          isRecordingRef.current = true;
-          setStateMode('listening');
-          playBeep(700, 0.12);
+          // Web speech actively streaming
         };
 
         recognition.onresult = (event) => {
@@ -384,96 +434,34 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
         };
 
         recognition.onerror = (event) => {
-          console.warn('SpeechRecognition notice:', event.error);
+          console.warn('SpeechRecognition notice on PC/Mobile:', event.error);
+          // If Web Speech API has a network error or audio-capture on PC,
+          // the background MediaRecorder continues capturing audio smoothly!
           if (event.error === 'not-allowed') {
-            setErrorMsg('Microphone access was denied. Please allow microphone permission in your browser address bar or device settings.');
-            setIsRecording(false);
-            isRecordingRef.current = false;
-            setStateMode('idle');
-          } else if (event.error === 'network') {
-            console.warn('SpeechRecognition network glitch, switching to direct audio recorder...');
-            try { recognition.stop(); } catch (e) {}
-            startMediaRecorderFallback();
+            console.warn('WebSpeech not-allowed, using hardware audio fallback');
           }
         };
 
         recognition.onend = () => {
-          // If the user hasn't clicked stop and speech recognition times out, auto-restart to keep listening
+          // Auto-rearm if still recording and no error
           if (isRecordingRef.current) {
-            // Commit confirmed final speech so far (never raw interim)
             if (recognizedTextRef.current.trim()) {
               committedFinal = deduplicateSpeechRepetitions(recognizedTextRef.current.trim());
             }
             try {
               recognition.start();
-            } catch (e) {
-              if (recognizedTextRef.current.trim()) {
-                isRecordingRef.current = false;
-                setIsRecording(false);
-                finishSpeechAndPreview(recognizedTextRef.current.trim());
-              }
-            }
+            } catch (e) {}
           }
         };
 
         recognitionRef.current = recognition;
-        recognition.start();
-        return;
+        try {
+          recognition.start();
+        } catch (startErr) {
+          console.warn('SpeechRecognition.start() error:', startErr);
+        }
       } catch (err) {
-        console.warn('SpeechRecognition start error, falling back to MediaRecorder:', err.message);
-      }
-    }
-
-    // FALLBACK PIPELINE: Direct Hardware Audio Recording (for browsers without Web Speech)
-    await startMediaRecorderFallback();
-  };
-
-  const startMediaRecorderFallback = async () => {
-    try {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        setErrorMsg('Microphone access is not supported by this browser. You can type what you did below!');
-        setIsRecording(false);
-        isRecordingRef.current = false;
-        setStateMode('idle');
-        return;
-      }
-
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaStreamRef.current = stream;
-      setupAudioVisualizer(stream);
-
-      let mimeType = 'audio/webm';
-      if (typeof MediaRecorder !== 'undefined') {
-        if (!MediaRecorder.isTypeSupported('audio/webm')) {
-          if (MediaRecorder.isTypeSupported('audio/mp4')) mimeType = 'audio/mp4';
-          else if (MediaRecorder.isTypeSupported('audio/ogg')) mimeType = 'audio/ogg';
-          else mimeType = '';
-        }
-      }
-
-      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
-      mediaRecorderRef.current = recorder;
-      recorder.ondataavailable = (e) => {
-        if (e.data && e.data.size > 0) {
-          audioChunksRef.current.push(e.data);
-        }
-      };
-
-      recorder.start(100);
-      setIsRecording(true);
-      isRecordingRef.current = true;
-      setStateMode('listening');
-      playBeep(700, 0.12);
-    } catch (err) {
-      console.error('Microphone fallback error:', err);
-      setIsRecording(false);
-      isRecordingRef.current = false;
-      setStateMode('idle');
-      cleanupAudio();
-      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-        setErrorMsg('Microphone permission was denied. Please allow microphone access in your browser or phone settings.');
-      } else {
-        setErrorMsg('Could not access microphone: ' + (err.message || 'Unknown device error'));
+        console.warn('SpeechRecognition setup error:', err);
       }
     }
   };

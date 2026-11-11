@@ -65,11 +65,17 @@ async function safeFetch(url, options = {}) {
     ...customHeaders
   };
 
+  const controller = new AbortController();
+  const timeoutMs = options.timeout || 12000;
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
   try {
     const res = await fetch(url, {
       ...options,
-      headers
+      headers,
+      signal: options.signal || controller.signal
     });
+    clearTimeout(timeoutId);
 
     if (res.status === 413) {
       return { 
@@ -104,33 +110,48 @@ async function safeFetch(url, options = {}) {
       return { error: text || 'Non-JSON server response' };
     }
   } catch (err) {
+    clearTimeout(timeoutId);
     console.warn(`[API] Request error for ${url}:`, err.message);
     return { error: err.message || 'Network connection failed' };
   }
 }
 
 export const api = {
-  // Server Health & Connectivity Check (Strictly monitors Render Cloud Backend)
+  // Server Health & Connectivity Check (Intelligently detects Localhost vs Cloud Backend)
   checkServerHealth: async () => {
+    const isLocalhost = typeof window !== 'undefined' && (
+      window.location.hostname === 'localhost' || 
+      window.location.hostname === '127.0.0.1'
+    ) && Boolean(window.location.port);
+
+    const targetUrl = isLocalhost ? '/api/health' : `${RENDER_BACKEND}/api/health`;
+    const targetHost = isLocalhost ? `localhost:${window.location.port}` : RENDER_BACKEND;
+
     try {
       const start = performance.now();
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000);
-      const res = await fetch(`${RENDER_BACKEND}/api/health`, { signal: controller.signal });
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      const res = await fetch(targetUrl, { signal: controller.signal });
       clearTimeout(timeoutId);
       const latency = Math.round(performance.now() - start);
 
       const contentType = res.headers.get('content-type') || '';
       if (res.ok && contentType.includes('application/json')) {
         const data = await res.json();
-        return { status: 'running', latency, host: RENDER_BACKEND, ...data };
+        return { 
+          status: 'running', 
+          latency, 
+          host: targetHost, 
+          serverType: isLocalhost ? 'Local Server' : 'Render Cloud Backend',
+          ...data 
+        };
       }
-      return { status: 'turning-on', latency, host: RENDER_BACKEND, error: 'Render cloud server is waking up...' };
+      return { status: 'turning-on', latency, host: targetHost, error: 'Server waking up...' };
     } catch (err) {
       if (err.name === 'AbortError') {
-        return { status: 'turning-on', latency: null, host: RENDER_BACKEND, error: 'Render free tier waking from sleep (~15-25s)...' };
+        return { status: 'turning-on', latency: null, host: targetHost, error: 'Connection timeout...' };
       }
-      return { status: 'offline', latency: null, host: RENDER_BACKEND, error: err.message };
+      return { status: 'offline', latency: null, host: targetHost, error: err.message };
     }
   },
 
