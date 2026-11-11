@@ -129,7 +129,7 @@ export default function AuthScreen({ onAuthSuccess }) {
       if (res.success && res.user) {
         setSuccessMsg(`Signed in with Google as ${res.user.name} (${res.user.email})!`);
         setTimeout(() => {
-          onAuthSuccess(res.user);
+          onAuthSuccess(res.user, res.profile);
         }, 500);
       } else {
         throw new Error(res.error || 'Google authentication failed on server');
@@ -182,7 +182,7 @@ export default function AuthScreen({ onAuthSuccess }) {
         setIsGoogleModalOpen(false);
         setSuccessMsg(`Welcome, ${res.user.name}!`);
         setTimeout(() => {
-          onAuthSuccess(res.user);
+          onAuthSuccess(res.user, res.profile);
         }, 500);
       } else {
         throw new Error(res.error || 'Google authentication failed');
@@ -211,7 +211,7 @@ export default function AuthScreen({ onAuthSuccess }) {
         if (res.success && res.user) {
           setSuccessMsg('Account created successfully! Welcome to AGY FIT.');
           setTimeout(() => {
-            onAuthSuccess(res.user);
+            onAuthSuccess(res.user, res.profile);
           }, 600);
         } else {
           throw new Error(res.error || 'Failed to create account');
@@ -224,7 +224,7 @@ export default function AuthScreen({ onAuthSuccess }) {
         if (res.success && res.user) {
           setSuccessMsg('Signed in! Loading your dashboard...');
           setTimeout(() => {
-            onAuthSuccess(res.user);
+            onAuthSuccess(res.user, res.profile);
           }, 500);
         } else {
           throw new Error(res.error || 'Invalid email or password');

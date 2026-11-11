@@ -61,10 +61,14 @@ export default function App() {
     setProfile(updatedProfile);
   };
 
-  const handleAuthSuccess = async (user) => {
+  const handleAuthSuccess = async (user, initialProfile) => {
+    if (!user) return;
+    localStorage.setItem('agy_current_user', JSON.stringify(user));
     setCurrentUser(user);
+    setProfile(initialProfile || null);
+
     try {
-      const p = await api.getProfile();
+      const p = initialProfile || await api.getProfile();
       if (p) setProfile(p);
       if (!p || !p.isConfigured || !p.heightCm || !p.weightKg) {
         setIsOnboardingOpen(true);
@@ -77,8 +81,14 @@ export default function App() {
   const handleLogout = async () => {
     try {
       await api.logout();
-      setCurrentUser(null);
     } catch (e) {}
+    setCurrentUser(null);
+    setProfile(null);
+    setIsOnboardingOpen(false);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('agy_current_user');
+      sessionStorage.removeItem('onboarding_wizard_dismissed');
+    }
   };
 
   const handleVoiceActionCompleted = (res) => {
@@ -199,19 +209,22 @@ export default function App() {
       />
 
       {/* Interactive Onboarding / Profile Setup Wizard Modal */}
-      <OnboardingModal
-        isOpen={isOnboardingOpen}
-        onClose={() => {
-          setIsOnboardingOpen(false);
-          sessionStorage.setItem('onboarding_wizard_dismissed', 'true');
-        }}
-        currentProfile={profile}
-        currentUser={currentUser}
-        onProfileSaved={(p) => {
-          handleProfileSaved(p);
-          sessionStorage.setItem('onboarding_wizard_dismissed', 'true');
-        }}
-      />
+      {isOnboardingOpen && (
+        <OnboardingModal
+          key={currentUser?.id || 'new_user'}
+          isOpen={isOnboardingOpen}
+          onClose={() => {
+            setIsOnboardingOpen(false);
+            sessionStorage.setItem('onboarding_wizard_dismissed', 'true');
+          }}
+          currentProfile={profile}
+          currentUser={currentUser}
+          onProfileSaved={(p) => {
+            handleProfileSaved(p);
+            sessionStorage.setItem('onboarding_wizard_dismissed', 'true');
+          }}
+        />
+      )}
 
       {/* Settings & Token Guard Modal */}
       <SettingsModal

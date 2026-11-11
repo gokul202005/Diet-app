@@ -190,6 +190,7 @@ app.post('/api/auth/signup', (req, res) => {
     res.status(201).json({
       success: true,
       user: db.currentUser,
+      profile: db.profiles[newUser.id],
       message: 'Account created successfully'
     });
   } catch (err) {

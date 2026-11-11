@@ -3,13 +3,15 @@ import { Sparkles, User, Target, Flame, Heart, Scale, Activity, ArrowRight, Chec
 import { api } from '../api';
 
 export default function OnboardingModal({ isOpen, onClose, currentProfile, currentUser, onProfileSaved }) {
-  const accountName = currentProfile?.name || currentUser?.name || '';
+  const resolvedName = currentUser?.name || currentProfile?.name || '';
+  const isConfigured = Boolean(currentProfile?.isConfigured);
+
   const [formData, setFormData] = useState({
-    name: accountName,
-    age: currentProfile?.age || '',
+    name: resolvedName,
+    age: isConfigured ? (currentProfile?.age || '') : '',
     gender: currentProfile?.gender || 'male',
-    heightCm: currentProfile?.heightCm || '',
-    weightKg: currentProfile?.weightKg || '',
+    heightCm: isConfigured ? (currentProfile?.heightCm || '') : '',
+    weightKg: isConfigured ? (currentProfile?.weightKg || '') : '',
     goals: Array.isArray(currentProfile?.goals) && currentProfile.goals.length > 0
       ? currentProfile.goals
       : (currentProfile?.goal ? [currentProfile.goal] : ['recomp']),
@@ -25,17 +27,38 @@ export default function OnboardingModal({ isOpen, onClose, currentProfile, curre
     dailyTargetSteps: currentProfile?.dailyTargetSteps || 10000,
   });
 
-  const [isEditingName, setIsEditingName] = useState(!accountName);
   const [liveTargets, setLiveTargets] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [step, setStep] = useState(1); // 1: Bio info, 2: Goal & Activity, 3: Review Calculated Macros
 
-  // Sync if account changes
+  // Sync strictly when user account changes or modal opens
   useEffect(() => {
-    if (accountName && !formData.name) {
-      setFormData(prev => ({ ...prev, name: accountName }));
+    if (isOpen) {
+      const freshName = currentUser?.name || currentProfile?.name || '';
+      const configured = Boolean(currentProfile?.isConfigured);
+      setFormData({
+        name: freshName,
+        age: configured ? (currentProfile?.age || '') : '',
+        gender: currentProfile?.gender || 'male',
+        heightCm: configured ? (currentProfile?.heightCm || '') : '',
+        weightKg: configured ? (currentProfile?.weightKg || '') : '',
+        goals: Array.isArray(currentProfile?.goals) && currentProfile.goals.length > 0
+          ? currentProfile.goals
+          : (currentProfile?.goal ? [currentProfile.goal] : ['recomp']),
+        goal: currentProfile?.goal || 'recomp',
+        activityLevel: currentProfile?.activityLevel || 'moderately_active',
+        dietaryTags: currentProfile?.dietaryTags || ['🍗 Non-Veg'],
+        focusAreas: currentProfile?.focusAreas || ['🛡️ Full Body Balance'],
+        dailyTargetCalories: currentProfile?.dailyTargetCalories || 2100,
+        dailyTargetProtein: currentProfile?.dailyTargetProtein || 140,
+        dailyTargetCarbs: currentProfile?.dailyTargetCarbs || 220,
+        dailyTargetFat: currentProfile?.dailyTargetFat || 60,
+        dailyTargetWater: currentProfile?.dailyTargetWater || 3000,
+        dailyTargetSteps: currentProfile?.dailyTargetSteps || 10000,
+      });
+      setStep(1);
     }
-  }, [accountName]);
+  }, [isOpen, currentUser?.id, currentProfile?.id]);
 
   // Toggle multi-select goals
   const toggleGoal = (goalId) => {
@@ -57,9 +80,13 @@ export default function OnboardingModal({ isOpen, onClose, currentProfile, curre
     }));
   };
 
-  // Recalculate targets whenever bio stats or goals change
+  // Recalculate targets whenever bio stats or goals change (only if height & weight entered)
   useEffect(() => {
     async function calc() {
+      if (!formData.heightCm || !formData.weightKg) {
+        setLiveTargets(null);
+        return;
+      }
       try {
         const res = await api.calculateTargets(formData);
         if (res.success) {
@@ -177,42 +204,21 @@ export default function OnboardingModal({ isOpen, onClose, currentProfile, curre
                 <p className="text-xs text-slate-400">Used to accurately calculate your Basal Metabolic Rate (BMR)</p>
               </div>
 
-              {/* Account identity confirmation */}
-              {!isEditingName && formData.name ? (
-                <div className="flex items-center justify-between p-3.5 bg-slate-950/80 border border-slate-800 rounded-2xl">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 font-black flex items-center justify-center text-sm">
-                      {formData.name.charAt(0).toUpperCase()}
-                    </div>
-                    <div>
-                      <div className="text-[11px] text-slate-400 uppercase font-semibold">Account Member</div>
-                      <div className="text-sm font-bold text-white">{formData.name}</div>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsEditingName(true)}
-                    className="text-xs text-emerald-400 hover:text-emerald-300 underline font-semibold cursor-pointer"
-                  >
-                    Change
-                  </button>
+              {/* Account User Name */}
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1.5">Your Full Name</label>
+                <div className="relative">
+                  <User className="absolute left-3.5 top-3 w-4 h-4 text-emerald-400" />
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="Enter your name"
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 placeholder-slate-600 focus:outline-none focus:border-emerald-500 text-sm font-semibold"
+                    required
+                  />
                 </div>
-              ) : (
-                <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1.5">Your Name</label>
-                  <div className="relative">
-                    <User className="absolute left-3.5 top-3 w-4 h-4 text-slate-500" />
-                    <input
-                      type="text"
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      placeholder="e.g. Gokul"
-                      className="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 placeholder-slate-600 focus:outline-none focus:border-emerald-500 text-sm"
-                      required
-                    />
-                  </div>
-                </div>
-              )}
+              </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -276,7 +282,7 @@ export default function OnboardingModal({ isOpen, onClose, currentProfile, curre
                 </div>
               </div>
 
-              {liveTargets && (
+              {liveTargets && Number(formData.heightCm) > 0 && Number(formData.weightKg) > 0 && (
                 <div className="bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800 flex items-center justify-between text-xs">
                   <div className="flex items-center space-x-2 text-slate-400">
                     <Heart className="w-4 h-4 text-rose-500" />
