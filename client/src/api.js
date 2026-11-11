@@ -110,27 +110,27 @@ async function safeFetch(url, options = {}) {
 }
 
 export const api = {
-  // Server Health & Connectivity Check
+  // Server Health & Connectivity Check (Strictly monitors Render Cloud Backend)
   checkServerHealth: async () => {
     try {
       const start = performance.now();
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 12000);
-      const res = await fetch(`${BASE_URL}/health`, { signal: controller.signal });
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+      const res = await fetch(`${RENDER_BACKEND}/api/health`, { signal: controller.signal });
       clearTimeout(timeoutId);
       const latency = Math.round(performance.now() - start);
 
       const contentType = res.headers.get('content-type') || '';
       if (res.ok && contentType.includes('application/json')) {
         const data = await res.json();
-        return { status: 'running', latency, ...data };
+        return { status: 'running', latency, host: RENDER_BACKEND, ...data };
       }
-      return { status: 'turning-on', latency, error: 'Server waking up...' };
+      return { status: 'turning-on', latency, host: RENDER_BACKEND, error: 'Render cloud server is waking up...' };
     } catch (err) {
       if (err.name === 'AbortError') {
-        return { status: 'turning-on', latency: null, error: 'Server is waking up (takes ~15-25s)...' };
+        return { status: 'turning-on', latency: null, host: RENDER_BACKEND, error: 'Render free tier waking from sleep (~15-25s)...' };
       }
-      return { status: 'offline', latency: null, error: err.message };
+      return { status: 'offline', latency: null, host: RENDER_BACKEND, error: err.message };
     }
   },
 

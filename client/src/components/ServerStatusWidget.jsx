@@ -168,10 +168,10 @@ export default function ServerStatusWidget({ variant = 'pill', onOpenModal }) {
       <button
         onClick={() => setIsModalOpen(true)}
         className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-bold border transition-all cursor-pointer shadow-sm ${badge.bgClass}`}
-        title={`Backend Server: ${badge.label} (Click for Server Health Details)`}
+        title={`Render Cloud Server: ${badge.label} (diet-app-backend-udje.onrender.com)`}
       >
         <span className={`w-2 h-2 rounded-full ${badge.dotClass}`} />
-        <span className="hidden sm:inline">Server:</span>
+        <span className="hidden sm:inline">Render:</span>
         <span className="capitalize">{badge.label}</span>
         {status === 'running' && latency !== null && (
           <span className="text-[9px] opacity-75 font-normal hidden md:inline">({latency}ms)</span>
@@ -205,8 +205,8 @@ export default function ServerStatusWidget({ variant = 'pill', onOpenModal }) {
                 <Server className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-base font-black text-white">Backend Server Status</h3>
-                <p className="text-xs text-slate-400">Live API connectivity & heartbeat monitoring</p>
+                <h3 className="text-base font-black text-white">Render Cloud Server Status</h3>
+                <p className="text-xs text-emerald-400 font-mono">diet-app-backend-udje.onrender.com</p>
               </div>
             </div>
 
@@ -217,9 +217,9 @@ export default function ServerStatusWidget({ variant = 'pill', onOpenModal }) {
                 <div>
                   <div className="text-xs font-black uppercase tracking-wider">{badge.label}</div>
                   <div className="text-[11px] opacity-80 mt-0.5">
-                    {status === 'running' && 'API is healthy and handling requests'}
-                    {status === 'turning-on' && 'Starting up or spinning from sleep'}
-                    {status === 'offline' && 'Cannot reach server endpoint'}
+                    {status === 'running' && 'Render cloud backend is healthy & handling API requests'}
+                    {status === 'turning-on' && 'Render free tier is waking up from sleep (~15-25s)'}
+                    {status === 'offline' && 'Cannot reach Render cloud server'}
                   </div>
                 </div>
               </div>
@@ -234,11 +234,15 @@ export default function ServerStatusWidget({ variant = 'pill', onOpenModal }) {
             {/* Diagnostics Stats */}
             <div className="space-y-2 text-xs bg-slate-950 p-4 rounded-2xl border border-slate-800">
               <div className="flex justify-between py-1 border-b border-slate-800/80 text-slate-400">
-                <span>Database Connection</span>
-                <span className="font-bold text-white">{serverData?.database || (status === 'running' ? 'Connected' : 'Offline')}</span>
+                <span>Target Host</span>
+                <span className="font-bold text-sky-400 font-mono text-[11px]">Render Cloud (Production)</span>
               </div>
               <div className="flex justify-between py-1 border-b border-slate-800/80 text-slate-400">
-                <span>Server Uptime</span>
+                <span>Database Connection</span>
+                <span className="font-bold text-white">{serverData?.database || (status === 'running' ? 'Supabase Connected' : 'Offline')}</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-slate-800/80 text-slate-400">
+                <span>Cloud Uptime</span>
                 <span className="font-bold text-white">{formatUptime(serverData?.uptimeSeconds)}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-slate-800/80 text-slate-400">
@@ -249,7 +253,7 @@ export default function ServerStatusWidget({ variant = 'pill', onOpenModal }) {
               </div>
               <div className="flex justify-between py-1 text-slate-400">
                 <span>API Version</span>
-                <span className="font-bold text-emerald-400">v1.0.0 (Capacitor + Node)</span>
+                <span className="font-bold text-emerald-400">v1.0.0 (Node + Express + Supabase)</span>
               </div>
             </div>
 
