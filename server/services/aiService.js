@@ -1,5 +1,13 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { localParseMealText, searchFoodDatabase } from '../data/foodDatabase.js';
+import { 
+  SOUTH_INDIAN_BREAKFASTS, 
+  SOUTH_INDIAN_LUNCHES, 
+  SOUTH_INDIAN_SNACKS, 
+  SOUTH_INDIAN_DINNERS, 
+  shuffleArray, 
+  scaleMealTemplate 
+} from './southIndianRecipes.js';
 
 // Cache to prevent duplicate token costs
 const queryCache = new Map();
@@ -771,352 +779,58 @@ Instructions:
     };
   }
 
-  // 5. Instant South Indian Calorie & Macro Target Meal Blueprint Engine (< 5ms calculation)
-  async generateDailyMealPlan(userProfile = {}, preference = 'south_indian_mixed', daysCount = 7) {
+  // 5. Dynamic Authentic South Indian Calorie & Macro Target Meal Blueprint Engine
+  async generateDailyMealPlan(userProfile = {}, preference = 'south_indian_mixed', daysCount = 7, options = {}) {
     const targetCal = Number(userProfile.dailyTargetCalories) || 2100;
     const targetProt = Number(userProfile.dailyTargetProtein) || 140;
     const targetCarb = Number(userProfile.dailyTargetCarbs) || 220;
     const targetFat = Number(userProfile.dailyTargetFat) || 60;
-    const goal = userProfile.goal || 'cutting';
+    const isVegOnly = preference === 'south_indian_veg';
+    const isForceFresh = Boolean(options.forceFresh);
 
+    // If not forced fresh and no custom seed, check queryCache
     const cacheKey = `meal_plan:${targetCal}:${targetProt}:${preference}:${daysCount}`;
-    if (queryCache.has(cacheKey)) {
+    if (!isForceFresh && !options.seed && queryCache.has(cacheKey)) {
       return { ...queryCache.get(cacheKey), cached: true };
     }
 
-    // 100% Authentic South Indian 7-Day Instant Calculation Engine (Zero North Indian dishes, Max 2-3 items/meal)
-    const isVegOnly = preference === 'south_indian_veg';
-    const scale = Math.max(0.7, targetCal / 2400);
-    const eggCountMultiplier = Math.max(1, Math.round(targetProt / 100));
+    // Macro target meal caloric distribution:
+    // Breakfast: 26% of daily calories
+    // Lunch: 36% of daily calories
+    // Evening Snack: 12% of daily calories
+    // Dinner: 26% of daily calories
+    const targetBreakfastCal = Math.round(targetCal * 0.26);
+    const targetLunchCal = Math.round(targetCal * 0.36);
+    const targetSnackCal = Math.round(targetCal * 0.12);
+    const targetDinnerCal = Math.max(200, targetCal - (targetBreakfastCal + targetLunchCal + targetSnackCal));
 
-    // 7 Distinct 100% Home-Cooked Authentic South Indian Days (Simple everyday home meals, rare chicken/fish)
-    const SOUTH_INDIAN_7_DAYS = [
-      // Day 1: Monday (Simple Home Chicken Curry & Idli)
-      {
-        day: 'Monday',
-        type: 'non_veg',
-        breakfast: {
-          title: 'Steamed Idlis with Drumstick Sambar & Boiled Eggs',
-          foods: [
-            { name: 'Steamed Idli', basePortion: 4, unit: 'pieces', cal: 65, prot: 2.3, carb: 13, fat: 0.3 },
-            { name: 'Drumstick Sambar', basePortion: 1, unit: 'bowl (200ml)', cal: 140, prot: 6.5, carb: 22, fat: 2.8 },
-            { name: isVegOnly ? 'Roasted Chana Sundal' : 'Boiled Eggs', basePortion: isVegOnly ? 1 : 3, unit: isVegOnly ? 'cup' : 'large eggs', cal: isVegOnly ? 190 : 72, prot: isVegOnly ? 11 : 6.3, carb: isVegOnly ? 30 : 0.4, fat: isVegOnly ? 3 : 5.0 }
-          ]
-        },
-        lunch: {
-          title: isVegOnly ? 'Ponni Rice with Paruppu Urundai Kuzhambu & Poriyal' : 'Ponni Rice with Simple Home Chicken Curry & Fresh Thayir',
-          foods: [
-            { name: 'Cooked Ponni Rice', basePortion: 1.8, unit: 'cups (280g)', cal: 200, prot: 4.2, carb: 45, fat: 0.4 },
-            { name: isVegOnly ? 'Paruppu Urundai Kuzhambu' : 'Simple Home Chicken Curry (Veetu Kozhi Curry)', basePortion: 1.2, unit: 'bowls (240g)', cal: isVegOnly ? 230 : 310, prot: isVegOnly ? 11.5 : 32, carb: isVegOnly ? 26 : 7, fat: isVegOnly ? 9 : 16 },
-            { name: isVegOnly ? 'Beans & Carrot Poriyal' : 'Fresh Curd (Thayir)', basePortion: 1, unit: isVegOnly ? 'cup (120g)' : 'bowl (150g)', cal: isVegOnly ? 90 : 95, prot: isVegOnly ? 3.0 : 5.0, carb: isVegOnly ? 10 : 6.5, fat: isVegOnly ? 4.5 : 5.5 }
-          ]
-        },
-        snack: {
-          title: 'Kala Chana Sundal & Degree Filter Coffee',
-          foods: [
-            { name: 'Black Chickpea Sundal', basePortion: 1.2, unit: 'cups (150g)', cal: 220, prot: 12.0, carb: 35, fat: 3.5 },
-            { name: 'Degree Filter Coffee (with Toned Milk)', basePortion: 1, unit: 'davarah (150ml)', cal: 65, prot: 3.5, carb: 8, fat: 1.5 }
-          ]
-        },
-        dinner: {
-          title: isVegOnly ? 'Crispy Plain Dosa with Tomato Chutney & Sundal' : 'Crispy Plain Dosa with Tomato Chutney & Boiled Eggs',
-          foods: [
-            { name: 'Crispy Plain Dosa', basePortion: 2.5, unit: 'medium dosas', cal: 133, prot: 3.2, carb: 23, fat: 3.0 },
-            { name: 'South Indian Tomato Chutney', basePortion: 1, unit: 'serving (60g)', cal: 60, prot: 1.5, carb: 7, fat: 3.0 },
-            { name: isVegOnly ? 'Pachai Payaru Sundal' : 'Boiled Eggs', basePortion: isVegOnly ? 1 : 3, unit: isVegOnly ? 'cup' : 'large eggs', cal: isVegOnly ? 210 : 72, prot: isVegOnly ? 13 : 6.3, carb: isVegOnly ? 34 : 0.4, fat: isVegOnly ? 2.5 : 5.0 }
-          ]
-        }
-      },
+    // Dynamic random shuffle of all pools to guarantee varied dishes across days & refreshes
+    const bShuffled = shuffleArray(SOUTH_INDIAN_BREAKFASTS);
+    const lShuffled = shuffleArray(
+      SOUTH_INDIAN_LUNCHES.filter(l => {
+        if (isVegOnly && l.isNonVeg && !l.vegTitle) return false;
+        return true;
+      })
+    );
+    const sShuffled = shuffleArray(SOUTH_INDIAN_SNACKS);
+    const dShuffled = shuffleArray(SOUTH_INDIAN_DINNERS);
 
-      // Day 2: Tuesday (Karakolambu Special: Poondu Kara Kuzhambu & Muttai Podimas)
-      {
-        day: 'Tuesday',
-        type: 'veg_egg',
-        breakfast: {
-          title: 'Ven Pongal with Drumstick Sambar & Boiled Eggs',
-          foods: [
-            { name: 'South Indian Ven Pongal (Rice & Moong Dal)', basePortion: 1.5, unit: 'cups (250g)', cal: 320, prot: 9.0, carb: 48, fat: 10.5 },
-            { name: 'Drumstick Sambar', basePortion: 1, unit: 'bowl (200ml)', cal: 140, prot: 6.5, carb: 22, fat: 2.8 },
-            { name: isVegOnly ? 'White Chana Sundal' : 'Boiled Eggs', basePortion: isVegOnly ? 1 : 3, unit: isVegOnly ? 'cup' : 'large eggs', cal: isVegOnly ? 190 : 72, prot: isVegOnly ? 11 : 6.3, carb: isVegOnly ? 31 : 0.4, fat: isVegOnly ? 3 : 5.0 }
-          ]
-        },
-        lunch: {
-          title: isVegOnly ? 'Ponni Rice with Poondu Kara Kuzhambu (Garlic Karakolambu) & Poriyal' : 'Ponni Rice with Poondu Kara Kuzhambu (Garlic Karakolambu) & Muttai Podimas',
-          foods: [
-            { name: 'Cooked Ponni Rice', basePortion: 1.8, unit: 'cups (280g)', cal: 200, prot: 4.2, carb: 45, fat: 0.4 },
-            { name: 'Poondu Kara Kuzhambu / Karakolambu (Garlic Tamarind Curry)', basePortion: 1.2, unit: 'bowls (200ml)', cal: 150, prot: 3.0, carb: 16, fat: 8.5 },
-            { name: isVegOnly ? 'Cabbage Poriyal with Coconut' : 'Muttai Podimas (Simple Home Egg Scramble with Onions & Chillies)', basePortion: isVegOnly ? 1 : 3, unit: isVegOnly ? 'cup (120g)' : 'eggs scramble', cal: isVegOnly ? 85 : 90, prot: isVegOnly ? 2.5 : 7.0, carb: isVegOnly ? 9 : 2, fat: isVegOnly ? 4.5 : 6.0 }
-          ]
-        },
-        snack: {
-          title: 'Boiled Peanuts Sundal & South Indian Filter Coffee',
-          foods: [
-            { name: 'Boiled Peanuts Sundal', basePortion: 1, unit: 'cup (120g)', cal: 240, prot: 11.5, carb: 14, fat: 17.0 },
-            { name: 'Degree Filter Coffee', basePortion: 1, unit: 'davarah (150ml)', cal: 65, prot: 3.5, carb: 8, fat: 1.5 }
-          ]
-        },
-        dinner: {
-          title: isVegOnly ? 'Pesarattu with Allam (Ginger) Chutney & Sambar' : 'Pesarattu (Green Moong Dal Dosa) with Allam Chutney & Boiled Eggs',
-          foods: [
-            { name: 'Pesarattu (Whole Green Gram Dosa)', basePortion: 2.5, unit: 'medium dosas', cal: 150, prot: 8.0, carb: 22, fat: 3.5 },
-            { name: 'Allam (Ginger) Chutney', basePortion: 1, unit: 'serving (50g)', cal: 55, prot: 1.0, carb: 8, fat: 2.5 },
-            { name: isVegOnly ? 'Drumstick Sambar' : 'Boiled Eggs', basePortion: isVegOnly ? 1 : 3, unit: isVegOnly ? 'bowl' : 'large eggs', cal: isVegOnly ? 140 : 72, prot: isVegOnly ? 6.5 : 6.3, carb: isVegOnly ? 22 : 0.4, fat: isVegOnly ? 2.8 : 5.0 }
-          ]
-        }
-      },
-
-      // Day 3: Wednesday (Home Pepper Rasam & Egg Podimas / Rare Fish Option)
-      {
-        day: 'Wednesday',
-        type: 'veg_egg',
-        breakfast: {
-          title: 'Podi Dosa (with Gingelly Oil) & Sambar with Boiled Eggs',
-          foods: [
-            { name: 'Podi Dosa (with Gingelly Oil)', basePortion: 2.5, unit: 'dosas', cal: 165, prot: 4.5, carb: 24, fat: 5.5 },
-            { name: 'Drumstick Sambar', basePortion: 1, unit: 'bowl (200ml)', cal: 140, prot: 6.5, carb: 22, fat: 2.8 },
-            { name: isVegOnly ? 'Roasted Bengal Gram' : 'Boiled Eggs', basePortion: isVegOnly ? 1 : 3, unit: isVegOnly ? 'serving' : 'large eggs', cal: isVegOnly ? 180 : 72, prot: isVegOnly ? 9 : 6.3, carb: isVegOnly ? 8 : 0.4, fat: isVegOnly ? 14 : 5.0 }
-          ]
-        },
-        lunch: {
-          title: isVegOnly ? 'Ponni Rice with Mor Kuzhambu & Cabbage Poriyal' : 'Ponni Rice with Pepper Garlic Rasam & Muttai Podimas (or Home Fish Curry)',
-          foods: [
-            { name: 'Cooked Ponni Rice', basePortion: 1.8, unit: 'cups (280g)', cal: 200, prot: 4.2, carb: 45, fat: 0.4 },
-            { name: isVegOnly ? 'Mor Kuzhambu / Pulissery' : 'Pepper Garlic Rasam (Milagu Poondu Rasam)', basePortion: 1.2, unit: 'bowls (220ml)', cal: isVegOnly ? 155 : 45, prot: isVegOnly ? 4.5 : 2.0, carb: isVegOnly ? 11 : 7, fat: isVegOnly ? 10 : 1.0 },
-            { name: isVegOnly ? 'Cabbage Poriyal with Coconut' : 'Muttai Podimas (Simple Home Egg Scramble with Onions & Chillies)', basePortion: isVegOnly ? 1 : 3, unit: isVegOnly ? 'cup (120g)' : 'eggs scramble', cal: isVegOnly ? 85 : 90, prot: isVegOnly ? 2.5 : 7.0, carb: isVegOnly ? 9 : 2, fat: isVegOnly ? 4.5 : 6.0 }
-          ]
-        },
-        snack: {
-          title: 'Masala Neer Mor & Roasted Bengal Gram (Pottukadalai)',
-          foods: [
-            { name: 'Masala Neer Mor (Buttermilk with Ginger & Curry Leaves)', basePortion: 1.5, unit: 'glasses (350ml)', cal: 50, prot: 3.5, carb: 5, fat: 1.5 },
-            { name: 'Roasted Bengal Gram (Pottukadalai)', basePortion: 1, unit: 'cup (60g)', cal: 220, prot: 12.5, carb: 34, fat: 3.5 }
-          ]
-        },
-        dinner: {
-          title: isVegOnly ? 'Steamed Idiyappam with Coconut Veg Kurma & Rasam' : 'Steamed Idiyappam (String Hoppers) with Simple Home Egg Curry (Muttai Kuzhambu)',
-          foods: [
-            { name: 'Steamed Idiyappam (Sevai)', basePortion: 4, unit: 'cakes (200g)', cal: 80, prot: 1.8, carb: 18, fat: 0.3 },
-            { name: isVegOnly ? 'Vegetable Coconut Kurma' : 'South Indian Muttai Kuzhambu (Egg Curry)', basePortion: 1.2, unit: 'bowls', cal: isVegOnly ? 190 : 260, prot: isVegOnly ? 4.5 : 16, carb: isVegOnly ? 16 : 9, fat: isVegOnly ? 12 : 17 },
-            { name: 'Tomato Garlic Rasam', basePortion: 1, unit: 'cup (180ml)', cal: 45, prot: 1.5, carb: 7, fat: 1.0 }
-          ]
-        }
-      },
-
-      // Day 4: Thursday (Ennai Kathirikai Karakolambu & Adai Avial Day)
-      {
-        day: 'Thursday',
-        type: 'veg_egg',
-        breakfast: {
-          title: isVegOnly ? 'Adai Avial (Multi-Lentil High-Protein Pancake with Coconut Avial)' : 'Adai Avial with Boiled Eggs',
-          foods: [
-            { name: 'Adai (High-Protein Multi-Lentil Pancake)', basePortion: 2.5, unit: 'adais', cal: 170, prot: 7.2, carb: 23, fat: 5.5 },
-            { name: 'Kerala Avial (Mixed Vegetables in Coconut & Curd)', basePortion: 1, unit: 'bowl (150g)', cal: 160, prot: 3.5, carb: 14, fat: 10.5 },
-            { name: isVegOnly ? 'Coconut Chutney' : 'Boiled Eggs', basePortion: isVegOnly ? 1 : 3, unit: isVegOnly ? 'serving (40g)' : 'large eggs', cal: isVegOnly ? 85 : 72, prot: isVegOnly ? 1.2 : 6.3, carb: isVegOnly ? 3.5 : 0.4, fat: isVegOnly ? 7.5 : 5.0 }
-          ]
-        },
-        lunch: {
-          title: isVegOnly ? 'Ponni Rice with Ennai Kathirikai Kara Kuzhambu (Brinjal Karakolambu) & Potato Roast' : 'Ponni Rice with Ennai Kathirikai Kara Kuzhambu (Brinjal Karakolambu) & South Indian Omelet',
-          foods: [
-            { name: 'Cooked Ponni Rice', basePortion: 1.8, unit: 'cups (280g)', cal: 200, prot: 4.2, carb: 45, fat: 0.4 },
-            { name: 'Ennai Kathirikai Kara Kuzhambu / Karakolambu (Baby Brinjal Curry)', basePortion: 1.2, unit: 'bowls (180g)', cal: 195, prot: 3.2, carb: 16, fat: 13.5 },
-            { name: isVegOnly ? 'Potato Roast (Urulai Varuval)' : 'South Indian Egg Omelet (with Onions & Pepper)', basePortion: isVegOnly ? 1 : 2.5, unit: isVegOnly ? 'cup' : 'eggs omelet', cal: isVegOnly ? 195 : 95, prot: isVegOnly ? 3.5 : 7.2, carb: isVegOnly ? 28 : 1.5, fat: isVegOnly ? 8.0 : 7.0 }
-          ]
-        },
-        snack: {
-          title: 'Pachai Payaru (Green Gram) Sundal & Degree Filter Coffee',
-          foods: [
-            { name: 'Pachai Payaru Sundal', basePortion: 1.2, unit: 'cups (150g)', cal: 210, prot: 13.0, carb: 34, fat: 2.5 },
-            { name: 'Degree Filter Coffee', basePortion: 1, unit: 'davarah (150ml)', cal: 65, prot: 3.5, carb: 8, fat: 1.5 }
-          ]
-        },
-        dinner: {
-          title: isVegOnly ? 'Steamed Idlis with Kara Chutney & Sambar' : 'Steamed Idlis with Kara Chutney & Boiled Eggs',
-          foods: [
-            { name: 'Steamed Idli', basePortion: 4, unit: 'pieces', cal: 65, prot: 2.3, carb: 13, fat: 0.3 },
-            { name: 'Kara Chutney (Spicy Onion Garlic Red Chutney)', basePortion: 1, unit: 'serving (60g)', cal: 55, prot: 1.5, carb: 6, fat: 3.0 },
-            { name: isVegOnly ? 'Drumstick Sambar' : 'Boiled Eggs', basePortion: isVegOnly ? 1 : 3, unit: isVegOnly ? 'bowl' : 'large eggs', cal: isVegOnly ? 140 : 72, prot: isVegOnly ? 6.5 : 6.3, carb: isVegOnly ? 22 : 0.4, fat: isVegOnly ? 2.8 : 5.0 }
-          ]
-        }
-      },
-
-      // Day 5: Friday (Kuzhi Paniyaram & Kollu Rasam Home Special)
-      {
-        day: 'Friday',
-        type: 'veg_egg',
-        breakfast: {
-          title: isVegOnly ? 'Chettinad Kuzhi Paniyaram with Kara Chutney & Sambar' : 'Chettinad Kuzhi Paniyaram with Kara Chutney & Boiled Eggs',
-          foods: [
-            { name: 'Chettinad Kuzhi Paniyaram (Crispy Rice & Dal Dumplings)', basePortion: 6, unit: 'pieces', cal: 46, prot: 1.1, carb: 7.2, fat: 1.4 },
-            { name: 'Kara Chutney (Spicy Onion Garlic Chutney)', basePortion: 1, unit: 'serving (60g)', cal: 55, prot: 1.5, carb: 6, fat: 3.0 },
-            { name: isVegOnly ? 'Drumstick Sambar' : 'Boiled Eggs', basePortion: isVegOnly ? 1 : 3, unit: isVegOnly ? 'bowl' : 'large eggs', cal: isVegOnly ? 140 : 72, prot: isVegOnly ? 6.5 : 6.3, carb: isVegOnly ? 22 : 0.4, fat: isVegOnly ? 2.8 : 5.0 }
-          ]
-        },
-        lunch: {
-          title: isVegOnly ? 'Ponni Rice with Kollu Rasam (Horse Gram Fat-Loss Soup) & Urulaikizhangu Roast' : 'Ponni Rice with Kollu Rasam & Muttai Podimas (Simple Home Egg Scramble)',
-          foods: [
-            { name: 'Cooked Ponni Rice', basePortion: 1.8, unit: 'cups (280g)', cal: 200, prot: 4.2, carb: 45, fat: 0.4 },
-            { name: 'Kollu Rasam (Horse Gram Fat-Loss & Endurance Soup)', basePortion: 1.2, unit: 'bowls (220ml)', cal: 55, prot: 3.5, carb: 8, fat: 1.0 },
-            { name: isVegOnly ? 'Potato Roast (Urulai Kizhangu Varuval)' : 'Muttai Podimas (Simple Home Egg Scramble with Onions & Chillies)', basePortion: isVegOnly ? 1 : 3, unit: isVegOnly ? 'cup (130g)' : 'eggs scramble', cal: isVegOnly ? 195 : 90, prot: isVegOnly ? 3.5 : 7.0, carb: isVegOnly ? 28 : 2, fat: isVegOnly ? 8.0 : 6.0 }
-          ]
-        },
-        snack: {
-          title: 'Karamani (Black-eyed Pea) Sundal & Degree Filter Coffee',
-          foods: [
-            { name: 'Karamani Sundal', basePortion: 1.2, unit: 'cups (150g)', cal: 200, prot: 12.0, carb: 33, fat: 2.5 },
-            { name: 'Degree Filter Coffee', basePortion: 1, unit: 'davarah (150ml)', cal: 65, prot: 3.5, carb: 8, fat: 1.5 }
-          ]
-        },
-        dinner: {
-          title: isVegOnly ? 'Plain Kal Dosa with Tomato Chutney & Fresh Curd' : '2 Egg Dosas (Muttai Dosa with Pepper & Curry Leaves) with Tomato Chutney',
-          foods: [
-            { name: isVegOnly ? 'Kal Dosa (Soft Sponge Dosa)' : 'Egg Dosa (Muttai Dosa with Pepper & Curry Leaves)', basePortion: isVegOnly ? 2.5 : 2, unit: isVegOnly ? 'dosas' : 'egg dosas', cal: isVegOnly ? 120 : 210, prot: isVegOnly ? 3.0 : 11.5, carb: isVegOnly ? 22 : 22, fat: isVegOnly ? 2 : 8.5 },
-            { name: 'Tomato Chutney', basePortion: 1, unit: 'serving (60g)', cal: 60, prot: 1.5, carb: 7, fat: 3.0 },
-            { name: 'Fresh Curd (Thayir)', basePortion: 1, unit: 'cup (120g)', cal: 80, prot: 4.0, carb: 5.5, fat: 4.5 }
-          ]
-        }
-      },
-
-      // Day 6: Saturday (Vatha Kuzhambu & Curd Rice Special)
-      {
-        day: 'Saturday',
-        type: 'veg_egg',
-        breakfast: {
-          title: isVegOnly ? 'Kerala Appam with Vegetable Coconut Kurma' : 'Kerala Appam with Coconut Kurma & Boiled Eggs',
-          foods: [
-            { name: 'Appam (Soft fermented rice hopper)', basePortion: 3, unit: 'pieces', cal: 95, prot: 2.0, carb: 20, fat: 1.0 },
-            { name: 'South Indian Vegetable Coconut Kurma', basePortion: 1, unit: 'bowl (200g)', cal: 180, prot: 4.5, carb: 18, fat: 10.0 },
-            { name: isVegOnly ? 'Kala Chana Sundal' : 'Boiled Eggs', basePortion: isVegOnly ? 1 : 3, unit: isVegOnly ? 'cup' : 'large eggs', cal: isVegOnly ? 190 : 72, prot: isVegOnly ? 11 : 6.3, carb: isVegOnly ? 31 : 0.4, fat: isVegOnly ? 3 : 5.0 }
-          ]
-        },
-        lunch: {
-          title: isVegOnly ? 'Ponni Rice with Vatha Kuzhambu (Sundakkai Tamarind Curry) & Keerai Kootu' : 'Ponni Rice with Vatha Kuzhambu (Sundakkai Tamarind Curry) & Muttai Thokku',
-          foods: [
-            { name: 'Cooked Ponni Rice', basePortion: 1.8, unit: 'cups (280g)', cal: 200, prot: 4.2, carb: 45, fat: 0.4 },
-            { name: 'Vatha Kuzhambu / Vathal Kolambu', basePortion: 1.2, unit: 'ladles (100ml)', cal: 135, prot: 2.0, carb: 13, fat: 8.5 },
-            { name: isVegOnly ? 'Keerai Kootu (Spinach Lentil Mash)' : 'Egg Thokku (Spicy Boiled Egg Roast)', basePortion: isVegOnly ? 1 : 3, unit: isVegOnly ? 'bowl (160g)' : 'eggs with gravy', cal: isVegOnly ? 130 : 85, prot: isVegOnly ? 6.0 : 6.8, carb: isVegOnly ? 16 : 3, fat: isVegOnly ? 4.5 : 5.5 }
-          ]
-        },
-        snack: {
-          title: 'Masala Neer Mor & Boiled Eggs',
-          foods: [
-            { name: 'Masala Neer Mor (Buttermilk)', basePortion: 1.5, unit: 'glasses (350ml)', cal: 50, prot: 3.5, carb: 5, fat: 1.5 },
-            { name: isVegOnly ? 'Pattani (Peas) Sundal' : 'Boiled Eggs', basePortion: isVegOnly ? 1 : 2, unit: isVegOnly ? 'cup' : 'large eggs', cal: isVegOnly ? 205 : 72, prot: isVegOnly ? 11.5 : 6.3, carb: isVegOnly ? 34 : 0.4, fat: isVegOnly ? 2.5 : 5.0 }
-          ]
-        },
-        dinner: {
-          title: isVegOnly ? 'Curd Rice (Thayir Sadam) with Potato Roast & Pickle' : 'Curd Rice (Thayir Sadam) with South Indian Egg Thokku (Muttai Thokku)',
-          foods: [
-            { name: 'South Indian Curd Rice (Tempered Thayir Sadam)', basePortion: 1.8, unit: 'cups (280g)', cal: 210, prot: 5.5, carb: 38, fat: 4.5 },
-            { name: isVegOnly ? 'Potato Roast (Urulai Varuval)' : 'Egg Thokku (Spicy Boiled Egg Roast)', basePortion: isVegOnly ? 1 : 3, unit: isVegOnly ? 'bowl' : 'eggs with gravy', cal: isVegOnly ? 195 : 85, prot: isVegOnly ? 3.5 : 6.8, carb: isVegOnly ? 28 : 3, fat: isVegOnly ? 8.0 : 5.5 },
-            { name: 'South Indian Mango / Mavadu Pickle', basePortion: 1, unit: 'tsp', cal: 20, prot: 0.2, carb: 1, fat: 1.5 }
-          ]
-        }
-      },
-
-      // Day 7: Sunday (Simple Home Chicken Biryani Feast & Kal Dosa Special)
-      {
-        day: 'Sunday',
-        type: 'non_veg',
-        breakfast: {
-          title: isVegOnly ? 'Steamed Idlis with Drumstick Sambar & Coconut Chutney' : 'Steamed Idlis with Simple Home Chicken Gravy & Boiled Eggs',
-          foods: [
-            { name: 'Steamed Idli', basePortion: 4, unit: 'pieces', cal: 65, prot: 2.3, carb: 13, fat: 0.3 },
-            { name: isVegOnly ? 'Drumstick Sambar' : 'South Indian Chicken Salna / Korma (Madurai Salna)', basePortion: 1.2, unit: 'bowls (220ml)', cal: isVegOnly ? 140 : 230, prot: isVegOnly ? 6.5 : 18, carb: isVegOnly ? 22 : 8, fat: isVegOnly ? 2.8 : 14 },
-            { name: isVegOnly ? 'Coconut Chutney' : 'Boiled Eggs', basePortion: isVegOnly ? 1 : 2, unit: isVegOnly ? 'serving' : 'large eggs', cal: isVegOnly ? 95 : 72, prot: isVegOnly ? 1.8 : 6.3, carb: isVegOnly ? 4 : 0.4, fat: isVegOnly ? 8.5 : 5.0 }
-          ]
-        },
-        lunch: {
-          title: isVegOnly ? 'Simple Home Vegetable Biryani with Thayir Raitha & Sundal' : 'Simple Home Chicken Biryani with Thayir Raitha & Boiled Egg',
-          foods: [
-            { name: isVegOnly ? 'South Indian Vegetable Biryani' : 'Simple Home Chicken Biryani (Veetu Chicken Biryani)', basePortion: 2, unit: 'cups (320g)', cal: isVegOnly ? 240 : 320, prot: isVegOnly ? 6 : 22, carb: isVegOnly ? 46 : 38, fat: isVegOnly ? 7 : 11 },
-            { name: 'Onion Pachadi (Thayir Raitha)', basePortion: 1, unit: 'bowl (150g)', cal: 85, prot: 3.5, carb: 7, fat: 4.5 },
-            { name: isVegOnly ? 'Kala Chana Sundal' : 'Boiled Egg', basePortion: isVegOnly ? 1 : 2, unit: isVegOnly ? 'cup' : 'large eggs', cal: isVegOnly ? 190 : 72, prot: isVegOnly ? 11 : 6.3, carb: isVegOnly ? 31 : 0.4, fat: isVegOnly ? 3 : 5.0 }
-          ]
-        },
-        snack: {
-          title: 'Kala Chana Sundal & Degree Filter Coffee',
-          foods: [
-            { name: 'Kala Chana Sundal', basePortion: 1.2, unit: 'cups (150g)', cal: 220, prot: 12.0, carb: 35, fat: 3.5 },
-            { name: 'Degree Filter Coffee', basePortion: 1, unit: 'davarah (150ml)', cal: 65, prot: 3.5, carb: 8, fat: 1.5 }
-          ]
-        },
-        dinner: {
-          title: isVegOnly ? 'Kal Dosa with Tomato Thokku & Drumstick Sambar' : 'Kal Dosa (Soft Sponge Dosa) with South Indian Egg Thokku',
-          foods: [
-            { name: 'Kal Dosa (Thick Soft Sponge Dosa)', basePortion: 2.5, unit: 'dosas', cal: 120, prot: 3.0, carb: 22, fat: 2.0 },
-            { name: 'Tomato Onion Thokku', basePortion: 1, unit: 'serving (60g)', cal: 60, prot: 1.5, carb: 7, fat: 3.0 },
-            { name: isVegOnly ? 'Drumstick Sambar' : 'Boiled Eggs', basePortion: isVegOnly ? 1 : 3, unit: isVegOnly ? 'bowl' : 'large eggs', cal: isVegOnly ? 140 : 72, prot: isVegOnly ? 6.5 : 6.3, carb: isVegOnly ? 22 : 0.4, fat: isVegOnly ? 2.8 : 5.0 }
-          ]
-        }
-      }
-    ];
-
+    const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
     const generatedDays = [];
+
     for (let d = 1; d <= daysCount; d++) {
-      const template = SOUTH_INDIAN_7_DAYS[(d - 1) % 7];
+      const dayName = DAY_NAMES[(d - 1) % DAY_NAMES.length];
+      const bTemplate = bShuffled[(d - 1) % bShuffled.length];
+      const lTemplate = lShuffled[(d - 1) % lShuffled.length];
+      const sTemplate = sShuffled[(d - 1) % sShuffled.length];
+      const dTemplate = dShuffled[(d - 1) % dShuffled.length];
 
-      // Calculate Day's Raw Base Calories and Protein
-      let rawBaseCal = 0;
-      let rawBaseProt = 0;
-      ['breakfast', 'lunch', 'snack', 'dinner'].forEach(mKey => {
-        template[mKey].foods.forEach(f => {
-          rawBaseCal += f.cal * f.basePortion;
-          rawBaseProt += f.prot * f.basePortion;
-        });
-      });
+      const breakfastMeal = scaleMealTemplate(bTemplate, 'Breakfast', '08:30 AM', targetBreakfastCal, isVegOnly);
+      const lunchMeal = scaleMealTemplate(lTemplate, 'Lunch', '01:30 PM', targetLunchCal, isVegOnly);
+      const snackMeal = scaleMealTemplate(sTemplate, 'Evening Snack', '05:00 PM', targetSnackCal, isVegOnly);
+      const dinnerMeal = scaleMealTemplate(dTemplate, 'Dinner', '08:30 PM', targetDinnerCal, isVegOnly);
 
-      // Target calibration multiplier
-      const dayScale = targetCal / rawBaseCal;
-
-      const buildMeal = (mObj, mealType, time) => {
-        const scaledFoods = mObj.foods.map(f => {
-          const scaledPortion = Number((f.basePortion * dayScale).toFixed(1));
-          const cal = Math.round(f.cal * scaledPortion);
-          const prot = Number((f.prot * scaledPortion).toFixed(1));
-          const carb = Number((f.carb * scaledPortion).toFixed(1));
-          const fat = Number((f.fat * scaledPortion).toFixed(1));
-
-          let portionLabel = `${scaledPortion} ${f.unit}`;
-          if (f.unit.includes('eggs')) {
-            portionLabel = `${Math.max(1, Math.round(scaledPortion))} ${f.unit}`;
-          } else if (f.unit.includes('pieces') || f.unit.includes('dosas')) {
-            portionLabel = `${Math.max(1, Math.round(scaledPortion))} ${f.unit}`;
-          }
-
-          return {
-            name: f.name,
-            portion: portionLabel,
-            calories: cal,
-            protein: prot,
-            carbs: carb,
-            fat: fat
-          };
-        });
-
-        const mealCal = scaledFoods.reduce((acc, f) => acc + f.calories, 0);
-        const mealProt = Number(scaledFoods.reduce((acc, f) => acc + f.protein, 0).toFixed(1));
-        const mealCarb = Number(scaledFoods.reduce((acc, f) => acc + f.carbs, 0).toFixed(1));
-        const mealFat = Number(scaledFoods.reduce((acc, f) => acc + f.fat, 0).toFixed(1));
-
-        return {
-          mealType,
-          title: mObj.title,
-          time,
-          foods: scaledFoods,
-          mealCalories: mealCal,
-          mealProtein: mealProt,
-          mealCarbs: mealCarb,
-          mealFat: mealFat
-        };
-      };
-
-      const dayMeals = [
-        buildMeal(template.breakfast, 'Breakfast', '08:30 AM'),
-        buildMeal(template.lunch, 'Lunch', '01:30 PM'),
-        buildMeal(template.snack, 'Evening Snack', '05:00 PM'),
-        buildMeal(template.dinner, 'Dinner', '08:30 PM')
-      ];
-
+      const dayMeals = [breakfastMeal, lunchMeal, snackMeal, dinnerMeal];
       const totalDayCal = dayMeals.reduce((acc, m) => acc + m.mealCalories, 0);
       const totalDayProt = Number(dayMeals.reduce((acc, m) => acc + m.mealProtein, 0).toFixed(1));
       const totalDayCarb = Number(dayMeals.reduce((acc, m) => acc + m.mealCarbs, 0).toFixed(1));
@@ -1124,7 +838,7 @@ Instructions:
 
       generatedDays.push({
         dayNumber: d,
-        dayName: `Day ${d} (${template.day})`,
+        dayName: `Day ${d} (${dayName})`,
         meals: dayMeals,
         dayTotalCalories: totalDayCal,
         dayTotalProtein: totalDayProt,
@@ -1135,15 +849,65 @@ Instructions:
       });
     }
 
-    const fallbackPlan = {
+    const plan = {
       preference,
       targetCalories: targetCal,
       targetProtein: targetProt,
       days: generatedDays,
-      source: 'south-indian-algorithmic-engine'
+      source: 'south-indian-smart-engine',
+      generatedAt: new Date().toISOString()
     };
 
-    queryCache.set(cacheKey, fallbackPlan);
-    return fallbackPlan;
+    if (!isForceFresh) {
+      queryCache.set(cacheKey, plan);
+    }
+    return plan;
+  }
+
+  // 6. Swap an individual meal with a fresh South Indian alternative matching target calories
+  swapMeal({ mealType = 'Breakfast', currentTitle = '', targetCalories = 500, preference = 'south_indian_mixed' }) {
+    const isVegOnly = preference === 'south_indian_veg';
+    const typeLower = (mealType || '').toLowerCase();
+
+    let pool = SOUTH_INDIAN_BREAKFASTS;
+    let defaultTime = '08:30 AM';
+    let stdType = 'Breakfast';
+
+    if (typeLower.includes('lunch')) {
+      pool = SOUTH_INDIAN_LUNCHES.filter(l => {
+        if (isVegOnly && l.isNonVeg && !l.vegTitle) return false;
+        return true;
+      });
+      defaultTime = '01:30 PM';
+      stdType = 'Lunch';
+    } else if (typeLower.includes('snack')) {
+      pool = SOUTH_INDIAN_SNACKS;
+      defaultTime = '05:00 PM';
+      stdType = 'Evening Snack';
+    } else if (typeLower.includes('dinner')) {
+      pool = SOUTH_INDIAN_DINNERS;
+      defaultTime = '08:30 PM';
+      stdType = 'Dinner';
+    }
+
+    // Filter out items that match the current meal title to guarantee a new dish
+    const cleanCurrent = (currentTitle || '').toLowerCase().trim();
+    const available = pool.filter(t => {
+      const activeTitle = (isVegOnly ? (t.vegTitle || t.title) : t.title).toLowerCase().trim();
+      const firstWord = activeTitle.split(' ')[0] || '';
+      return !activeTitle.includes(cleanCurrent.slice(0, 10)) &&
+             !cleanCurrent.includes(firstWord);
+    });
+
+    const candidates = available.length > 0 ? available : pool;
+    const pickedTemplate = candidates[Math.floor(Math.random() * candidates.length)];
+
+    return scaleMealTemplate(
+      pickedTemplate,
+      stdType,
+      defaultTime,
+      Number(targetCalories) || pickedTemplate.baseTargetCal || 500,
+      isVegOnly
+    );
   }
 }

@@ -244,6 +244,20 @@ export const api = {
       body: JSON.stringify(payload)
     });
   },
+  swapMeal: async (payload) => {
+    return safeFetch(`${BASE_URL}/ai/swap-meal`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+  },
+  saveMealPlan: async (plan) => {
+    return safeFetch(`${BASE_URL}/ai/save-meal-plan`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ plan })
+    });
+  },
 
   // Universal Full-Website Voice Command Engine
   parseVoiceIntent: async (text, date) => {

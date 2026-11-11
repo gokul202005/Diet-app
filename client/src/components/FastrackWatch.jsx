@@ -13,7 +13,8 @@ import {
   Smartphone,
   Sparkles,
   ShieldCheck,
-  CheckCircle2
+  CheckCircle2,
+  Info
 } from 'lucide-react';
 import { api } from '../api';
 import { watchAutoSync } from '../utils/watchAutoSync';
@@ -43,6 +44,7 @@ export default function FastrackWatch({ selectedDate, profile }) {
   const [healthLastSync, setHealthLastSync] = useState(null);
   const [healthProvider, setHealthProvider] = useState('health_connect');
   const [sensorSteps, setSensorSteps] = useState(0);
+  const [showHealthGuide, setShowHealthGuide] = useState(false);
 
   // Subscribe to Automatic Health Connect Sync pulses
   useEffect(() => {
@@ -399,8 +401,52 @@ export default function FastrackWatch({ selectedDate, profile }) {
               <RefreshCw className={`w-3.5 h-3.5 ${isHealthSyncing ? 'animate-spin text-emerald-400' : 'text-slate-400'}`} />
               <span>{isHealthSyncing ? 'Syncing...' : 'Sync Now'}</span>
             </button>
+
+            {/* Guide Button */}
+            <button
+              onClick={() => setShowHealthGuide(!showHealthGuide)}
+              className="px-3.5 py-2.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-sky-500/40 text-sky-400 font-bold rounded-2xl text-xs transition-all flex items-center space-x-1.5 cursor-pointer"
+            >
+              <Info className="w-3.5 h-3.5" />
+              <span>{showHealthGuide ? 'Hide Guide' : 'How to Connect Google Fit'}</span>
+            </button>
           </div>
         </div>
+
+        {/* Expandable Google Fit & Health Connect Connection Guide */}
+        {showHealthGuide && (
+          <div className="mt-4 pt-4 border-t border-slate-800/80 grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+            <div className="p-3.5 bg-slate-950 border border-slate-800 rounded-2xl space-y-1">
+              <div className="font-bold text-sky-400 flex items-center space-x-1.5">
+                <span className="w-5 h-5 rounded-full bg-sky-500/20 flex items-center justify-center text-[11px]">1</span>
+                <span>In Google Fit App</span>
+              </div>
+              <p className="text-slate-400 text-[11px] leading-relaxed">
+                Open Google Fit on your phone → Tap Profile (top right) → Settings (Gear) → Turn ON <strong className="text-slate-200">"Sync Fit with Health Connect"</strong>.
+              </p>
+            </div>
+
+            <div className="p-3.5 bg-slate-950 border border-slate-800 rounded-2xl space-y-1">
+              <div className="font-bold text-emerald-400 flex items-center space-x-1.5">
+                <span className="w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center text-[11px]">2</span>
+                <span>In Fastrack Reflex App</span>
+              </div>
+              <p className="text-slate-400 text-[11px] leading-relaxed">
+                Open Fastrack Reflex (or watch companion app) → Settings / Profile → Third Party Apps → Turn ON <strong className="text-slate-200">"Sync to Google Fit / Health Connect"</strong>.
+              </p>
+            </div>
+
+            <div className="p-3.5 bg-slate-950 border border-slate-800 rounded-2xl space-y-1">
+              <div className="font-bold text-teal-400 flex items-center space-x-1.5">
+                <span className="w-5 h-5 rounded-full bg-teal-500/20 flex items-center justify-center text-[11px]">3</span>
+                <span>In AGY FIT App</span>
+              </div>
+              <p className="text-slate-400 text-[11px] leading-relaxed">
+                Tap <strong className="text-emerald-400">"Enable Auto-Sync"</strong> above. Steps, calories, heart rate, and sleep automatically sync in real-time in the background!
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 2. REAL METRICS DISPLAY (ZERO FAKE DATA) */}

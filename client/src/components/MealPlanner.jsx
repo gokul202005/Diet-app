@@ -12,7 +12,8 @@ import {
   Info,
   CheckCircle2,
   RefreshCw,
-  ArrowRight
+  ArrowRight,
+  Shuffle
 } from 'lucide-react';
 import { api } from '../api';
 import { exportDietPlanToExcel } from '../utils/excelExporter';
@@ -21,12 +22,13 @@ export default function MealPlanner({ profile, selectedDate, onPlanLogged }) {
   const [preference, setPreference] = useState('south_indian_mixed');
   const [daysCount, setDaysCount] = useState(7);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [swappingMealIdx, setSwappingMealIdx] = useState(null);
   const [generatedPlan, setGeneratedPlan] = useState(null);
   const [selectedDayIdx, setSelectedDayIdx] = useState(0);
   const [isLoggingAll, setIsLoggingAll] = useState(false);
   const [loggedSuccess, setLoggedSuccess] = useState(false);
 
-  // Load saved meal plan on mount without automatically re-rolling on every visit
+  // Load saved meal plan on mount
   useEffect(() => {
     const loadSavedPlan = async () => {
       // 1. Check localStorage first for instant 0ms restoration
@@ -57,26 +59,34 @@ export default function MealPlanner({ profile, selectedDate, onPlanLogged }) {
         }
       } catch (e) {}
 
-      // 3. Only if no plan has ever been generated, generate an initial one
-      handleGeneratePlan('south_indian_mixed', 7);
+      // 3. If no plan has ever been generated, generate fresh
+      handleGeneratePlan('south_indian_mixed', 7, true);
     };
 
     loadSavedPlan();
   }, []);
 
-  const handleGeneratePlan = async (customPref, customDays) => {
+  const handleGeneratePlan = async (customPref, customDays, forceFresh = false) => {
     const prefToUse = customPref || preference;
     const daysToUse = customDays !== undefined ? customDays : daysCount;
     setIsGenerating(true);
     setLoggedSuccess(false);
     try {
-      const res = await api.generateMealPlan({ preference: prefToUse, daysCount: daysToUse });
+      const res = await api.generateMealPlan({ 
+        preference: prefToUse, 
+        daysCount: daysToUse,
+        forceFresh: Boolean(forceFresh),
+        seed: forceFresh ? Date.now() : undefined
+      });
       if (res.success && res.plan) {
         setGeneratedPlan(res.plan);
         setSelectedDayIdx(0);
         try {
           localStorage.setItem('antigravity_saved_meal_plan', JSON.stringify(res.plan));
         } catch (e) {}
+        if (forceFresh && typeof window !== 'undefined' && window.showToast) {
+          window.showToast('Fresh South Indian weekly menu generated with varied dishes!', 'success', 'New Menu Ready');
+        }
       }
     } catch (err) {
       if (typeof window !== 'undefined' && window.showToast) {
@@ -84,6 +94,66 @@ export default function MealPlanner({ profile, selectedDate, onPlanLogged }) {
       }
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  // 1-Click Swap a Single Meal with another authentic South Indian recipe
+  const handleSwapMeal = async (mealIdx) => {
+    if (!generatedPlan || !generatedPlan.days[selectedDayIdx]) return;
+    const currentDay = generatedPlan.days[selectedDayIdx];
+    const meal = currentDay.meals[mealIdx];
+    if (!meal) return;
+
+    setSwappingMealIdx(mealIdx);
+    try {
+      const res = await api.swapMeal({
+        mealType: meal.mealType,
+        currentTitle: meal.title,
+        targetCalories: meal.mealCalories,
+        targetProtein: meal.mealProtein,
+        preference
+      });
+
+      if (res.success && res.meal) {
+        const newDays = [...generatedPlan.days];
+        const updatedMeals = [...currentDay.meals];
+        updatedMeals[mealIdx] = res.meal;
+
+        const newTotalCal = updatedMeals.reduce((acc, m) => acc + m.mealCalories, 0);
+        const newTotalProt = Number(updatedMeals.reduce((acc, m) => acc + m.mealProtein, 0).toFixed(1));
+        const newTotalCarb = Number(updatedMeals.reduce((acc, m) => acc + m.mealCarbs, 0).toFixed(1));
+        const newTotalFat = Number(updatedMeals.reduce((acc, m) => acc + m.mealFat, 0).toFixed(1));
+
+        newDays[selectedDayIdx] = {
+          ...currentDay,
+          meals: updatedMeals,
+          dayTotalCalories: newTotalCal,
+          dayTotalProtein: newTotalProt,
+          dayTotalCarbs: newTotalCarb,
+          dayTotalFat: newTotalFat
+        };
+
+        const updatedPlan = {
+          ...generatedPlan,
+          days: newDays
+        };
+
+        setGeneratedPlan(updatedPlan);
+        try {
+          localStorage.setItem('antigravity_saved_meal_plan', JSON.stringify(updatedPlan));
+        } catch (e) {}
+        api.saveMealPlan(updatedPlan).catch(() => {});
+
+        if (typeof window !== 'undefined' && window.showToast) {
+          window.showToast(`Swapped to: ${res.meal.title}!`, 'success', 'Dish Swapped');
+        }
+      }
+    } catch (err) {
+      if (typeof window !== 'undefined' && window.showToast) {
+        window.showToast('Could not swap dish: ' + err.message, 'error', 'Swap Error');
+      }
+    } finally {
+      setSwappingMealIdx(null);
     }
   };
 
@@ -181,25 +251,26 @@ export default function MealPlanner({ profile, selectedDate, onPlanLogged }) {
             </p>
           </div>
 
-          {/* Action Buttons: Export to Excel & Regenerate */}
+          {/* Action Buttons: Export to Excel & Regenerate / Shuffle */}
           <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
             <button
               onClick={handleExportExcel}
               disabled={!generatedPlan}
-              className="flex items-center space-x-2 px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-slate-950 font-bold rounded-xl text-xs transition-all shadow-md shadow-emerald-500/20"
+              className="flex items-center space-x-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 border border-slate-700 font-bold rounded-xl text-xs transition-all shadow-md cursor-pointer"
               title="Download formatted Excel spreadsheet"
             >
-              <FileSpreadsheet className="w-4 h-4" />
-              <span>Export to Excel (.xlsx)</span>
+              <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+              <span>Export Excel</span>
             </button>
 
             <button
-              onClick={() => handleGeneratePlan(preference, daysCount)}
+              onClick={() => handleGeneratePlan(preference, daysCount, true)}
               disabled={isGenerating}
               className="flex items-center space-x-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black rounded-xl text-xs transition-all shadow-md shadow-emerald-500/20 cursor-pointer"
+              title="Generate a brand new randomized weekly menu with different dishes"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${isGenerating ? 'animate-spin' : ''}`} />
-              <span>{isGenerating ? 'Calculating Plan...' : 'Generate / Update Plan'}</span>
+              <Shuffle className={`w-3.5 h-3.5 ${isGenerating ? 'animate-spin' : ''}`} />
+              <span>{isGenerating ? 'Rolling Variety...' : '🎲 Shuffle / New Dishes'}</span>
             </button>
           </div>
         </div>
@@ -216,7 +287,10 @@ export default function MealPlanner({ profile, selectedDate, onPlanLogged }) {
             ].map((p) => (
               <button
                 key={p.id}
-                onClick={() => setPreference(p.id)}
+                onClick={() => {
+                  setPreference(p.id);
+                  handleGeneratePlan(p.id, daysCount, true);
+                }}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
                   preference === p.id
                     ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50'
@@ -236,7 +310,10 @@ export default function MealPlanner({ profile, selectedDate, onPlanLogged }) {
             ].map((dur) => (
               <button
                 key={dur.count}
-                onClick={() => setDaysCount(dur.count)}
+                onClick={() => {
+                  setDaysCount(dur.count);
+                  handleGeneratePlan(preference, dur.count, true);
+                }}
                 className={`px-3 py-1 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
                   daysCount === dur.count
                     ? 'bg-emerald-500 text-slate-950 border-emerald-400 font-bold'
@@ -246,6 +323,15 @@ export default function MealPlanner({ profile, selectedDate, onPlanLogged }) {
                 {dur.label}
               </button>
             ))}
+          </div>
+        </div>
+
+        {/* Helpful Tip about Saved Plan & Shuffling */}
+        <div className="mt-4 p-3 bg-slate-950/70 border border-slate-800 rounded-2xl flex items-start space-x-2 text-xs text-slate-400">
+          <Info className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+          <div>
+            <span className="text-slate-200 font-semibold">Saved across refreshes: </span>
+            Your customized menu stays saved even if you refresh or reopen the app. Tap <strong className="text-emerald-400 font-bold">"🎲 Shuffle / New Dishes"</strong> above anytime to generate a completely new weekly menu, or tap <strong className="text-emerald-400 font-bold">"🎲 Swap Dish"</strong> on any individual meal below to switch it out!
           </div>
         </div>
       </div>
@@ -359,12 +445,24 @@ export default function MealPlanner({ profile, selectedDate, onPlanLogged }) {
                   </div>
                 </div>
 
-                <div className="text-right self-start sm:self-auto">
-                  <div className="text-base font-black text-white">{meal.mealCalories} kcal</div>
-                  <div className="text-[11px] text-slate-400 space-x-2">
-                    <span className="text-sky-400 font-semibold">{meal.mealProtein}g Protein</span>
-                    <span className="text-amber-400 font-semibold">{meal.mealCarbs}g Carbs</span>
-                    <span className="text-rose-400 font-semibold">{meal.mealFat}g Fat</span>
+                <div className="flex items-center space-x-3 self-start sm:self-auto">
+                  <button
+                    onClick={() => handleSwapMeal(mIdx)}
+                    disabled={swappingMealIdx === mIdx}
+                    className="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-950 hover:bg-slate-800 text-emerald-400 hover:text-emerald-300 border border-slate-800 hover:border-emerald-500/40 rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer disabled:opacity-50"
+                    title="Don't feel like eating this? Swap with another authentic South Indian recipe matching this meal's calories"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${swappingMealIdx === mIdx ? 'animate-spin text-emerald-400' : 'text-slate-400'}`} />
+                    <span>{swappingMealIdx === mIdx ? 'Swapping...' : '🎲 Swap Dish'}</span>
+                  </button>
+
+                  <div className="text-right">
+                    <div className="text-base font-black text-white">{meal.mealCalories} kcal</div>
+                    <div className="text-[11px] text-slate-400 space-x-2">
+                      <span className="text-sky-400 font-semibold">{meal.mealProtein}g Protein</span>
+                      <span className="text-amber-400 font-semibold">{meal.mealCarbs}g Carbs</span>
+                      <span className="text-rose-400 font-semibold">{meal.mealFat}g Fat</span>
+                    </div>
                   </div>
                 </div>
               </div>

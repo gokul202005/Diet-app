@@ -1089,17 +1089,34 @@ app.get('/api/ai/saved-meal-plan', (req, res) => {
   res.json({ success: true, plan: db.savedMealPlan || null });
 });
 
+app.post('/api/ai/save-meal-plan', (req, res) => {
+  try {
+    const { plan } = req.body;
+    if (!plan) return res.status(400).json({ error: 'Plan is required' });
+    const db = readDB();
+    db.savedMealPlan = plan;
+    writeDB(db);
+    res.json({ success: true, message: 'Meal plan saved successfully' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to save meal plan', details: err.message });
+  }
+});
+
 app.post('/api/ai/generate-meal-plan', async (req, res) => {
   try {
-    const { preference = 'south_indian_mixed', daysCount = 7 } = req.body;
+    const { preference = 'south_indian_mixed', daysCount = 7, forceFresh = false, shuffle = false, seed = null } = req.body;
     const db = readDB();
     const userId = getAuthUserId(req, db);
     const userProfile = getUserProfile(db, userId);
 
     aiService.setApiKey(getUserApiKey(db, userId));
-    const plan = await aiService.generateDailyMealPlan(userProfile, preference, Number(daysCount) || 7);
+    const shouldForceFresh = Boolean(forceFresh) || Boolean(shuffle) || Boolean(seed);
+    const plan = await aiService.generateDailyMealPlan(userProfile, preference, Number(daysCount) || 7, {
+      forceFresh: shouldForceFresh,
+      seed
+    });
 
-    // Persist saved meal plan so it doesn't re-roll automatically
+    // Persist saved meal plan
     db.savedMealPlan = plan;
 
     // Track usage
@@ -1113,6 +1130,23 @@ app.post('/api/ai/generate-meal-plan', async (req, res) => {
   } catch (err) {
     console.error('Error generating meal plan:', err);
     res.status(500).json({ error: 'Failed to generate meal plan', details: err.message });
+  }
+});
+
+app.post('/api/ai/swap-meal', (req, res) => {
+  try {
+    const { mealType, currentTitle, targetCalories, targetProtein, preference } = req.body;
+    const newMeal = aiService.swapMeal({
+      mealType,
+      currentTitle,
+      targetCalories,
+      targetProtein,
+      preference
+    });
+    res.json({ success: true, meal: newMeal });
+  } catch (err) {
+    console.error('Error swapping meal:', err);
+    res.status(500).json({ error: 'Failed to swap meal', details: err.message });
   }
 });
 
