@@ -185,15 +185,30 @@ export default function SettingsModal({ isOpen, onClose, onEditProfile }) {
                 <Activity className="w-4 h-4 text-sky-400" />
                 <span>Google Cloud OAuth Client ID (Optional)</span>
               </label>
-              <a
-                href="https://console.cloud.google.com/apis/credentials"
-                target="_blank"
-                rel="noreferrer"
-                className="text-[11px] text-sky-400 hover:underline flex items-center space-x-1"
-              >
-                <span>Google Cloud</span>
-                <ExternalLink className="w-3 h-3" />
-              </a>
+              <div className="flex items-center space-x-2">
+                {googleClientId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setGoogleClientId('');
+                      localStorage.removeItem('agy_google_client_id');
+                      localStorage.removeItem('agy_google_fit_token');
+                    }}
+                    className="text-[11px] text-rose-400 hover:text-rose-300 hover:underline font-semibold"
+                  >
+                    Clear ID
+                  </button>
+                )}
+                <a
+                  href="https://console.cloud.google.com/apis/credentials"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[11px] text-sky-400 hover:underline flex items-center space-x-1"
+                >
+                  <span>Google Cloud</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
             </div>
             <input
               type="text"
@@ -202,8 +217,16 @@ export default function SettingsModal({ isOpen, onClose, onEditProfile }) {
               className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 placeholder-slate-600 focus:outline-none focus:border-emerald-500 text-xs font-mono"
               placeholder="e.g. 123456789-abcdef.apps.googleusercontent.com"
             />
-            <p className="text-[11px] text-slate-500">
-              Only required if you want direct 1-click Google Cloud REST sync. Otherwise, AGY Fit connects to Google Fit and smartwatches automatically via Android Health Connect with zero setup!
+            <p className="text-[11px] text-slate-400 leading-relaxed">
+              {googleClientId ? (
+                <span className="text-emerald-400 font-semibold">
+                  Client ID active. If Google shows Error 403, add your email to "Test Users" in Google Cloud OAuth Consent Screen. If Error 401, click "Clear ID".
+                </span>
+              ) : (
+                <span>
+                  Optional: If left empty, AGY Fit connects to Google Fit and smartwatches automatically via Android Health Connect & built-in sensor bridge with zero setup!
+                </span>
+              )}
             </p>
           </div>
 
