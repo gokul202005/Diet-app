@@ -224,6 +224,17 @@ export default function Navbar({
                         <span>Install App (PWA)</span>
                       </button>
 
+                      {/* Direct Android APK Download */}
+                      <a
+                        href="/api/download/android-apk"
+                        download="AGY-Fit-release.apk"
+                        onClick={() => setIsUserMenuOpen(false)}
+                        className="w-full flex items-center space-x-2.5 px-3 py-2 rounded-xl text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10 transition-colors cursor-pointer text-left font-medium"
+                      >
+                        <Download className="w-4 h-4 text-cyan-400" />
+                        <span>Download Android APK</span>
+                      </a>
+
                       {/* Server Status Trigger inside Dropdown */}
                       <div className="px-3 py-1.5 border-t border-slate-800/60 my-1">
                         <div className="text-[10px] uppercase font-bold text-slate-500 mb-1">Cloud Backend</div>

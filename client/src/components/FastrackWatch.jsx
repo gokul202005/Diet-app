@@ -198,7 +198,10 @@ export default function FastrackWatch({ selectedDate, profile, currentUser }) {
 
       if (watchRes.log && watchRes.log.syncedAt) {
         setFastrackLog(watchRes.log);
-        setRealSteps(watchRes.log.steps || 0);
+        setRealSteps(prev => {
+          const prevNum = Number(prev) || 0;
+          return Math.max(prevNum, watchRes.log.steps || 0);
+        });
         setRealHeartRate(watchRes.log.avgHeartRate || '');
         setLiveHeartRate(watchRes.log.avgHeartRate || null);
         setRealSleep(watchRes.log.sleepHours || '');

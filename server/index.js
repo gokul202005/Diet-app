@@ -2562,6 +2562,15 @@ app.post('/api/database/migrate-to-supabase', async (req, res) => {
   res.json(result);
 });
 
+// Direct APK Download Endpoint
+app.get('/api/download/android-apk', (req, res) => {
+  const localApkPath = path.join(__dirname, 'uploads/agy-fit-release.apk');
+  if (fs.existsSync(localApkPath)) {
+    return res.download(localApkPath, 'AGY-Fit-release.apk');
+  }
+  return res.redirect('https://github.com/gokul202005/Diet-app/releases/latest');
+});
+
 // Serve frontend static build
 const clientDist = path.join(__dirname, '../client/dist');
 if (fs.existsSync(clientDist)) {

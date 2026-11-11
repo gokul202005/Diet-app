@@ -202,6 +202,15 @@ export default function CoachChat({ profile, selectedDate }) {
   const recognitionRef = useRef(null);
   const capturedSpeechRef = useRef('');
   const isListeningRef = useRef(false);
+  const isJarvisModeRef = useRef(isJarvisMode);
+  const mediaStreamRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const silenceTimeoutRef = useRef(null);
+
+  useEffect(() => {
+    isJarvisModeRef.current = isJarvisMode;
+  }, [isJarvisMode]);
 
   // Available Voice Personas
   const VOICE_PERSONAS = [
@@ -314,6 +323,19 @@ export default function CoachChat({ profile, selectedDate }) {
 
   useEffect(() => {
     loadHistory();
+    const handleUpdate = () => loadHistory();
+    const handleJarvisSync = (e) => {
+      if (e?.detail?.isActive !== undefined) {
+        setIsJarvisMode(e.detail.isActive);
+        isJarvisModeRef.current = e.detail.isActive;
+      }
+    };
+    window.addEventListener('agy-coach-chat-updated', handleUpdate);
+    window.addEventListener('agy-jarvis-state-sync', handleJarvisSync);
+    return () => {
+      window.removeEventListener('agy-coach-chat-updated', handleUpdate);
+      window.removeEventListener('agy-jarvis-state-sync', handleJarvisSync);
+    };
   }, []);
 
   useEffect(() => {
@@ -376,10 +398,10 @@ export default function CoachChat({ profile, selectedDate }) {
     utterance.onend = () => {
       setIsSpeaking(false);
       setSpeakingMsgId(null);
-      if (autoListenAfter && isJarvisMode) {
+      if (autoListenAfter && isJarvisModeRef.current) {
         setTimeout(() => {
           startListeningSession();
-        }, 500);
+        }, 400);
       }
     };
 
@@ -391,19 +413,31 @@ export default function CoachChat({ profile, selectedDate }) {
     window.speechSynthesis.speak(utterance);
   };
 
+  const cleanupAudio = () => {
+    if (silenceTimeoutRef.current) {
+      clearTimeout(silenceTimeoutRef.current);
+      silenceTimeoutRef.current = null;
+    }
+    if (mediaStreamRef.current) {
+      try {
+        mediaStreamRef.current.getTracks().forEach(t => t.stop());
+      } catch {}
+      mediaStreamRef.current = null;
+    }
+    mediaRecorderRef.current = null;
+  };
+
   const toggleJarvisMode = () => {
     const next = !isJarvisMode;
     setIsJarvisMode(next);
+    isJarvisModeRef.current = next;
     localStorage.setItem('agy_jarvis_voice_mode', String(next));
+    window.dispatchEvent(new CustomEvent('agy-jarvis-external-toggle', { detail: { isActive: next, persona: voicePersona } }));
     if (next) {
       speakText("Jarvis Mode Activated. I am listening! Ask me anything about your South Indian diet, Fastrack watch steps, or gym workouts.", null, true);
     } else {
       stopSpeaking();
-      if (isListeningRef.current && recognitionRef.current) {
-        try { recognitionRef.current.stop(); } catch (e) {}
-      }
-      setIsListening(false);
-      isListeningRef.current = false;
+      stopListening();
     }
   };
 
@@ -411,22 +445,49 @@ export default function CoachChat({ profile, selectedDate }) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isSending]);
 
-  // Robust Hands-Free Speech Recognition Session (PC & Mobile compatible)
+  // Guaranteed Dual-Engine Speech & Hardware Headset Recording (PC & Mobile compatible)
   const startListeningSession = async () => {
     if (isListeningRef.current) return;
 
-    // Step 1: Explicit microphone device permission check for desktop PC Chrome/Edge
+    audioChunksRef.current = [];
+    capturedSpeechRef.current = '';
+
+    // Step 1: Open hardware microphone / headset stream
+    let stream = null;
     try {
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        // Release immediate test stream so SpeechRecognition can take over
-        stream.getTracks().forEach(t => t.stop());
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          }
+        });
+        mediaStreamRef.current = stream;
+
+        // Background hardware recorder for guaranteed headset audio capture on PC
+        let mimeType = 'audio/webm';
+        if (typeof MediaRecorder !== 'undefined') {
+          if (!MediaRecorder.isTypeSupported('audio/webm')) {
+            if (MediaRecorder.isTypeSupported('audio/mp4')) mimeType = 'audio/mp4';
+            else if (MediaRecorder.isTypeSupported('audio/ogg')) mimeType = 'audio/ogg';
+            else mimeType = '';
+          }
+        }
+        const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+        mediaRecorderRef.current = recorder;
+        recorder.ondataavailable = (e) => {
+          if (e.data && e.data.size > 0) {
+            audioChunksRef.current.push(e.data);
+          }
+        };
+        recorder.start(100);
       }
     } catch (micErr) {
       console.warn('Microphone permission check failed:', micErr);
       if (micErr.name === 'NotAllowedError' || micErr.name === 'PermissionDeniedError') {
         if (typeof window !== 'undefined' && window.showToast) {
-          window.showToast('Please allow Microphone access in your browser address bar to speak with Jarvis.', 'warning', 'Mic Blocked');
+          window.showToast('Please click the lock or camera icon in your browser address bar and allow Microphone access.', 'warning', 'Mic Blocked');
         }
         setIsListening(false);
         isListeningRef.current = false;
@@ -434,77 +495,134 @@ export default function CoachChat({ profile, selectedDate }) {
       }
     }
 
+    setIsListening(true);
+    isListeningRef.current = true;
+
+    // Step 2: Attach Web Speech API
     const SpeechRec = typeof window !== 'undefined' ? (window.SpeechRecognition || window.webkitSpeechRecognition) : null;
-    if (!SpeechRec) {
-      if (typeof window !== 'undefined' && window.showToast) {
-        window.showToast('Voice speech recognition is not supported on this browser.', 'warning', 'Mic Unavailable');
+    if (SpeechRec) {
+      try {
+        if (recognitionRef.current) {
+          try { recognitionRef.current.abort(); } catch {}
+        }
+
+        const recognition = new SpeechRec();
+        recognition.lang = 'en-US';
+        recognition.continuous = true;
+        recognition.interimResults = true;
+
+        recognition.onresult = (event) => {
+          let transcript = '';
+          for (let i = 0; i < event.results.length; i++) {
+            transcript += event.results[i][0].transcript;
+          }
+          capturedSpeechRef.current = transcript;
+          setInputText(transcript);
+
+          // Reset silence timer: auto-send after 1.8s pause when speaking in Jarvis mode
+          if (silenceTimeoutRef.current) clearTimeout(silenceTimeoutRef.current);
+          if (isJarvisModeRef.current) {
+            silenceTimeoutRef.current = setTimeout(() => {
+              finishListeningAndSend();
+            }, 1800);
+          }
+        };
+
+        recognition.onerror = (e) => {
+          console.warn('Speech recognition notice:', e.error);
+        };
+
+        recognition.onend = () => {
+          // If still listening and user was speaking, finish and send
+          if (isListeningRef.current && capturedSpeechRef.current.trim().length > 1) {
+            finishListeningAndSend();
+          } else if (isListeningRef.current) {
+            try { recognition.start(); } catch {}
+          }
+        };
+
+        recognitionRef.current = recognition;
+        try { recognition.start(); } catch {}
+      } catch (err) {
+        console.warn('Speech recognition setup notice:', err);
       }
+    }
+  };
+
+  const finishListeningAndSend = async () => {
+    if (!isListeningRef.current) return;
+    setIsListening(false);
+    isListeningRef.current = false;
+
+    if (silenceTimeoutRef.current) {
+      clearTimeout(silenceTimeoutRef.current);
+      silenceTimeoutRef.current = null;
+    }
+
+    if (recognitionRef.current) {
+      try { recognitionRef.current.stop(); } catch {}
+    }
+
+    const captured = capturedSpeechRef.current.trim() || inputText.trim();
+
+    // 1. Direct Web Speech words
+    if (captured.length > 1) {
+      cleanupAudio();
+      capturedSpeechRef.current = '';
+      setInputText('');
+      handleSend(captured);
       return;
     }
 
-    try {
-      if (recognitionRef.current) {
-        try { recognitionRef.current.abort(); } catch (e) {}
-      }
+    // 2. Headset MediaRecorder audio upload fallback (Zero-fail on desktop PC)
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      const recorder = mediaRecorderRef.current;
+      recorder.onstop = async () => {
+        const mime = recorder.mimeType || 'audio/webm';
+        const audioBlob = new Blob(audioChunksRef.current, { type: mime });
+        cleanupAudio();
 
-      const recognition = new SpeechRec();
-      // 'en-US' is universally supported on desktop PC Chromium without cloud network dropouts
-      recognition.lang = 'en-US';
-      recognition.continuous = false;
-      recognition.interimResults = true;
-
-      capturedSpeechRef.current = '';
-
-      recognition.onstart = () => {
-        setIsListening(true);
-        isListeningRef.current = true;
-      };
-
-      recognition.onresult = (event) => {
-        let transcript = '';
-        for (let i = 0; i < event.results.length; i++) {
-          transcript += event.results[i][0].transcript;
-        }
-        capturedSpeechRef.current = transcript;
-        setInputText(transcript);
-      };
-
-      recognition.onerror = (e) => {
-        console.warn('Coach mic notice:', e.error);
-        setIsListening(false);
-        isListeningRef.current = false;
-      };
-
-      recognition.onend = () => {
-        setIsListening(false);
-        isListeningRef.current = false;
-
-        const captured = capturedSpeechRef.current.trim();
-        capturedSpeechRef.current = '';
-
-        // HANDS-FREE AUTOMATION: If user spoke in Jarvis mode, automatically send the query!
-        if (captured.length > 1 && isJarvisMode) {
+        if (audioBlob.size > 2000) {
+          try {
+            setInputText('Transcribing headset audio...');
+            const res = await api.universalVoiceAudio(audioBlob, selectedDate);
+            if (res.success && res.transcribedText) {
+              setInputText('');
+              handleSend(res.transcribedText);
+            } else {
+              setInputText('');
+              if (typeof window !== 'undefined' && window.showToast) {
+                window.showToast(res.error || 'Could not detect clear words. Please try speaking closer to your microphone.', 'warning', 'No Speech Detected');
+              }
+            }
+          } catch (e) {
+            setInputText('');
+          }
+        } else {
           setInputText('');
-          handleSend(captured);
         }
       };
 
-      recognitionRef.current = recognition;
-      recognition.start();
-    } catch (err) {
-      console.warn('Coach mic start error:', err);
-      setIsListening(false);
-      isListeningRef.current = false;
+      try { recorder.stop(); } catch { cleanupAudio(); }
+      return;
     }
+
+    cleanupAudio();
+  };
+
+  const stopListening = () => {
+    setIsListening(false);
+    isListeningRef.current = false;
+    if (silenceTimeoutRef.current) clearTimeout(silenceTimeoutRef.current);
+    if (recognitionRef.current) {
+      try { recognitionRef.current.stop(); } catch {}
+    }
+    cleanupAudio();
   };
 
   const toggleMic = () => {
     if (isListening || isListeningRef.current) {
-      if (recognitionRef.current) {
-        try { recognitionRef.current.stop(); } catch (e) {}
-      }
-      setIsListening(false);
-      isListeningRef.current = false;
+      finishListeningAndSend();
     } else {
       startListeningSession();
     }
@@ -811,6 +929,38 @@ export default function CoachChat({ profile, selectedDate }) {
 
         <div ref={messagesEndRef} />
       </div>
+
+      {/* Live Jarvis / Voice Listening Indicator Banner */}
+      {(isListening || isSpeaking || isJarvisMode) && (
+        <div className="flex items-center justify-between px-3 py-2 bg-slate-950/90 border border-cyan-500/40 rounded-xl text-xs shadow-md shadow-cyan-950/30">
+          <div className="flex items-center space-x-2">
+            <span className={`w-2.5 h-2.5 rounded-full ${isSpeaking ? 'bg-emerald-400 animate-bounce' : isListening ? 'bg-cyan-400 animate-ping' : 'bg-cyan-600'}`} />
+            <span className="font-bold text-cyan-300">
+              {isSpeaking ? '🔊 Jarvis is Speaking...' : isListening ? '🎙️ Jarvis is Listening (Speak now through your headset)' : '⚡ Jarvis Mode Active (Continuous Speech Loop)'}
+            </span>
+          </div>
+          <div className="flex items-center space-x-2">
+            {isListening && (
+              <button
+                type="button"
+                onClick={finishListeningAndSend}
+                className="px-2.5 py-1 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black text-[11px] rounded-lg cursor-pointer transition-all"
+              >
+                Send Query
+              </button>
+            )}
+            {isSpeaking && (
+              <button
+                type="button"
+                onClick={stopSpeaking}
+                className="px-2.5 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/40 text-[11px] rounded-lg cursor-pointer transition-all"
+              >
+                Stop Voice
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Suggested Quick Questions: Sleek Horizontal Ribbon (Never pushes typing box down) */}
       <div className="flex items-center space-x-2 overflow-x-auto pb-1 no-scrollbar whitespace-nowrap">

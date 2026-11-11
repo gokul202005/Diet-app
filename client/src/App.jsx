@@ -11,6 +11,7 @@ import HunterSystem from './components/HunterSystem';
 import OnboardingModal from './components/OnboardingModal';
 import SettingsModal from './components/SettingsModal';
 import UniversalVoiceAssistant from './components/UniversalVoiceAssistant';
+import GlobalJarvis from './components/GlobalJarvis';
 import AuthScreen from './components/AuthScreen';
 import { api } from './api';
 import { healthConnectSync } from './utils/healthConnectSync';
@@ -277,6 +278,14 @@ export default function App() {
           />
         )}
       </main>
+
+      {/* Persistent Global Jarvis Voice Companion (Stays Active Across All Tabs) */}
+      <GlobalJarvis
+        profile={profile}
+        selectedDate={selectedDate}
+        onActionCompleted={() => setRefreshKey(k => k + 1)}
+        onOpenCoach={() => setActiveTab('coach')}
+      />
 
       {/* Universal Floating & Modal Voice Assistant (Active on Every Screen) */}
       <UniversalVoiceAssistant
