@@ -688,7 +688,7 @@ export async function syncWatchLogToSupabase(wl) {
       is_auto_synced: wl.isAutoSynced !== false,
       last_auto_sync_at: wl.lastAutoSyncAt || null,
       synced_at: wl.syncedAt || new Date().toISOString()
-    }, { onConflict: 'id' });
+    }, { onConflict: 'user_id,date' });
     if (error) console.warn('[Supabase syncWatchLog Error]:', error.message);
     return !error;
   } catch (e) {
