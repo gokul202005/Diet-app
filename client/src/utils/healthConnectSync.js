@@ -231,13 +231,22 @@ class HealthConnectSyncEngine {
         aggregateBy: [
           { 
             dataTypeName: 'com.google.step_count.delta',
+            dataSourceId: 'derived:com.google.step_count.delta:com.google.android.gms:estimated_steps'
+          },
+          { 
+            dataTypeName: 'com.google.step_count.delta',
             dataSourceId: 'derived:com.google.step_count.delta:com.google.android.gms:merge_step_deltas'
           },
+          { dataTypeName: 'com.google.step_count.delta' },
+          { 
+            dataTypeName: 'com.google.distance.delta',
+            dataSourceId: 'derived:com.google.distance.delta:com.google.android.gms:merge_distance_deltas'
+          },
+          { dataTypeName: 'com.google.distance.delta' },
           { 
             dataTypeName: 'com.google.calories.expended',
             dataSourceId: 'derived:com.google.calories.expended:com.google.android.gms:merge_calories_expended'
           },
-          { dataTypeName: 'com.google.step_count.delta' },
           { dataTypeName: 'com.google.calories.expended' },
           { dataTypeName: 'com.google.heart_rate.bpm' },
           { dataTypeName: 'com.google.sleep.segment' }
@@ -274,6 +283,7 @@ class HealthConnectSyncEngine {
       return {
         steps: this.stepCount,
         activeCalories: Math.round(this.stepCount * 0.04),
+        distanceKm: Number(((this.stepCount * 0.00075).toFixed(2))),
         avgHeartRate: 72,
         sleepHours: 7.0,
         source: 'Health Connect (Hardware Fallback)',
@@ -284,9 +294,8 @@ class HealthConnectSyncEngine {
 
   parseGoogleFitResponse(data) {
     let totalSteps = 0;
-    let mergedSteps = 0;
     let totalCalories = 0;
-    let mergedCalories = 0;
+    let totalDistanceMeters = 0;
     let heartRateVals = [];
     let sleepHours = 7.0;
 
@@ -294,46 +303,58 @@ class HealthConnectSyncEngine {
       const buckets = data.bucket || [];
       for (const bucket of buckets) {
         if (!bucket.dataset) continue;
-        let bucketSteps = 0;
-        let bucketCalories = 0;
+        let bucketMaxSteps = 0;
+        let bucketMaxCalories = 0;
+        let bucketMaxDistance = 0;
 
         for (const ds of bucket.dataset) {
           const type = (ds.dataSourceId || '').toLowerCase();
-          
-          // Steps extraction (prioritizes official Google Fit merged deltas)
-          if (type.includes('step') || type.includes('delta')) {
+          const dataTypeName = (ds.point?.[0]?.dataTypeName || '').toLowerCase();
+
+          // Steps extraction: check each dataset stream and take highest accurate count
+          if (type.includes('step') || type.includes('delta') || dataTypeName.includes('step')) {
             const streamSum = ds.point?.reduce((acc, pt) => {
               const val = pt.value?.[0];
               const count = val?.intVal !== undefined ? Number(val.intVal) : (val?.fpVal !== undefined ? Math.round(Number(val.fpVal)) : 0);
               return acc + (isNaN(count) ? 0 : count);
             }, 0) || 0;
-            if (type.includes('merge_step_deltas')) {
-              mergedSteps = Math.max(mergedSteps, streamSum);
+            if (streamSum > bucketMaxSteps) {
+              bucketMaxSteps = streamSum;
             }
-            bucketSteps = Math.max(bucketSteps, streamSum);
           }
 
-          // Calories extraction (prioritizes official merged calories)
-          if (type.includes('calorie') || type.includes('expended')) {
+          // Calories extraction
+          if (type.includes('calorie') || type.includes('expended') || dataTypeName.includes('calorie')) {
             const streamCal = ds.point?.reduce((acc, pt) => {
               const val = pt.value?.[0];
               const cal = val?.fpVal !== undefined ? Number(val.fpVal) : (val?.intVal !== undefined ? Number(val.intVal) : 0);
               return acc + (isNaN(cal) ? 0 : cal);
             }, 0) || 0;
-            if (type.includes('merge_calories_expended')) {
-              mergedCalories = Math.max(mergedCalories, streamCal);
+            if (streamCal > bucketMaxCalories) {
+              bucketMaxCalories = streamCal;
             }
-            bucketCalories = Math.max(bucketCalories, streamCal);
+          }
+
+          // Distance extraction
+          if (type.includes('distance') || dataTypeName.includes('distance')) {
+            const streamDist = ds.point?.reduce((acc, pt) => {
+              const val = pt.value?.[0];
+              const dist = val?.fpVal !== undefined ? Number(val.fpVal) : (val?.intVal !== undefined ? Number(val.intVal) : 0);
+              return acc + (isNaN(dist) ? 0 : dist);
+            }, 0) || 0;
+            if (streamDist > bucketMaxDistance) {
+              bucketMaxDistance = streamDist;
+            }
           }
 
           // Heart rate extraction
-          if (type.includes('heart') || type.includes('bpm')) {
+          if (type.includes('heart') || type.includes('bpm') || dataTypeName.includes('heart')) {
             const vals = ds.point?.map(pt => pt.value?.[0]?.fpVal || pt.value?.[0]?.intVal).filter(Boolean) || [];
             heartRateVals.push(...vals);
           }
 
           // Sleep duration extraction
-          if (type.includes('sleep')) {
+          if (type.includes('sleep') || dataTypeName.includes('sleep')) {
             const sleepNanos = ds.point?.reduce((acc, pt) => {
               const start = Number(pt.startTimeNanos || 0);
               const end = Number(pt.endTimeNanos || 0);
@@ -345,8 +366,9 @@ class HealthConnectSyncEngine {
           }
         }
 
-        totalSteps = Math.max(totalSteps, mergedSteps > 0 ? mergedSteps : bucketSteps);
-        totalCalories = Math.max(totalCalories, mergedCalories > 0 ? mergedCalories : bucketCalories);
+        totalSteps = Math.max(totalSteps, bucketMaxSteps);
+        totalCalories = Math.max(totalCalories, bucketMaxCalories);
+        totalDistanceMeters = Math.max(totalDistanceMeters, bucketMaxDistance);
       }
     } catch (e) {
       console.warn('[GoogleFit] Parsing error:', e);
@@ -364,8 +386,13 @@ class HealthConnectSyncEngine {
       ? Math.round(heartRateVals.reduce((a, b) => a + Number(b), 0) / heartRateVals.length)
       : 72;
 
+    const finalDistanceKm = totalDistanceMeters > 0 
+      ? Number((totalDistanceMeters / 1000).toFixed(2)) 
+      : Number(((finalSteps * 0.00075).toFixed(2)));
+
     return {
       steps: finalSteps,
+      distanceKm: finalDistanceKm,
       activeCalories: Math.round(totalCalories) || Math.round(finalSteps * 0.04),
       avgHeartRate,
       sleepHours: Number(sleepHours.toFixed(1)),
@@ -404,6 +431,7 @@ class HealthConnectSyncEngine {
         date: selectedDate,
         deviceName: metrics.source || 'Android Health Connect',
         steps: metrics.steps,
+        distanceKm: metrics.distanceKm,
         activeCalories: metrics.activeCalories,
         avgHeartRate: metrics.avgHeartRate,
         sleepHours: metrics.sleepHours

@@ -255,23 +255,23 @@ export async function saveProfileToSupabase(userId, p) {
       user_id: cleanUserId,
       name: p.name || 'User',
       age: p.age ? parseInt(p.age) : null,
-      gender: p.gender || 'male',
+      gender: p.gender || null,
       height_cm: p.heightCm ? parseFloat(p.heightCm) : null,
       weight_kg: p.weightKg ? parseFloat(p.weightKg) : null,
       target_weight_kg: p.targetWeightKg ? parseFloat(p.targetWeightKg) : null,
-      goal: p.goal || 'recomp',
-      activity_level: p.activityLevel || 'moderately_active',
-      daily_target_calories: p.dailyTargetCalories || 2100,
-      daily_target_protein: p.dailyTargetProtein || 140,
-      daily_target_carbs: p.dailyTargetCarbs || 220,
-      daily_target_fat: p.dailyTargetFat || 60,
+      goal: p.goal || null,
+      activity_level: p.activityLevel || null,
+      daily_target_calories: p.dailyTargetCalories || 2000,
+      daily_target_protein: p.dailyTargetProtein || 130,
+      daily_target_carbs: p.dailyTargetCarbs || 200,
+      daily_target_fat: p.dailyTargetFat || 55,
       daily_target_water: p.dailyTargetWater || 3000,
       daily_target_steps: p.dailyTargetSteps || 10000,
-      dietary_tags: p.dietaryTags || ['🍗 Non-Veg'],
-      focus_areas: p.focusAreas || ['🛡️ Full Body Balance'],
-      goals: p.goals || [p.goal || 'recomp'],
+      dietary_tags: Array.isArray(p.dietaryTags) ? p.dietaryTags : [],
+      focus_areas: Array.isArray(p.focusAreas) ? p.focusAreas : [],
+      goals: Array.isArray(p.goals) ? p.goals : (p.goal ? [p.goal] : []),
       recalculate_targets: Boolean(p.recalculateTargets),
-      is_configured: Boolean(p.isConfigured !== false)
+      is_configured: Boolean(p.isConfigured)
     }, { onConflict: 'user_id' });
 
     if (error) {
@@ -332,22 +332,22 @@ export async function migrateLocalDataToSupabase(localDb) {
       const { error } = await supabase.from('profiles').upsert({
         user_id: userId,
         name: p.name || 'User',
-        age: p.age || 23,
-        gender: p.gender || 'male',
-        height_cm: p.heightCm || 175,
-        weight_kg: p.weightKg || 70,
-        target_weight_kg: p.targetWeightKg || 68,
-        goal: p.goal || 'recomp',
-        activity_level: p.activityLevel || 'moderately_active',
-        daily_target_calories: p.dailyTargetCalories || 2100,
-        daily_target_protein: p.dailyTargetProtein || 140,
-        daily_target_carbs: p.dailyTargetCarbs || 220,
-        daily_target_fat: p.dailyTargetFat || 60,
+        age: p.age ? parseInt(p.age) : null,
+        gender: p.gender || null,
+        height_cm: p.heightCm ? parseFloat(p.heightCm) : null,
+        weight_kg: p.weightKg ? parseFloat(p.weightKg) : null,
+        target_weight_kg: p.targetWeightKg ? parseFloat(p.targetWeightKg) : null,
+        goal: p.goal || null,
+        activity_level: p.activityLevel || null,
+        daily_target_calories: p.dailyTargetCalories || 2000,
+        daily_target_protein: p.dailyTargetProtein || 130,
+        daily_target_carbs: p.dailyTargetCarbs || 200,
+        daily_target_fat: p.dailyTargetFat || 55,
         daily_target_water: p.dailyTargetWater || 3000,
         daily_target_steps: p.dailyTargetSteps || 10000,
-        dietary_tags: p.dietaryTags || ['🍗 Non-Veg'],
-        focus_areas: p.focusAreas || ['🛡️ Full Body Balance'],
-        goals: p.goals || ['recomp'],
+        dietary_tags: Array.isArray(p.dietaryTags) ? p.dietaryTags : [],
+        focus_areas: Array.isArray(p.focusAreas) ? p.focusAreas : [],
+        goals: Array.isArray(p.goals) ? p.goals : (p.goal ? [p.goal] : []),
         recalculate_targets: Boolean(p.recalculateTargets),
         is_configured: Boolean(p.isConfigured)
       }, { onConflict: 'user_id' });
@@ -434,6 +434,102 @@ export async function migrateLocalDataToSupabase(localDb) {
       }, { onConflict: 'id' });
       if (error) results.errors.push(`Photo ${p.id}: ${error.message}`);
       else results.photosMigrated++;
+    }
+
+    return {
+      success: results.errors.length === 0,
+      ...results
+    };
+  } catch (err) {
+    return {
+      success: false,
+      error: err.message,
+      ...results
+    };
+  }
+}
+
+/**
+ * Permanently deletes ALL users, profiles, meals, workouts, watch logs, photos,
+ * and Supabase Storage files from Supabase Cloud PostgreSQL & Storage to start 100% fresh.
+ */
+export async function resetSupabaseAllData() {
+  if (!isSupabaseReady()) return { success: false, message: 'Supabase not ready' };
+  const results = {
+    vaultPhotosDeleted: 0,
+    storageFilesDeleted: 0,
+    watchLogsDeleted: 0,
+    workoutsDeleted: 0,
+    mealsDeleted: 0,
+    profilesDeleted: 0,
+    usersDeleted: 0,
+    errors: []
+  };
+
+  try {
+    // 1. Delete all rows in child tables first (foreign keys)
+    try {
+      const { error } = await supabase.from('vault_photos').delete().neq('id', '___none___');
+      if (error) results.errors.push(`vault_photos: ${error.message}`);
+      else results.vaultPhotosDeleted = 1;
+    } catch (e) { results.errors.push(e.message); }
+
+    try {
+      const { error } = await supabase.from('watch_logs').delete().neq('id', '___none___');
+      if (error) results.errors.push(`watch_logs: ${error.message}`);
+      else results.watchLogsDeleted = 1;
+    } catch (e) { results.errors.push(e.message); }
+
+    try {
+      const { error } = await supabase.from('workouts').delete().neq('id', '___none___');
+      if (error) results.errors.push(`workouts: ${error.message}`);
+      else results.workoutsDeleted = 1;
+    } catch (e) { results.errors.push(e.message); }
+
+    try {
+      const { error } = await supabase.from('meals').delete().neq('id', '___none___');
+      if (error) results.errors.push(`meals: ${error.message}`);
+      else results.mealsDeleted = 1;
+    } catch (e) { results.errors.push(e.message); }
+
+    try {
+      const { error } = await supabase.from('profiles').delete().neq('user_id', '___none___');
+      if (error) results.errors.push(`profiles: ${error.message}`);
+      else results.profilesDeleted = 1;
+    } catch (e) { results.errors.push(e.message); }
+
+    try {
+      const { error } = await supabase.from('users').delete().neq('id', '___none___');
+      if (error) results.errors.push(`users: ${error.message}`);
+      else results.usersDeleted = 1;
+    } catch (e) { results.errors.push(e.message); }
+
+    // 2. Clean up files in Supabase Storage 'physique_vault'
+    try {
+      const { data: topItems } = await supabase.storage.from('physique_vault').list('', { limit: 100 });
+      if (Array.isArray(topItems)) {
+        for (const topItem of topItems) {
+          if (!topItem.name) continue;
+          // List subfolders/files
+          const { data: subItems } = await supabase.storage.from('physique_vault').list(topItem.name, { limit: 100 });
+          if (Array.isArray(subItems)) {
+            for (const subItem of subItems) {
+              const { data: dateItems } = await supabase.storage.from('physique_vault').list(`${topItem.name}/${subItem.name}`, { limit: 100 });
+              if (Array.isArray(dateItems) && dateItems.length > 0) {
+                const pathsToRemove = dateItems.map(di => `${topItem.name}/${subItem.name}/${di.name}`);
+                await supabase.storage.from('physique_vault').remove(pathsToRemove);
+                results.storageFilesDeleted += pathsToRemove.length;
+              }
+              await supabase.storage.from('physique_vault').remove([`${topItem.name}/${subItem.name}`]);
+              results.storageFilesDeleted++;
+            }
+          }
+          await supabase.storage.from('physique_vault').remove([topItem.name]);
+          results.storageFilesDeleted++;
+        }
+      }
+    } catch (e) {
+      results.errors.push(`Storage clean: ${e.message}`);
     }
 
     return {

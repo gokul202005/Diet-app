@@ -60,12 +60,28 @@ export default function App() {
           setCurrentUser(null);
           setProfile(null);
           localStorage.removeItem('agy_current_user');
+          sessionStorage.removeItem('onboarding_wizard_dismissed');
+          try {
+            Object.keys(localStorage).forEach(key => {
+              if (key.startsWith('agy_profile_')) {
+                localStorage.removeItem(key);
+              }
+            });
+          } catch (e) {}
         }
       } catch (err) {
         console.error('Failed to load profile or auth:', err);
         setCurrentUser(null);
         setProfile(null);
         localStorage.removeItem('agy_current_user');
+        sessionStorage.removeItem('onboarding_wizard_dismissed');
+        try {
+          Object.keys(localStorage).forEach(key => {
+            if (key.startsWith('agy_profile_')) {
+              localStorage.removeItem(key);
+            }
+          });
+        } catch (e) {}
       } finally {
         setLoading(false);
       }
@@ -124,6 +140,13 @@ export default function App() {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('agy_current_user');
       sessionStorage.removeItem('onboarding_wizard_dismissed');
+      try {
+        Object.keys(localStorage).forEach(key => {
+          if (key.startsWith('agy_profile_')) {
+            localStorage.removeItem(key);
+          }
+        });
+      } catch (e) {}
     }
   };
 

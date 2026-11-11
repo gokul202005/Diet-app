@@ -26,7 +26,7 @@ import { api } from '../api';
 function deduplicateSpeechRepetitions(text) {
   if (!text || typeof text !== 'string') return '';
   // 1. Remove consecutive identical words (e.g. "I I I" -> "I", "idli idli" -> "idli")
-  let clean = text.replace(/\b([a-zA-Z0-9]+)(\s+\1\b)+/gi, (m, p) => p);
+  let clean = text.replace(/\b([a-zA-Z0-9]+)(\s+\1\b)+/gi, '$1');
 
   // 2. Token-level duplicate phrase remover (e.g. repeated sentence halves)
   let words = clean.split(/\s+/).filter(Boolean);
@@ -44,18 +44,27 @@ function deduplicateSpeechRepetitions(text) {
     clean = words.join(' ');
   }
 
-  // 3. Remove prefix stutter repetition: "I ate I ate 3" -> "I ate 3"
+  // 3. Remove cumulative prefix repetitions:
+  // e.g. "I ate I ate 3 I ate 3 Idli" -> "I ate 3 Idli"
   words = clean.split(/\s+/).filter(Boolean);
   if (words.length >= 4) {
-    for (let k = 1; k <= Math.floor(words.length / 2); k++) {
-      const p1 = words.slice(0, k).join(' ').toLowerCase();
-      const p2 = words.slice(k, k * 2).join(' ').toLowerCase();
-      if (p1 === p2) {
-        words.splice(0, k);
-        clean = words.join(' ');
-        break;
+    let modified = true;
+    while (modified && words.length >= 4) {
+      modified = false;
+      for (let len = 1; len <= Math.floor(words.length / 2); len++) {
+        const p1 = words.slice(0, len).join(' ').toLowerCase();
+        const remainder = words.slice(len);
+        if (remainder.length >= len) {
+          const startOfRemainder = remainder.slice(0, len).join(' ').toLowerCase();
+          if (p1 === startOfRemainder) {
+            words.splice(0, len);
+            modified = true;
+            break;
+          }
+        }
       }
     }
+    clean = words.join(' ');
   }
 
   return clean.replace(/\s+/g, ' ').trim();
@@ -66,6 +75,7 @@ function combineSpeechBuffers(committed, currentFinal, currentInterim) {
   const normFinal = (currentFinal || '').trim();
   const normInterim = (currentInterim || '').trim();
 
+  // If current session already includes committed text from the beginning, discard committed
   let base = normCommitted;
   if (normFinal) {
     if (!base) {
@@ -102,7 +112,22 @@ function combineSpeechBuffers(committed, currentFinal, currentInterim) {
     } else if (normInterim.toLowerCase().startsWith(full.toLowerCase())) {
       full = normInterim;
     } else {
-      full = `${full} ${normInterim}`;
+      // Check word-level overlap before appending
+      const baseWords = full.split(/\s+/).filter(Boolean);
+      const interimWords = normInterim.split(/\s+/).filter(Boolean);
+      let overlap = 0;
+      const maxCheck = Math.min(baseWords.length, interimWords.length);
+      for (let k = maxCheck; k >= 1; k--) {
+        if (baseWords.slice(-k).join(' ').toLowerCase() === interimWords.slice(0, k).join(' ').toLowerCase()) {
+          overlap = k;
+          break;
+        }
+      }
+      if (overlap > 0) {
+        full = baseWords.concat(interimWords.slice(overlap)).join(' ');
+      } else {
+        full = `${full} ${normInterim}`;
+      }
     }
   }
 
@@ -323,7 +348,7 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
         recognition.lang = speechLang || 'en-IN';
         recognition.maxAlternatives = 1;
 
-        let committedText = '';
+        let committedFinal = '';
 
         recognition.onstart = () => {
           setIsRecording(true);
@@ -346,7 +371,7 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
             }
           }
 
-          const { finalText, fullText } = combineSpeechBuffers(committedText, currentSessionFinal, currentSessionInterim);
+          const { finalText, fullText } = combineSpeechBuffers(committedFinal, currentSessionFinal, currentSessionInterim);
 
           const cleanFinal = normalizeFitnessSpeech(finalText);
           const cleanInterim = normalizeFitnessSpeech(currentSessionInterim);
@@ -375,9 +400,9 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
         recognition.onend = () => {
           // If the user hasn't clicked stop and speech recognition times out, auto-restart to keep listening
           if (isRecordingRef.current) {
-            // Commit current clean speech so far
+            // Commit confirmed final speech so far (never raw interim)
             if (recognizedTextRef.current.trim()) {
-              committedText = recognizedTextRef.current.trim();
+              committedFinal = deduplicateSpeechRepetitions(recognizedTextRef.current.trim());
             }
             try {
               recognition.start();

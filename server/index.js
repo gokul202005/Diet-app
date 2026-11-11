@@ -11,7 +11,7 @@ import { FastrackService } from './services/fastrackService.js';
 import { searchFoodDatabase } from './data/foodDatabase.js';
 import { calculateNutritionTargets } from './services/profileCalculator.js';
 import { uploadImageToOnlineStorage, deleteImageFromOnlineStorage } from './services/cloudStorage.js';
-import { isSupabaseReady, migrateLocalDataToSupabase, getSupabase, getPhotosFromSupabase, getProfileFromSupabase, saveProfileToSupabase } from './services/supabaseService.js';
+import { isSupabaseReady, migrateLocalDataToSupabase, getSupabase, getPhotosFromSupabase, getProfileFromSupabase, saveProfileToSupabase, resetSupabaseAllData } from './services/supabaseService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -204,7 +204,33 @@ app.post('/api/auth/login', async (req, res) => {
     const db = readDB();
     db.users = db.users || [];
 
-    const user = db.users.find(u => u.email.toLowerCase() === (email || '').toLowerCase());
+    let user = db.users.find(u => u.email.toLowerCase() === (email || '').toLowerCase());
+    
+    // Check Supabase Cloud if user not in local memory/cache
+    if (!user && isSupabaseReady() && email) {
+      try {
+        const { data: cloudUser } = await getSupabase()
+          .from('users')
+          .select('*')
+          .eq('email', email.toLowerCase())
+          .maybeSingle();
+
+        if (cloudUser && (!cloudUser.password_hash || cloudUser.password_hash === password)) {
+          user = {
+            id: cloudUser.id,
+            name: cloudUser.name || email.split('@')[0],
+            email: cloudUser.email,
+            password: cloudUser.password_hash || password,
+            provider: cloudUser.provider || 'email',
+            createdAt: cloudUser.created_at || new Date().toISOString()
+          };
+          db.users.push(user);
+        }
+      } catch (e) {
+        console.warn('Supabase email login check notice:', e.message);
+      }
+    }
+
     if (!user || user.password !== password) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
@@ -268,11 +294,42 @@ app.post('/api/auth/google', async (req, res) => {
     db.users = db.users || [];
 
     let user = db.users.find(u => u.email.toLowerCase() === email.toLowerCase());
+    
+    // Check Supabase Cloud if user not in local database
+    if (!user && isSupabaseReady()) {
+      try {
+        const { data: cloudUser } = await getSupabase()
+          .from('users')
+          .select('*')
+          .eq('email', email.toLowerCase())
+          .maybeSingle();
+
+        if (cloudUser) {
+          user = {
+            id: cloudUser.id,
+            name: cloudUser.name || name || email.split('@')[0],
+            email: cloudUser.email,
+            picture: cloudUser.avatar_url || picture || null,
+            googleId: googleId || `gid-${Date.now()}`,
+            provider: 'google',
+            createdAt: cloudUser.created_at || new Date().toISOString()
+          };
+          db.users.push(user);
+        }
+      } catch (e) {
+        console.warn('Supabase Google user lookup notice:', e.message);
+      }
+    }
+
     let isNewUser = false;
     if (!user) {
       isNewUser = true;
+      // Deterministic, permanent stable user ID based on googleId or clean email
+      const stableId = googleId 
+        ? `user-google-${googleId}` 
+        : `user-google-${email.toLowerCase().replace(/[^a-zA-Z0-9]/g, '_')}`;
       user = {
-        id: `user-google-${Date.now()}`,
+        id: stableId,
         name: name || email.split('@')[0],
         email: email.toLowerCase(),
         picture: picture || null,
@@ -287,9 +344,21 @@ app.post('/api/auth/google', async (req, res) => {
     }
 
     db.currentUser = { id: user.id, name: user.name, email: user.email, picture: user.picture, provider: 'google' };
-
     db.profiles = db.profiles || {};
-    if (isNewUser || !db.profiles[user.id]) {
+
+    // Check Supabase Cloud for saved configured profile
+    let cloudProfile = null;
+    if (isSupabaseReady()) {
+      try {
+        cloudProfile = await getProfileFromSupabase(user.id);
+      } catch (e) {}
+    }
+
+    if (cloudProfile && cloudProfile.isConfigured) {
+      db.profiles[user.id] = { ...cloudProfile, name: user.name };
+      isNewUser = false;
+    } else if (!db.profiles[user.id]) {
+      // 100% clean slate: Zero pre-filled values
       db.profiles[user.id] = {
         isConfigured: false,
         name: user.name,
@@ -297,6 +366,7 @@ app.post('/api/auth/google', async (req, res) => {
         gender: '',
         heightCm: '',
         weightKg: '',
+        targetWeightKg: '',
         goal: '',
         activityLevel: '',
         dailyTargetCalories: 2000,
@@ -310,18 +380,6 @@ app.post('/api/auth/google', async (req, res) => {
         focusAreas: [],
         goals: []
       };
-    }
-
-    // For returning Google users, check Supabase Cloud for saved configured profile
-    if (!isNewUser && !db.profiles[user.id]?.isConfigured && isSupabaseReady()) {
-      try {
-        const cloudProfile = await getProfileFromSupabase(user.id);
-        if (cloudProfile && cloudProfile.isConfigured) {
-          db.profiles[user.id] = { ...db.profiles[user.id], ...cloudProfile };
-        }
-      } catch (e) {
-        console.warn('Supabase Google profile check warning:', e.message);
-      }
     }
 
     db.profile = db.profiles[user.id];
@@ -362,42 +420,77 @@ app.post('/api/auth/logout', (req, res) => {
 });
 
 // Admin / User Request: Reset all users and accounts to start fresh
-app.post('/api/auth/reset-all', (req, res) => {
-  const cleanDb = {
-    users: [],
-    currentUser: null,
-    profiles: {},
-    profile: {
-      isConfigured: false,
-      name: '',
-      age: null,
-      gender: 'male',
-      heightCm: null,
-      weightKg: null,
-      targetWeightKg: null,
-      goal: 'recomposition',
-      activityLevel: 'moderately_active',
-      dietPreference: 'south_indian_mixed',
-      dailyTargetCalories: 2100,
-      dailyTargetProtein: 140,
-      dailyTargetCarbs: 220,
-      dailyTargetFat: 60,
-      dailyTargetWater: 3000,
-      dailyTargetSteps: 10000
-    },
-    meals: [],
-    workouts: [],
-    workoutPlans: [],
-    fastrackLogs: [],
-    waterLogs: [],
-    weightLogs: [],
-    photoVault: [],
-    chatHistory: [],
-    savedMealPlan: null,
-    settings: {}
-  };
-  writeDB(cleanDb);
-  res.json({ success: true, message: 'All users and accounts deleted. System reset to fresh clean slate.' });
+app.post('/api/auth/reset-all', async (req, res) => {
+  try {
+    const cleanDb = {
+      users: [],
+      currentUser: null,
+      profiles: {},
+      profile: {
+        isConfigured: false,
+        name: '',
+        age: '',
+        gender: '',
+        heightCm: '',
+        weightKg: '',
+        targetWeightKg: '',
+        goal: '',
+        activityLevel: '',
+        dailyTargetCalories: 2000,
+        dailyTargetProtein: 130,
+        dailyTargetCarbs: 200,
+        dailyTargetFat: 55,
+        dailyTargetWater: 3000,
+        dailyTargetSteps: 10000,
+        recalculateTargets: true,
+        dietaryTags: [],
+        focusAreas: [],
+        goals: []
+      },
+      meals: [],
+      workouts: [],
+      workoutPlans: [],
+      fastrackLogs: [],
+      waterLogs: [],
+      weightLogs: [],
+      photoVault: [],
+      chatHistory: [],
+      savedMealPlan: null,
+      settings: {}
+    };
+    writeDB(cleanDb);
+
+    // Clean up local vault upload photos from disk
+    const vaultDir = path.join(__dirname, 'uploads', 'vault');
+    if (fs.existsSync(vaultDir)) {
+      try {
+        const files = fs.readdirSync(vaultDir);
+        for (const file of files) {
+          if (file !== '.gitkeep') {
+            try { fs.unlinkSync(path.join(vaultDir, file)); } catch (e) {}
+          }
+        }
+      } catch (e) {}
+    }
+
+    // Delete all records & storage files from Supabase Cloud PostgreSQL
+    let supabaseResult = null;
+    if (isSupabaseReady()) {
+      try {
+        supabaseResult = await resetSupabaseAllData();
+      } catch (err) {
+        console.warn('Error clearing Supabase cloud database during reset-all:', err.message);
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'All users, profiles, and data deleted from local database and Supabase Cloud. Clean slate ready.',
+      supabase: supabaseResult
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to reset database', details: err.message });
+  }
 });
 
 // --- USER PROFILE & GOALS ---
@@ -1489,7 +1582,10 @@ app.post('/api/fastrack/auto-sync', (req, res) => {
     ? Number(req.body.avgHeartRate) 
     : (existing?.avgHeartRate || null);
   const peakHeartRate = Math.max(existing?.peakHeartRate || 0, Number(req.body.peakHeartRate) || (avgHeartRate || 0));
-  const distanceKm = Number(((steps * 0.00075).toFixed(2)));
+  const incomingDist = req.body.distanceKm !== undefined ? Number(req.body.distanceKm) : null;
+  const distanceKm = (incomingDist !== null && incomingDist > 0)
+    ? Number(incomingDist.toFixed(2))
+    : Number(((steps * 0.00075).toFixed(2)));
   const totalBurned = bmr + activeCalories;
 
   const autoRecord = {

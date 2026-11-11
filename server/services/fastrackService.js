@@ -12,17 +12,18 @@ export class FastrackService {
   // Calculate Net Energy Balance combining Diet Intake and Fastrack Watch Data
   static calculateEnergyBalance(consumedCalories, fastrackLog, profile) {
     const bmr = this.calculateBMR(
-      profile.weightKg || 72,
-      profile.heightCm || 175,
-      profile.age || 24,
-      profile.gender || 'male'
+      Number(profile?.weightKg) || 70,
+      Number(profile?.heightCm) || 170,
+      Number(profile?.age) || 24,
+      profile?.gender || 'male'
     );
 
     const activeBurn = fastrackLog?.activeCalories || 0;
     const totalExpenditure = bmr + activeBurn;
     const netCalories = consumedCalories - totalExpenditure;
 
-    const userGoal = (profile.goal || (Array.isArray(profile.goals) ? profile.goals[0] : 'recomp')).toLowerCase();
+    const rawGoal = profile?.goal || (Array.isArray(profile?.goals) && profile.goals.length > 0 ? profile.goals[0] : '') || 'maintenance';
+    const userGoal = String(rawGoal).toLowerCase();
     const isBulking = userGoal.includes('bulk') || userGoal.includes('muscle');
     const isCutting = userGoal.includes('cut') || userGoal.includes('shred');
     const isRecomp = userGoal.includes('recomp');

@@ -11,18 +11,22 @@ const initialData = {
   profile: {
     isConfigured: false,
     name: '',
-    age: 23,
-    gender: 'male',
-    heightCm: 175,
-    weightKg: 70,
-    goal: 'recomp', // 'cutting' (fat loss), 'bulking' (muscle gain), 'recomp' (body recomposition), 'maintenance'
-    activityLevel: 'moderately_active', // sedentary, lightly_active, moderately_active, very_active
-    dailyTargetCalories: 2100,
-    dailyTargetProtein: 140, // grams
-    dailyTargetCarbs: 220,   // grams
-    dailyTargetFat: 60,      // grams
-    dailyTargetWater: 3000,  // ml
+    age: '',
+    gender: '',
+    heightCm: '',
+    weightKg: '',
+    targetWeightKg: '',
+    goal: '',
+    activityLevel: '',
+    dailyTargetCalories: 2000,
+    dailyTargetProtein: 130,
+    dailyTargetCarbs: 200,
+    dailyTargetFat: 55,
+    dailyTargetWater: 3000,
     dailyTargetSteps: 10000,
+    dietaryTags: [],
+    focusAreas: [],
+    goals: []
   },
   meals: [],
   workouts: [],
