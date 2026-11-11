@@ -100,7 +100,26 @@
   "meals": [],
   "workouts": [],
   "workoutPlans": [],
-  "fastrackLogs": [],
+  "fastrackLogs": [
+    {
+      "id": "fastrack-1794378647318",
+      "userId": "user-1794326427954",
+      "date": "2026-11-11",
+      "deviceName": "Health Connect (Sensor Bridge)",
+      "steps": 0,
+      "activeCalories": 0,
+      "restingCalories": 2310,
+      "totalBurned": 2310,
+      "distanceKm": 0,
+      "avgHeartRate": null,
+      "peakHeartRate": null,
+      "sleepHours": 7.2,
+      "batteryLevel": null,
+      "isAutoSynced": true,
+      "lastAutoSyncAt": "2026-11-11T06:35:15.831Z",
+      "syncedAt": "2026-11-11T06:35:15.831Z"
+    }
+  ],
   "waterLogs": [],
   "weightLogs": [],
   "photoVault": [],

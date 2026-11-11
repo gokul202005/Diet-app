@@ -65,12 +65,17 @@ function normalizeFitnessSpeech(rawText) {
     [/\bmy wait\b/gi, 'my weight'],
     [/\bhalf (?:a )?liter\b/gi, '500ml water'],
     [/\bone liter\b/gi, '1000ml water'],
-    [/\btwo liters?\b/gi, '2000ml water']
+    [/\btwo liters?\b/gi, '2000ml water'],
+    [/\bi 8\b|\bi ate\b/gi, 'i had'],
+    [/\b8374\b/gi, ''],
+    [/(\b[|I]\b\s*){3,}/g, 'I ']
   ];
   for (const [pattern, rep] of replacements) {
     clean = clean.replace(pattern, rep);
   }
-  return clean;
+  // Deduplicate accidental repeating phrases (e.g. "boiled eggs boiled eggs" -> "boiled eggs")
+  clean = clean.replace(/\b(\w+(?:\s+\w+)?)\s+\1\b/gi, '$1');
+  return clean.replace(/\s+/g, ' ').trim();
 }
 
 export default function UniversalVoiceAssistant({ selectedDate, onActionCompleted, isOpen: externalIsOpen, onClose: externalOnClose, onOpen: externalOnOpen }) {
@@ -221,7 +226,7 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
         recognition.lang = speechLang || 'en-IN';
         recognition.maxAlternatives = 1;
 
-        let sessionAccumulated = '';
+        let pastSessionsFinal = '';
 
         recognition.onstart = () => {
           setIsRecording(true);
@@ -231,24 +236,37 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
         };
 
         recognition.onresult = (event) => {
-          let currentFinal = '';
-          let currentInterim = '';
+          let currentSessionFinal = '';
+          let currentSessionInterim = '';
+
+          // event.results contains the entire list of results for this recognition session
           for (let i = 0; i < event.results.length; ++i) {
             const item = event.results[i];
             if (item.isFinal) {
-              currentFinal += item[0].transcript + ' ';
+              currentSessionFinal += item[0].transcript + ' ';
             } else {
-              currentInterim += item[0].transcript;
+              currentSessionInterim += item[0].transcript;
             }
           }
 
-          if (currentFinal) {
-            sessionAccumulated = (sessionAccumulated + ' ' + currentFinal).replace(/\s+/g, ' ').trim();
-          }
+          currentSessionFinal = currentSessionFinal.trim();
+          currentSessionInterim = currentSessionInterim.trim();
 
-          const fullDisplay = (sessionAccumulated + ' ' + currentInterim).trim();
-          setLiveFinalText(sessionAccumulated);
-          setLiveInterimText(currentInterim);
+          // Build clean, non-compounding final and interim text
+          const totalFinal = [pastSessionsFinal, currentSessionFinal]
+            .filter(Boolean)
+            .join(' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+          const fullDisplay = [totalFinal, currentSessionInterim]
+            .filter(Boolean)
+            .join(' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+          setLiveFinalText(totalFinal);
+          setLiveInterimText(currentSessionInterim);
           setTranscript(fullDisplay);
           recognizedTextRef.current = fullDisplay;
         };
@@ -268,8 +286,11 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
         };
 
         recognition.onend = () => {
-          // If the user hasn't clicked stop and silence happened, auto-restart to keep listening
+          // If the user hasn't clicked stop and speech recognition times out, auto-restart to keep listening
           if (isRecordingRef.current) {
+            if (recognizedTextRef.current.trim()) {
+              pastSessionsFinal = recognizedTextRef.current.trim();
+            }
             try {
               recognition.start();
             } catch (e) {

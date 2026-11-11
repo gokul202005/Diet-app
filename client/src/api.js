@@ -7,24 +7,39 @@ export const RENDER_BACKEND = 'https://diet-app-backend-udje.onrender.com';
 // Dynamically determine the best API endpoint
 const getBaseUrl = () => {
   if (typeof window !== 'undefined') {
-    // 1. If running locally (port 3000 Vite proxy, port 5000 Node, localhost) or directly on Render:
+    // 1. FIRST: Check if running inside Capacitor Native Android / iOS App
+    try {
+      const isCapacitorNative = 
+        (typeof Capacitor !== 'undefined' && Capacitor.isNativePlatform && Capacitor.isNativePlatform()) ||
+        Boolean(window.Capacitor?.isNativePlatform?.()) ||
+        window.location.protocol === 'capacitor:' ||
+        // Capacitor Android local WebView runs on localhost with NO port
+        (window.location.hostname === 'localhost' && !window.location.port && !window.location.search.includes('dev=true'));
+
+      if (isCapacitorNative) {
+        console.log('[API] Running in Capacitor Native Android Container -> Using Live Render Backend:', RENDER_BACKEND);
+        return `${RENDER_BACKEND}/api`;
+      }
+    } catch (e) {
+      console.warn('[API] Native platform check exception:', e);
+    }
+
+    // 2. If running locally with Vite proxy (port 3000) or Node (port 5000):
     if (
-      window.location.hostname === 'localhost' ||
-      window.location.hostname === '127.0.0.1' ||
-      window.location.hostname.includes('onrender.com') ||
+      window.location.port === '3000' || 
       window.location.port === '5000' ||
-      window.location.port === '3000'
+      window.location.port === '5173'
     ) {
       return '/api';
     }
-    // 2. If running inside Capacitor Native Android App:
-    try {
-      if (Capacitor.isNativePlatform && Capacitor.isNativePlatform()) {
-        return `${RENDER_BACKEND}/api`;
-      }
-    } catch (e) {}
+
+    // 3. If running directly on Render web domain:
+    if (window.location.hostname.includes('onrender.com')) {
+      return '/api';
+    }
   }
-  // 3. Fallback to live Render backend for external callers:
+
+  // 4. Default to live Render backend for external callers & mobile web:
   return `${RENDER_BACKEND}/api`;
 };
 
@@ -73,18 +88,13 @@ async function safeFetch(url, options = {}) {
     }
 
     const text = await res.text();
-    // Intercept true cold-start HTML responses (e.g. Render spin-up 502/503/504 gateway pages)
+    // Intercept true cold-start HTML responses (e.g. Render spin-up 502/503/504 gateway pages or WebView redirects)
     if (text.trim().startsWith('<')) {
-      if (res.status === 502 || res.status === 503 || res.status === 504 || url.includes('onrender.com')) {
-        console.warn(`[API] Server returned HTML (${res.status}) for ${url}. Backend is likely starting up on Render.`);
-        return { 
-          error: 'Backend server is starting up. Please allow 15-30 seconds...', 
-          isWakingUp: true,
-          status: 'turning-on' 
-        };
-      }
+      console.warn(`[API] Server returned HTML (${res.status}) for ${url}.`);
       return { 
-        error: `Server returned unexpected HTML response (${res.status}).` 
+        error: 'Cloud backend is warming up or connecting. Please tap Sign In again in a few moments.', 
+        isWakingUp: true,
+        status: 'turning-on' 
       };
     }
 
