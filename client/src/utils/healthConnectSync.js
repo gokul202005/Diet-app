@@ -205,6 +205,7 @@ class HealthConnectSyncEngine {
           scope: [
             'https://www.googleapis.com/auth/fitness.activity.read',
             'https://www.googleapis.com/auth/fitness.body.read',
+            'https://www.googleapis.com/auth/fitness.location.read',
             'https://www.googleapis.com/auth/fitness.heart_rate.read',
             'https://www.googleapis.com/auth/fitness.sleep.read'
           ].join(' '),
@@ -258,7 +259,7 @@ class HealthConnectSyncEngine {
     this.notify({ googleFitConnected: false });
   }
 
-  // Fetch real metrics from Google Fit REST API (or simulated Health Connect aggregation)
+  // Fetch real metrics from Google Fit REST API
   async fetchGoogleFitMetrics() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -279,63 +280,170 @@ class HealthConnectSyncEngine {
 
     try {
       const url = 'https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate';
-      const body = {
-        aggregateBy: [
-          { 
-            dataTypeName: 'com.google.step_count.delta',
-            dataSourceId: 'derived:com.google.step_count.delta:com.google.android.gms:estimated_steps'
-          },
-          { 
-            dataTypeName: 'com.google.step_count.delta',
-            dataSourceId: 'derived:com.google.step_count.delta:com.google.android.gms:merge_step_deltas'
-          },
-          { dataTypeName: 'com.google.step_count.delta' },
-          { 
-            dataTypeName: 'com.google.distance.delta',
-            dataSourceId: 'derived:com.google.distance.delta:com.google.android.gms:merge_distance_deltas'
-          },
-          { dataTypeName: 'com.google.distance.delta' },
-          { 
-            dataTypeName: 'com.google.calories.expended',
-            dataSourceId: 'derived:com.google.calories.expended:com.google.android.gms:merge_calories_expended'
-          },
-          { dataTypeName: 'com.google.calories.expended' },
-          { dataTypeName: 'com.google.heart_rate.bpm' },
-          { dataTypeName: 'com.google.sleep.segment' }
-        ],
-        bucketByTime: { durationMillis: 86400000 }, // Full-day aggregation bucket
-        startTimeMillis,
-        endTimeMillis
-      };
+      
+      // Query steps, calories, heart rate, and sleep in separate clean blocks so one missing permission does not break steps!
+      let totalSteps = 0;
+      let totalCalories = 0;
+      let totalDistance = 0;
+      let avgHeartRate = null;
+      let sleepHours = null;
 
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.googleFitToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(body)
-      });
+      // 1. Core query: Steps & Active Calories
+      try {
+        const stepBody = {
+          aggregateBy: [
+            { dataTypeName: 'com.google.step_count.delta' },
+            { dataTypeName: 'com.google.calories.expended' }
+          ],
+          bucketByTime: { durationMillis: 86400000 },
+          startTimeMillis,
+          endTimeMillis
+        };
 
-      if (!res.ok) {
-        if (res.status === 401) {
-          // Access token expired! Clear cached token so user knows to reconnect
-          this.googleFitToken = null;
-          localStorage.removeItem(STORAGE_KEYS.GOOGLE_FIT_TOKEN);
-          this.notify({ googleFitConnected: false });
-          throw new Error('Google Fit login token expired. Please tap "Connect Google Fit" to refresh.');
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${this.googleFitToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(stepBody)
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          const parsed = this.parseGoogleFitResponse(data);
+          totalSteps = parsed.steps;
+          totalCalories = parsed.activeCalories;
+          totalDistance = parsed.distanceKm;
+        } else if (res.status === 401) {
+          this.disconnectGoogleFit();
+          throw new Error('Google Fit session expired. Please tap Disconnect and reconnect Google Fit.');
+        } else {
+          console.warn(`[GoogleFit] Steps aggregate HTTP ${res.status}`);
         }
-        throw new Error(`Google Fit HTTP ${res.status}`);
+      } catch (stepErr) {
+        if (stepErr.message.includes('expired')) throw stepErr;
+        console.warn('[GoogleFit] Step query error:', stepErr.message);
       }
 
-      const data = await res.json();
-      return this.parseGoogleFitResponse(data);
+      // 1b. Direct datasource fallback if aggregate returned 0 steps
+      if (totalSteps === 0) {
+        try {
+          const startNanos = BigInt(startTimeMillis) * 1000000n;
+          const endNanos = BigInt(endTimeMillis) * 1000000n;
+          const dsUrl = `https://www.googleapis.com/fitness/v1/users/me/dataSources/derived:com.google.step_count.delta:com.google.android.gms:estimated_steps/datasets/${startNanos}-${endNanos}`;
+          const dsRes = await fetch(dsUrl, {
+            headers: { 'Authorization': `Bearer ${this.googleFitToken}` }
+          });
+          if (dsRes.ok) {
+            const dsData = await dsRes.json();
+            for (const pt of (dsData.point || [])) {
+              const val = pt.value?.[0];
+              const count = val?.intVal !== undefined ? Number(val.intVal) : (val?.fpVal !== undefined ? Math.round(Number(val.fpVal)) : 0);
+              if (!isNaN(count) && count > 0) {
+                totalSteps += count;
+              }
+            }
+            if (totalSteps > 0) {
+              totalDistance = Number(((totalSteps * 0.00075).toFixed(2)));
+              totalCalories = Math.round(totalSteps * 0.04);
+            }
+          }
+        } catch (dsErr) {
+          console.warn('[GoogleFit] Estimated steps datasource fallback:', dsErr.message);
+        }
+      }
+
+      // 2. Optional Heart Rate query
+      try {
+        const hrBody = {
+          aggregateBy: [
+            { dataTypeName: 'com.google.heart_rate.bpm' }
+          ],
+          bucketByTime: { durationMillis: 86400000 },
+          startTimeMillis,
+          endTimeMillis
+        };
+        const hrRes = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${this.googleFitToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(hrBody)
+        });
+        if (hrRes.ok) {
+          const hrData = await hrRes.json();
+          const hrVals = [];
+          for (const b of (hrData.bucket || [])) {
+            for (const ds of (b.dataset || [])) {
+              for (const pt of (ds.point || [])) {
+                const v = pt.value?.[0]?.fpVal || pt.value?.[0]?.intVal;
+                if (v) hrVals.push(Number(v));
+              }
+            }
+          }
+          if (hrVals.length > 0) {
+            avgHeartRate = Math.round(hrVals.reduce((a, b) => a + b, 0) / hrVals.length);
+          }
+        }
+      } catch (hrErr) {}
+
+      // 3. Optional Sleep query
+      try {
+        const sleepBody = {
+          aggregateBy: [
+            { dataTypeName: 'com.google.sleep.segment' }
+          ],
+          bucketByTime: { durationMillis: 86400000 },
+          startTimeMillis,
+          endTimeMillis
+        };
+        const sleepRes = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${this.googleFitToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(sleepBody)
+        });
+        if (sleepRes.ok) {
+          const sData = await sleepRes.json();
+          let sleepNanos = 0;
+          for (const b of (sData.bucket || [])) {
+            for (const ds of (b.dataset || [])) {
+              for (const pt of (ds.point || [])) {
+                const s = Number(pt.startTimeNanos || 0);
+                const e = Number(pt.endTimeNanos || 0);
+                if (e > s) sleepNanos += (e - s);
+              }
+            }
+          }
+          if (sleepNanos > 0) {
+            sleepHours = Number((sleepNanos / (1e9 * 3600)).toFixed(1));
+          }
+        }
+      } catch (sleepErr) {}
+
+      const finalSteps = Math.max(totalSteps, this.stepCount || 0);
+      if (finalSteps > this.stepCount) {
+        this.stepCount = finalSteps;
+      }
+
+      return {
+        steps: finalSteps,
+        distanceKm: totalDistance > 0 ? totalDistance : Number(((finalSteps * 0.00075).toFixed(2))),
+        activeCalories: totalCalories > 0 ? totalCalories : Math.round(finalSteps * 0.04),
+        avgHeartRate: avgHeartRate || 72,
+        sleepHours: sleepHours !== null ? sleepHours : 7.0,
+        source: 'Google Fit Cloud'
+      };
     } catch (err) {
       console.warn('[GoogleFit] API call failed:', err.message);
       return {
-        steps: this.stepCount,
-        activeCalories: Math.round(this.stepCount * 0.04),
-        distanceKm: Number(((this.stepCount * 0.00075).toFixed(2))),
+        steps: this.stepCount || 0,
+        activeCalories: Math.round((this.stepCount || 0) * 0.04),
+        distanceKm: Number(((this.stepCount || 0) * 0.00075).toFixed(2)),
         avgHeartRate: 72,
         sleepHours: 7.0,
         source: 'Health Connect (Hardware Fallback)',
@@ -348,107 +456,68 @@ class HealthConnectSyncEngine {
     let totalSteps = 0;
     let totalCalories = 0;
     let totalDistanceMeters = 0;
-    let heartRateVals = [];
-    let sleepHours = 7.0;
 
     try {
       const buckets = data.bucket || [];
       for (const bucket of buckets) {
         if (!bucket.dataset) continue;
-        let bucketMaxSteps = 0;
-        let bucketMaxCalories = 0;
-        let bucketMaxDistance = 0;
 
         for (const ds of bucket.dataset) {
           const type = (ds.dataSourceId || '').toLowerCase();
-          const dataTypeName = (ds.point?.[0]?.dataTypeName || '').toLowerCase();
+          const points = ds.point || [];
 
-          // Steps extraction: check each dataset stream and take highest accurate count
-          if (type.includes('step') || type.includes('delta') || dataTypeName.includes('step')) {
-            const streamSum = ds.point?.reduce((acc, pt) => {
+          // Steps extraction: sum all deltas for the bucket
+          if (type.includes('step')) {
+            for (const pt of points) {
               const val = pt.value?.[0];
-              const count = val?.intVal !== undefined ? Number(val.intVal) : (val?.fpVal !== undefined ? Math.round(Number(val.fpVal)) : 0);
-              return acc + (isNaN(count) ? 0 : count);
-            }, 0) || 0;
-            if (streamSum > bucketMaxSteps) {
-              bucketMaxSteps = streamSum;
+              const count = val?.intVal !== undefined 
+                ? Number(val.intVal) 
+                : (val?.fpVal !== undefined ? Math.round(Number(val.fpVal)) : 0);
+              if (!isNaN(count) && count > 0) {
+                totalSteps += count;
+              }
             }
           }
 
           // Calories extraction
-          if (type.includes('calorie') || type.includes('expended') || dataTypeName.includes('calorie')) {
-            const streamCal = ds.point?.reduce((acc, pt) => {
+          if (type.includes('calorie') || type.includes('expended')) {
+            for (const pt of points) {
               const val = pt.value?.[0];
-              const cal = val?.fpVal !== undefined ? Number(val.fpVal) : (val?.intVal !== undefined ? Number(val.intVal) : 0);
-              return acc + (isNaN(cal) ? 0 : cal);
-            }, 0) || 0;
-            if (streamCal > bucketMaxCalories) {
-              bucketMaxCalories = streamCal;
+              const cal = val?.fpVal !== undefined 
+                ? Number(val.fpVal) 
+                : (val?.intVal !== undefined ? Number(val.intVal) : 0);
+              if (!isNaN(cal) && cal > 0) {
+                totalCalories += cal;
+              }
             }
           }
 
           // Distance extraction
-          if (type.includes('distance') || dataTypeName.includes('distance')) {
-            const streamDist = ds.point?.reduce((acc, pt) => {
+          if (type.includes('distance')) {
+            for (const pt of points) {
               const val = pt.value?.[0];
-              const dist = val?.fpVal !== undefined ? Number(val.fpVal) : (val?.intVal !== undefined ? Number(val.intVal) : 0);
-              return acc + (isNaN(dist) ? 0 : dist);
-            }, 0) || 0;
-            if (streamDist > bucketMaxDistance) {
-              bucketMaxDistance = streamDist;
-            }
-          }
-
-          // Heart rate extraction
-          if (type.includes('heart') || type.includes('bpm') || dataTypeName.includes('heart')) {
-            const vals = ds.point?.map(pt => pt.value?.[0]?.fpVal || pt.value?.[0]?.intVal).filter(Boolean) || [];
-            heartRateVals.push(...vals);
-          }
-
-          // Sleep duration extraction
-          if (type.includes('sleep') || dataTypeName.includes('sleep')) {
-            const sleepNanos = ds.point?.reduce((acc, pt) => {
-              const start = Number(pt.startTimeNanos || 0);
-              const end = Number(pt.endTimeNanos || 0);
-              return acc + (end > start ? end - start : 0);
-            }, 0) || 0;
-            if (sleepNanos > 0) {
-              sleepHours = sleepNanos / (1e9 * 3600);
+              const dist = val?.fpVal !== undefined 
+                ? Number(val.fpVal) 
+                : (val?.intVal !== undefined ? Number(val.intVal) : 0);
+              if (!isNaN(dist) && dist > 0) {
+                totalDistanceMeters += dist;
+              }
             }
           }
         }
-
-        totalSteps = Math.max(totalSteps, bucketMaxSteps);
-        totalCalories = Math.max(totalCalories, bucketMaxCalories);
-        totalDistanceMeters = Math.max(totalDistanceMeters, bucketMaxDistance);
       }
     } catch (e) {
       console.warn('[GoogleFit] Parsing error:', e);
     }
 
-    const finalSteps = Math.max(totalSteps, this.stepCount);
-    if (finalSteps > this.stepCount) {
-      this.stepCount = finalSteps;
-      try {
-        localStorage.setItem(STORAGE_KEYS.LOCAL_STEPS_TODAY, String(finalSteps));
-      } catch (e) {}
-    }
-
-    const avgHeartRate = heartRateVals.length > 0
-      ? Math.round(heartRateVals.reduce((a, b) => a + Number(b), 0) / heartRateVals.length)
-      : 72;
-
     const finalDistanceKm = totalDistanceMeters > 0 
       ? Number((totalDistanceMeters / 1000).toFixed(2)) 
-      : Number(((finalSteps * 0.00075).toFixed(2)));
+      : Number(((totalSteps * 0.00075).toFixed(2)));
 
     return {
-      steps: finalSteps,
+      steps: totalSteps,
       distanceKm: finalDistanceKm,
-      activeCalories: Math.round(totalCalories) || Math.round(finalSteps * 0.04),
-      avgHeartRate,
-      sleepHours: Number(sleepHours.toFixed(1)),
-      source: 'Android Health Connect / Google Fit'
+      activeCalories: Math.round(totalCalories) || Math.round(totalSteps * 0.04)
     };
   }
 
