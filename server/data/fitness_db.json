@@ -12,12 +12,7 @@
       "picture": "https://lh3.googleusercontent.com/a/ACg8ocLRZRfLuZEzw1tLbTqySyGi50w9k6HSSOVAw--gwFiiSwhOnvCZ=s96-c"
     }
   ],
-  "currentUser": {
-    "id": "user-1794326427954",
-    "name": "Gokul Krishna",
-    "email": "jn.gokulkrishna@gmail.com",
-    "provider": "email"
-  },
+  "currentUser": null,
   "profiles": {
     "user-1794309303113": {
       "isConfigured": false,
@@ -72,6 +67,32 @@
         "cutting"
       ],
       "geminiApiKey": "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a"
+    },
+    "default_guest": {
+      "isConfigured": false,
+      "name": "",
+      "age": "",
+      "gender": "male",
+      "heightCm": "",
+      "weightKg": "",
+      "goal": "recomp",
+      "activityLevel": "moderately_active",
+      "dailyTargetCalories": 2100,
+      "dailyTargetProtein": 140,
+      "dailyTargetCarbs": 220,
+      "dailyTargetFat": 60,
+      "dailyTargetWater": 3000,
+      "dailyTargetSteps": 10000,
+      "recalculateTargets": true,
+      "dietaryTags": [
+        "🍗 Non-Veg"
+      ],
+      "focusAreas": [
+        "🛡️ Full Body Balance"
+      ],
+      "goals": [
+        "recomp"
+      ]
     }
   },
   "profile": {
@@ -106,6 +127,24 @@
   "workouts": [],
   "workoutPlans": [],
   "fastrackLogs": [
+    {
+      "id": "fastrack-1794387797314",
+      "userId": "default_guest",
+      "date": "2026-11-11",
+      "deviceName": "Android Health Connect / Google Fit",
+      "steps": 1362,
+      "activeCalories": 1104,
+      "restingCalories": 5,
+      "totalBurned": 1109,
+      "distanceKm": 1.02,
+      "avgHeartRate": 72,
+      "peakHeartRate": 72,
+      "sleepHours": 7,
+      "batteryLevel": null,
+      "isAutoSynced": true,
+      "lastAutoSyncAt": "2026-11-11T09:09:15.262Z",
+      "syncedAt": "2026-11-11T09:09:15.262Z"
+    },
     {
       "id": "fastrack-1794378647318",
       "userId": "user-1794326427954",

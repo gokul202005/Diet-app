@@ -3,10 +3,20 @@ import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
 
-dotenv.config();
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+dotenv.config({ path: path.join(__dirname, '../.env') });
 
 const SUPABASE_URL = process.env.SUPABASE_URL || '';
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || '';
+const SUPABASE_KEY = 
+  process.env.SUPABASE_SECRET_KEY || 
+  process.env.SUPABASE_SERVICE_ROLE_KEY || 
+  process.env.SUPABASE_ANON_KEY || 
+  process.env.SUPABASE_PUBLISHABLE_KEY || 
+  '';
 
 let supabase = null;
 
@@ -106,18 +116,28 @@ export async function migrateLocalDataToSupabase(localDb) {
   };
 
   try {
-    // 1. Migrate Users
-    const users = localDb.users || [];
-    for (const u of users) {
+    // 0. Ensure all referenced user IDs exist in the users table first (satisfies foreign key)
+    const allUserIds = new Set([
+      ...(localDb.users || []).map(u => u.id),
+      ...Object.keys(localDb.profiles || {}),
+      ...(localDb.fastrackLogs || []).map(wl => wl.userId || 'guest'),
+      ...(localDb.meals || []).map(m => m.userId || 'guest'),
+      ...(localDb.workouts || []).map(w => w.userId || 'guest')
+    ]);
+
+    for (const uid of allUserIds) {
+      if (!uid) continue;
+      const matched = (localDb.users || []).find(u => u.id === uid);
+      const profileName = localDb.profiles?.[uid]?.name;
       const { error } = await supabase.from('users').upsert({
-        id: u.id,
-        email: u.email,
-        password_hash: u.password || null,
-        name: u.name || 'User',
-        avatar_url: u.avatarUrl || null,
-        provider: u.provider || 'email'
+        id: uid,
+        email: matched?.email || `${uid}@agyfit.local`,
+        password_hash: matched?.password || null,
+        name: matched?.name || profileName || 'User',
+        avatar_url: matched?.avatarUrl || null,
+        provider: matched?.provider || 'local'
       }, { onConflict: 'id' });
-      if (error) results.errors.push(`User ${u.id}: ${error.message}`);
+      if (error) results.errors.push(`User ${uid}: ${error.message}`);
       else results.usersMigrated++;
     }
 
