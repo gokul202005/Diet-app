@@ -47,20 +47,23 @@ export default function AuthScreen({ onAuthSuccess }) {
   const [successMsg, setSuccessMsg] = useState('');
 
   // Real Google Sign-In state & prompt
-  const [isGoogleModalOpen, setIsGoogleModalOpen] = useState(false);
-  const [googleEmailInput, setGoogleEmailInput] = useState(() => {
-    return (typeof window !== 'undefined' ? localStorage.getItem('agy_saved_email') : '') || 'jn.gokulkrishna@gmail.com';
-  });
-  const [googleNameInput, setGoogleNameInput] = useState(() => {
-    return (typeof window !== 'undefined' ? localStorage.getItem('agy_saved_name') : '') || 'Gokul Krishna';
-  });
   const [googleClientId, setGoogleClientId] = useState(
     (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GOOGLE_CLIENT_ID) || 
     (typeof window !== 'undefined' ? localStorage.getItem('agy_google_client_id') : '') || 
-    ''
+    '916527076312-pmpo77mrp2h83fsl5dkb4u8s2v30ulf8.apps.googleusercontent.com'
   );
 
-  // Initialize official Google Identity Services if client ID is configured
+  // Fetch Google Client ID from server if not already cached
+  useEffect(() => {
+    api.getGoogleClientId().then(res => {
+      if (res && res.clientId) {
+        setGoogleClientId(res.clientId);
+        try { localStorage.setItem('agy_google_client_id', res.clientId); } catch {}
+      }
+    }).catch(() => null);
+  }, []);
+
+  // Initialize official Google Identity Services
   useEffect(() => {
     if (!googleClientId) return;
     let timer = null;
@@ -89,19 +92,20 @@ export default function AuthScreen({ onAuthSuccess }) {
               theme: 'filled_black',
               size: 'large',
               text: 'continue_with',
-              width: 360
+              width: 320,
+              shape: 'pill'
             });
           }
         } catch (e) {
           console.warn('Google Identity Services initialization warning:', e);
         }
-      } else if (attempts >= 15) {
+      } else if (attempts >= 25) {
         if (timer) clearInterval(timer);
       }
     };
 
     tryInitGoogle();
-    timer = setInterval(tryInitGoogle, 400);
+    timer = setInterval(tryInitGoogle, 300);
 
     return () => {
       if (timer) clearInterval(timer);
@@ -150,93 +154,71 @@ export default function AuthScreen({ onAuthSuccess }) {
     }
   };
 
-  // Click on "Continue with Google" (Includes Google Fit permissions upfront!)
-  const handleGoogleBtnClick = async () => {
+  // Click on "Continue with Google"
+  const handleGoogleBtnClick = () => {
     setErrorMsg('');
     setIsLoading(true);
     try {
       if (window.google?.accounts?.oauth2) {
-        const res = await healthConnectSync.requestGoogleFitAuth({
-          clientId: googleClientId
-        });
-        if (res.success && res.token) {
-          const userProfileRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-            headers: { Authorization: `Bearer ${res.token}` }
-          });
-          if (userProfileRes.ok) {
-            const googleProfile = await userProfileRes.json();
-            const authRes = await api.googleAuth({
-              email: googleProfile.email,
-              name: googleProfile.name || googleProfile.email.split('@')[0],
-              picture: googleProfile.picture,
-              googleId: googleProfile.sub
-            });
-            if (authRes.success && authRes.user) {
-              localStorage.setItem(`agy_google_fit_token_${authRes.user.id}`, res.token);
-              localStorage.setItem('agy_google_fit_token', res.token);
-              setSuccessMsg(`Google Fit authorized & signed in as ${authRes.user.name}!`);
-              setTimeout(() => {
-                onAuthSuccess(authRes.user, authRes.profile);
-              }, 400);
-              return;
+        const tokenClient = window.google.accounts.oauth2.initTokenClient({
+          client_id: googleClientId,
+          scope: 'openid email profile https://www.googleapis.com/auth/fitness.activity.read https://www.googleapis.com/auth/fitness.body.read',
+          callback: async (tokenResponse) => {
+            if (tokenResponse && tokenResponse.access_token) {
+              try {
+                const userProfileRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                  headers: { Authorization: `Bearer ${tokenResponse.access_token}` }
+                });
+                if (userProfileRes.ok) {
+                  const googleProfile = await userProfileRes.json();
+                  const authRes = await api.googleAuth({
+                    email: googleProfile.email,
+                    name: googleProfile.name || googleProfile.email.split('@')[0],
+                    picture: googleProfile.picture,
+                    googleId: googleProfile.sub
+                  });
+                  if (authRes.success && authRes.user) {
+                    localStorage.setItem(`agy_google_fit_token_${authRes.user.id}`, tokenResponse.access_token);
+                    localStorage.setItem('agy_google_fit_token', tokenResponse.access_token);
+                    setSuccessMsg(`Signed in with Google as ${authRes.user.name}!`);
+                    setTimeout(() => {
+                      onAuthSuccess(authRes.user, authRes.profile);
+                    }, 400);
+                    return;
+                  }
+                }
+              } catch (err) {
+                console.warn('Google profile fetch failed:', err);
+                setErrorMsg('Could not fetch Google profile: ' + err.message);
+              } finally {
+                setIsLoading(false);
+              }
+            } else {
+              setIsLoading(false);
+            }
+          },
+          error_callback: (err) => {
+            console.warn('Google OAuth error:', err);
+            setIsLoading(false);
+            if (err?.type !== 'popup_closed') {
+              setErrorMsg('Google Sign-In: ' + (err?.message || err?.type || 'Failed to authenticate'));
             }
           }
-        }
+        });
+        tokenClient.requestAccessToken({ prompt: 'select_account' });
+        return;
       }
+
+      if (window.google?.accounts?.id) {
+        window.google.accounts.id.prompt();
+        setIsLoading(false);
+        return;
+      }
+
+      throw new Error('Google Sign-In SDK is loading. Please tap again in a moment.');
     } catch (e) {
-      console.warn('Direct Google Fit login error, falling back:', e);
-    } finally {
       setIsLoading(false);
-    }
-
-    if (googleClientId && window.google?.accounts?.id) {
-      window.google.accounts.id.prompt((notification) => {
-        if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-          setIsGoogleModalOpen(true);
-        }
-      });
-    } else {
-      setIsGoogleModalOpen(true);
-    }
-  };
-
-  // Submit User's Own Google Account Details directly
-  const handleConfirmGoogleUser = async (e) => {
-    e.preventDefault();
-    setErrorMsg('');
-    const cleanEmail = googleEmailInput.trim().toLowerCase();
-    const cleanName = googleNameInput.trim() || cleanEmail.split('@')[0];
-
-    if (!cleanEmail || !cleanEmail.includes('@')) {
-      setErrorMsg('Please enter your valid Google email address (e.g. user@gmail.com)');
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      const res = await api.googleAuth({
-        email: cleanEmail,
-        name: cleanName,
-        googleId: `google-user-${Date.now()}`
-      });
-
-      if (res.success && res.user) {
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('agy_saved_email', res.user.email);
-          if (res.user.name) localStorage.setItem('agy_saved_name', res.user.name);
-        }
-        setIsGoogleModalOpen(false);
-        setSuccessMsg(`Welcome, ${res.user.name}!`);
-        setTimeout(() => {
-          onAuthSuccess(res.user, res.profile);
-        }, 500);
-      } else {
-        throw new Error(res.error || 'Google authentication failed');
-      }
-    } catch (err) {
-      setErrorMsg(err.message || 'Google account sign-in error');
-    } finally {
-      setIsLoading(false);
+      setErrorMsg(e.message || 'Google Sign-In failed');
     }
   };
 
@@ -353,45 +335,32 @@ export default function AuthScreen({ onAuthSuccess }) {
 
           {/* Google Sign-In Section */}
           <div className="space-y-2">
-            {googleClientId ? (
-              <div id="g-signin-container" className="flex justify-center w-full min-h-[44px]" />
-            ) : (
-              <button
-                type="button"
-                onClick={handleGoogleBtnClick}
-                disabled={isLoading}
-                className="w-full flex items-center justify-center space-x-3 py-3 px-4 bg-white hover:bg-slate-100 text-slate-900 rounded-2xl font-bold text-xs shadow-md transition-all active:scale-[0.99] cursor-pointer"
-              >
-                <svg className="w-4 h-4" viewBox="0 0 24 24">
-                  <path
-                    fill="#4285F4"
-                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                  />
-                  <path
-                    fill="#34A853"
-                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                  />
-                  <path
-                    fill="#FBBC05"
-                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                  />
-                  <path
-                    fill="#EA4335"
-                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                  />
-                </svg>
-                <span>Continue with Google</span>
-              </button>
-            )}
-
-            {/* Quick 1-Tap Google Account Login for Mobile / Origin Error Fallback */}
+            <div id="g-signin-container" className="flex justify-center w-full min-h-[44px]" />
             <button
               type="button"
-              onClick={() => setIsGoogleModalOpen(true)}
-              className="w-full flex items-center justify-center space-x-1.5 py-2 px-3 bg-slate-900/90 hover:bg-slate-850 border border-slate-800 hover:border-emerald-500/40 rounded-xl text-[11px] text-slate-300 hover:text-emerald-400 font-medium transition-all active:scale-[0.99] cursor-pointer"
+              onClick={handleGoogleBtnClick}
+              disabled={isLoading}
+              className="w-full flex items-center justify-center space-x-3 py-3 px-4 bg-white hover:bg-slate-100 text-slate-900 rounded-2xl font-bold text-xs shadow-md transition-all active:scale-[0.99] cursor-pointer"
             >
-              <span>⚡</span>
-              <span>Mobile / Origin Error? <strong>1-Tap Instant Google Sign-In</strong></span>
+              <svg className="w-4 h-4" viewBox="0 0 24 24">
+                <path
+                  fill="#4285F4"
+                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                />
+                <path
+                  fill="#34A853"
+                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                />
+                <path
+                  fill="#FBBC05"
+                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                />
+                <path
+                  fill="#EA4335"
+                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                />
+              </svg>
+              <span>Continue with Google</span>
             </button>
           </div>
 
@@ -499,83 +468,6 @@ export default function AuthScreen({ onAuthSuccess }) {
         </div>
 
       </div>
-
-      {/* USER GOOGLE ACCOUNT CONNECTOR MODAL */}
-      {isGoogleModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in">
-          <div className="relative w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-4">
-            
-            <button
-              onClick={() => setIsGoogleModalOpen(false)}
-              className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-white bg-slate-950/60 rounded-xl"
-            >
-              <X className="w-4 h-4" />
-            </button>
-
-            <div className="text-center space-y-1">
-              <div className="w-10 h-10 rounded-2xl bg-white mx-auto flex items-center justify-center shadow-md">
-                <svg className="w-5 h-5" viewBox="0 0 24 24">
-                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
-                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
-                </svg>
-              </div>
-              <h3 className="text-sm font-bold text-white">Sign in with your Google Account</h3>
-              <p className="text-[11px] text-slate-400">
-                Enter your own personal Google Account details to link your cloud fitness data.
-              </p>
-            </div>
-
-            <form onSubmit={handleConfirmGoogleUser} className="space-y-3 pt-2">
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-400 mb-1">Your Google Email</label>
-                <div className="relative">
-                  <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="email"
-                    required
-                    autoFocus
-                    value={googleEmailInput}
-                    onChange={(e) => setGoogleEmailInput(e.target.value)}
-                    placeholder="your.real.account@gmail.com"
-                    className="w-full pl-9 pr-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-400 mb-1">Your Name</label>
-                <div className="relative">
-                  <User className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    required
-                    value={googleNameInput}
-                    onChange={(e) => setGoogleNameInput(e.target.value)}
-                    placeholder="Your Full Name"
-                    className="w-full pl-9 pr-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black rounded-xl text-xs transition-all shadow-md cursor-pointer"
-              >
-                {isLoading ? 'Connecting...' : 'Connect My Google Account'}
-              </button>
-            </form>
-
-            {/* Google Origin Note */}
-            <div className="pt-2 border-t border-slate-800/80 text-[10px] text-slate-400 text-center leading-relaxed">
-              💡 To enable Google's popup on Android, add <code className="text-emerald-400 font-mono">https://localhost</code> under <strong>Authorized JavaScript origins</strong> in Google Cloud Console.
-            </div>
-
-          </div>
-        </div>
-      )}
 
     </div>
   );

@@ -98,33 +98,20 @@ function playSound(type) {
   } catch (e) {}
 }
 
-// Sung Jin-woo "ARISE" (일어서라) Voice Synthesizer
-function speakSungJinWooVoice() {
+// Real Sung Jin-woo "ARISE" (일어서라) Voice Audio Clip (Solo Leveling)
+function playRealSungJinWooArise() {
   if (typeof window === 'undefined') return;
   try {
-    if (window.speechSynthesis) {
-      window.speechSynthesis.cancel();
-      
-      // Sung Jin-woo's deep, authoritative, calm Monarch command
-      const utterance = new SpeechSynthesisUtterance("Arise.");
-      utterance.pitch = 0.55; // Low, deep monarch pitch
-      utterance.rate = 0.75;  // Slow, deliberate command
-      utterance.volume = 1.0;
-      
-      const voices = window.speechSynthesis.getVoices();
-      const deepVoice = voices.find(v => 
-        (v.lang.startsWith('en') || v.lang.startsWith('ko')) && 
-        (v.name.includes('Male') || v.name.includes('David') || v.name.includes('Guy') || v.name.includes('Natural') || v.name.includes('George') || v.name.includes('Google UK English Male'))
-      ) || voices[0];
-      
-      if (deepVoice) utterance.voice = deepVoice;
-      
-      setTimeout(() => {
-        try { window.speechSynthesis.speak(utterance); } catch {}
-      }, 200);
+    const audio = new Audio('/sounds/arise.mp3');
+    audio.volume = 1.0;
+    const playPromise = audio.play();
+    if (playPromise !== undefined) {
+      playPromise.catch(err => {
+        console.warn('Real Sung Jin-woo arise audio playback notice:', err);
+      });
     }
   } catch (e) {
-    console.warn('Monarch voice notice:', e);
+    console.warn('Real Sung Jin-woo audio exception:', e);
   }
 }
 
@@ -333,8 +320,7 @@ export default function HunterSystem({ selectedDate, currentUser }) {
   const handleExtractShadow = async (gateId) => {
     setExtractingGateId(gateId);
     try {
-      playSound('arise');
-      speakSungJinWooVoice();
+      playRealSungJinWooArise();
       const res = await api.extractShadow(gateId);
       if (res && res.success) {
         confetti({ 
@@ -1540,7 +1526,7 @@ export default function HunterSystem({ selectedDate, currentUser }) {
             <div className="flex flex-col sm:flex-row items-center gap-2">
               <button
                 type="button"
-                onClick={() => { playSound('arise'); speakSungJinWooVoice(); }}
+                onClick={playRealSungJinWooArise}
                 className="w-full sm:w-1/2 py-2.5 bg-slate-900 hover:bg-slate-800 border border-purple-500/40 text-purple-200 font-bold text-xs rounded-xl flex items-center justify-center space-x-1.5 cursor-pointer transition-all"
               >
                 <span>🔊</span>

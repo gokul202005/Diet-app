@@ -58,6 +58,7 @@ jobs:
           VITE_APP_VERSION: ${{ env.APP_VER }}
           VITE_BUILD_NUMBER: ${{ env.BUILD_NUM }}
           VITE_RELEASE_TAG: ${{ env.RELEASE_TAG }}
+          VITE_GOOGLE_CLIENT_ID: 916527076312-pmpo77mrp2h83fsl5dkb4u8s2v30ulf8.apps.googleusercontent.com
         run: |
           cd client
           mkdir -p public
