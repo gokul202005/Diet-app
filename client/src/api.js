@@ -581,5 +581,30 @@ export const api = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' }
     });
+  },
+  getHunterDungeons: async (date) => {
+    const q = date ? `?date=${encodeURIComponent(date)}` : '';
+    return safeFetch(`${BASE_URL}/hunter/dungeons${q}`);
+  },
+  enterHunterGate: async (gateId) => {
+    return safeFetch(`${BASE_URL}/hunter/dungeons/enter`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ gateId })
+    });
+  },
+  claimBossRaid: async (gateId, date) => {
+    return safeFetch(`${BASE_URL}/hunter/dungeons/claim-boss`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ gateId, date })
+    });
+  },
+  equipHunterTitle: async (title) => {
+    return safeFetch(`${BASE_URL}/hunter/equip-title`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title })
+    });
   }
 };

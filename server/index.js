@@ -1947,32 +1947,39 @@ app.get('/api/hunter/stats', async (req, res) => {
   ];
 
   // Rank & Title Calculation (Rewarding progression with Awakening support)
-  const lv = hProfile.level || 1;
-  const isAwakened = Boolean(hProfile.isAwakened);
+  const rawLevel = hProfile.level || 1;
+  const lv = Math.max(1, rawLevel);
+  // An unawakened hunter at Level 1 cannot have isAwakened = true
+  const isAwakened = lv >= 2 ? Boolean(hProfile.isAwakened) : false;
   let rank = 'E-Rank Hunter';
-  let title = 'E-Rank Novice';
+  let title = 'Novice Hunter';
 
   if (lv >= 15) { 
     rank = 'S-Rank Hunter'; 
-    title = isAwakened ? '⚡ Awakened Shadow Monarch' : 'Shadow Monarch / S-Rank Elite'; 
+    title = isAwakened ? '⚡ Awakened Shadow Monarch' : 'Shadow Monarch Candidate'; 
   } else if (lv >= 10) { 
     rank = 'A-Rank Hunter'; 
-    title = isAwakened ? '⚡ Awakened Raid Commander' : 'Dungeon Raid Leader'; 
+    title = isAwakened ? '⚡ Awakened Raid Commander' : 'A-Rank Raid Leader'; 
   } else if (lv >= 7) { 
     rank = 'B-Rank Hunter'; 
-    title = isAwakened ? '⚡ Awakened High-Tier' : 'High-Tier Awakened'; 
+    title = isAwakened ? '⚡ Awakened High-Tier' : 'B-Rank Vanguard'; 
   } else if (lv >= 5) { 
     rank = 'C-Rank Hunter'; 
-    title = isAwakened ? '⚡ Awakened Striker' : 'Dungeon Striker'; 
+    title = isAwakened ? '⚡ Awakened Striker' : 'C-Rank Striker'; 
   } else if (lv >= 3) { 
     rank = 'D-Rank Hunter'; 
-    title = isAwakened ? '⚡ Awakened Shadow Fighter' : 'D-Rank Awakened Fighter'; 
+    title = isAwakened ? '⚡ Awakened Shadow Fighter' : 'D-Rank Fighter'; 
   } else if (lv >= 2) {
     rank = 'E-Rank Elite';
     title = isAwakened ? '⚡ Awakened Scout' : 'E-Rank Scout';
   } else {
     rank = 'E-Rank Hunter';
-    title = isAwakened ? '⚡ Awakened Novice' : 'Awakened Novice';
+    title = 'Novice Hunter';
+  }
+
+  // Honor custom unlocked Boss Raid title if user equipped one
+  if (hProfile.equippedTitle) {
+    title = hProfile.equippedTitle;
   }
 
   // Check penalty condition (Past 10 PM and quests unfinished)
@@ -1980,8 +1987,8 @@ app.get('/api/hunter/stats', async (req, res) => {
   const allQuestsCompleted = quests.every(q => q.isCompleted);
   const isPenaltyActive = currentHour >= 22 && !allQuestsCompleted;
 
-  // Awakening availability: Only available when reaching Level 2+ and not yet awakened for current level
-  const canAwaken = (lv >= 2 && !hProfile.isAwakened) || (lv > (hProfile.lastAwakenedLevel || 1));
+  // Awakening availability: Only available when reaching Level 2+ and either never awakened, or level is greater than lastAwakenedLevel
+  const canAwaken = (lv >= 2 && !isAwakened) || (lv >= 2 && lv > (hProfile.lastAwakenedLevel || 1));
 
   res.json({
     success: true,
@@ -2101,11 +2108,373 @@ app.post('/api/hunter/reset', (req, res) => {
     claimedQuests: {},
     isAwakened: false,
     lastAwakenedLevel: 0,
-    title: 'Awakened Novice',
+    title: 'Novice Hunter',
     resetAt: new Date().toISOString()
   };
   writeDB(db);
   res.json({ success: true, message: 'Hunter progress has been reset to Level 1.', hunter: db.hunterProfiles[userId] });
+});
+
+// --- SOLO LEVELING DUNGEON GATES & BOSS RAIDS ---
+const DUNGEON_GATES = [
+  {
+    id: 'gate_e_goblin',
+    rank: 'E-Rank',
+    gateType: 'blue',
+    title: 'The Goblin Cave',
+    bossName: 'Goblin Chieftain',
+    bossSubtitle: 'Subterranean Savage',
+    maxHp: 100,
+    avatar: '👹',
+    minLevel: 1,
+    objectives: [
+      { text: '30 Push-Ups / Calisthenics Reps', points: 50 },
+      { text: '4,000 Physical Steps', points: 50 }
+    ],
+    rewards: {
+      xp: 120,
+      title: 'Goblin Slayer',
+      artifact: {
+        id: 'art_rusty_dagger',
+        name: 'Rusty Hunter Dagger',
+        rank: 'E-Rank',
+        icon: '🗡️',
+        bonus: '+5 STR, +3 AGI',
+        color: '#38bdf8'
+      }
+    }
+  },
+  {
+    id: 'gate_d_kasaka',
+    rank: 'D-Rank',
+    gateType: 'blue',
+    title: "Kasaka's Toxic Cavern",
+    bossName: 'Blue Venom-Fanged Kasaka',
+    bossSubtitle: 'Swamp Terror Serpent',
+    maxHp: 250,
+    avatar: '🐍',
+    minLevel: 2,
+    objectives: [
+      { text: '50 Push-Ups / Calisthenics Reps', points: 100 },
+      { text: '7,500 Steps Today', points: 75 },
+      { text: 'Hit 80g+ Protein Intake', points: 75 }
+    ],
+    rewards: {
+      xp: 220,
+      title: 'Serpent Crusher',
+      artifact: {
+        id: 'art_kasaka_fang',
+        name: "Kasaka's Poison Fang",
+        rank: 'D-Rank',
+        icon: '🗡️',
+        bonus: '+12 AGI, +8 VIT',
+        color: '#06b6d4'
+      }
+    }
+  },
+  {
+    id: 'gate_c_baruka',
+    rank: 'C-Rank',
+    gateType: 'red',
+    title: "Baruka's Frozen Glade",
+    bossName: 'Ice Elf Warlord Baruka',
+    bossSubtitle: 'Red Gate Frost Monarch Vanguard',
+    maxHp: 450,
+    avatar: '❄️',
+    minLevel: 3,
+    objectives: [
+      { text: '75 Push-Ups / Calisthenics Reps', points: 150 },
+      { text: '10,000 Steps Traversed', points: 150 },
+      { text: '2,500ml Water Hydration', points: 150 }
+    ],
+    rewards: {
+      xp: 350,
+      title: 'Frost Vanguard Vanquisher',
+      artifact: {
+        id: 'art_baruka_dagger',
+        name: "Baruka's Frost Dagger",
+        rank: 'C-Rank',
+        icon: '❄️',
+        bonus: '+18 VIT, +15 STR',
+        color: '#a855f7'
+      }
+    }
+  },
+  {
+    id: 'gate_b_kaiser',
+    rank: 'B-Rank',
+    gateType: 'red',
+    title: 'Demon Castle Peak',
+    bossName: 'Sky Wyvern Kaiser',
+    bossSubtitle: 'Draconic Shadow Beast',
+    maxHp: 700,
+    avatar: '🐉',
+    minLevel: 5,
+    objectives: [
+      { text: '1 Complete Gym Workout Session', points: 250 },
+      { text: '12,000 Steps Traversed', points: 250 },
+      { text: 'Hit Daily Calorie Target with South Indian Meals', points: 200 }
+    ],
+    rewards: {
+      xp: 500,
+      title: 'Wyvern Master',
+      artifact: {
+        id: 'art_kaiser_scale',
+        name: 'Kaiser Dragontooth Pauldron',
+        rank: 'B-Rank',
+        icon: '🛡️',
+        bonus: '+25 STR, +20 VIT',
+        color: '#f59e0b'
+      }
+    }
+  },
+  {
+    id: 'gate_s_igris',
+    rank: 'S-Rank',
+    gateType: 'red',
+    title: 'The Throne of the Bloodred Commander',
+    bossName: 'Bloodred Commander Igris',
+    bossSubtitle: 'Lord of the Shadow Legion',
+    maxHp: 1000,
+    avatar: '⚔️',
+    minLevel: 7,
+    objectives: [
+      { text: '100 Push-Ups or Intensive Chest Split', points: 350 },
+      { text: '14,000 Steps in One Day', points: 350 },
+      { text: 'Complete Daily Protein Goal (130g+)', points: 300 }
+    ],
+    rewards: {
+      xp: 800,
+      title: 'Bloodred Knight Slayer',
+      artifact: {
+        id: 'art_igris_sword',
+        name: "Commander Igris's Greatsword",
+        rank: 'S-Rank',
+        icon: '🗡️',
+        bonus: '+40 ALL STATS, Unlocks Dark Monarch Aura',
+        color: '#ef4444'
+      }
+    }
+  }
+];
+
+// Helper: Calculate today's Hunter battle power / damage dealt to dungeon bosses
+function calculateTodayDamage(db, userId, dateStr) {
+  const today = dateStr || new Date().toISOString().split('T')[0];
+
+  const workouts = (db.workouts || []).filter(w => (!w.userId || w.userId === userId) && w.date === today);
+  const fastrackLog = (db.fastrackLogs || []).find(l => (!l.userId || l.userId === userId) && l.date === today);
+  const meals = (db.meals || []).filter(m => (!m.userId || m.userId === userId) && m.date === today);
+  const waterLog = (db.waterLogs || []).find(w => (!w.userId || w.userId === userId) && w.date === today);
+
+  const steps = fastrackLog?.steps || 0;
+  const protein = meals.reduce((a, m) => a + (Number(m.totalProtein) || 0), 0);
+  const waterMl = waterLog?.amountMl || 0;
+
+  // Extract push-ups / calisthenics reps
+  let calisthenicsReps = 0;
+  workouts.forEach(w => {
+    (w.sets || []).forEach(s => {
+      const exName = (s.exercise || w.exerciseName || w.name || '').toLowerCase();
+      if (exName.includes('push') || exName.includes('pull') || exName.includes('squat') || exName.includes('dip')) {
+        calisthenicsReps += Number(s.reps) || 10;
+      } else {
+        calisthenicsReps += (Number(s.reps) || 8) * 0.5;
+      }
+    });
+  });
+
+  const pushupDamage = Math.round(calisthenicsReps * 3.5);
+  const stepDamage = Math.round(steps / 40);
+  const workoutDamage = workouts.length * 150;
+  const proteinDamage = Math.round((protein / 10) * 15);
+  const waterDamage = Math.round((waterMl / 250) * 10);
+
+  const totalDamage = pushupDamage + stepDamage + workoutDamage + proteinDamage + waterDamage;
+
+  return {
+    today,
+    calisthenicsReps,
+    steps,
+    protein: Math.round(protein),
+    waterMl,
+    pushupDamage,
+    stepDamage,
+    workoutDamage,
+    proteinDamage,
+    waterDamage,
+    totalDamage
+  };
+}
+
+app.get('/api/hunter/dungeons', async (req, res) => {
+  const db = readDB();
+  const userId = getAuthUserId(req, db);
+  const dateStr = req.query.date || new Date().toISOString().split('T')[0];
+
+  if (!db.hunterProfiles) db.hunterProfiles = {};
+  if (!db.hunterProfiles[userId]) {
+    db.hunterProfiles[userId] = {
+      level: 1,
+      xp: 0,
+      totalQuestsCompleted: 0,
+      claimedQuests: {},
+      isAwakened: false,
+      conqueredGates: [],
+      unlockedTitles: ['Novice Hunter'],
+      artifacts: [],
+      activeGateId: 'gate_e_goblin',
+      title: 'Novice Hunter'
+    };
+  }
+
+  const h = db.hunterProfiles[userId];
+  h.conqueredGates = h.conqueredGates || [];
+  h.unlockedTitles = h.unlockedTitles || ['Novice Hunter'];
+  h.artifacts = h.artifacts || [];
+  h.activeGateId = h.activeGateId || 'gate_e_goblin';
+
+  const damageStats = calculateTodayDamage(db, userId, dateStr);
+
+  const gates = DUNGEON_GATES.map(g => {
+    const isUnlocked = (h.level || 1) >= g.minLevel;
+    const isConquered = h.conqueredGates.includes(g.id);
+    const hpRemaining = Math.max(0, g.maxHp - damageStats.totalDamage);
+    const isDefeated = hpRemaining === 0;
+
+    return {
+      ...g,
+      isUnlocked,
+      isConquered,
+      hpRemaining,
+      isDefeated,
+      damagePercent: Math.min(100, Math.round((damageStats.totalDamage / g.maxHp) * 100))
+    };
+  });
+
+  res.json({
+    success: true,
+    activeGateId: h.activeGateId,
+    userLevel: h.level || 1,
+    equippedTitle: h.title || 'Novice Hunter',
+    unlockedTitles: h.unlockedTitles,
+    artifacts: h.artifacts,
+    conqueredGates: h.conqueredGates,
+    damageStats,
+    gates
+  });
+});
+
+app.post('/api/hunter/dungeons/enter', (req, res) => {
+  const { gateId } = req.body;
+  const db = readDB();
+  const userId = getAuthUserId(req, db);
+
+  if (!db.hunterProfiles || !db.hunterProfiles[userId]) {
+    return res.status(400).json({ error: 'Hunter profile not found' });
+  }
+
+  const gate = DUNGEON_GATES.find(g => g.id === gateId);
+  if (!gate) return res.status(404).json({ error: 'Gate not found' });
+
+  const h = db.hunterProfiles[userId];
+  if ((h.level || 1) < gate.minLevel) {
+    return res.status(400).json({ error: `Requires Hunter Level ${gate.minLevel} to enter this Gate!` });
+  }
+
+  h.activeGateId = gateId;
+  writeDB(db);
+  res.json({ success: true, message: `Entered Gate: ${gate.title}`, activeGateId: gateId });
+});
+
+app.post('/api/hunter/dungeons/claim-boss', (req, res) => {
+  const { gateId, date } = req.body;
+  const db = readDB();
+  const userId = getAuthUserId(req, db);
+  const today = date || new Date().toISOString().split('T')[0];
+
+  if (!db.hunterProfiles || !db.hunterProfiles[userId]) {
+    return res.status(400).json({ error: 'Hunter profile not found' });
+  }
+
+  const gate = DUNGEON_GATES.find(g => g.id === gateId);
+  if (!gate) return res.status(404).json({ error: 'Gate not found' });
+
+  const h = db.hunterProfiles[userId];
+  h.conqueredGates = h.conqueredGates || [];
+  h.unlockedTitles = h.unlockedTitles || ['Novice Hunter'];
+  h.artifacts = h.artifacts || [];
+
+  // Verify damage requirements
+  const damageStats = calculateTodayDamage(db, userId, today);
+  if (damageStats.totalDamage < gate.maxHp) {
+    return res.status(400).json({ 
+      error: `Boss HP is not depleted! ${gate.maxHp - damageStats.totalDamage} HP remains. Complete more push-ups, steps, or gym sets!` 
+    });
+  }
+
+  // Check if claimed already today
+  h.dailyBossClaims = h.dailyBossClaims || {};
+  if (h.dailyBossClaims[today]?.includes(gateId)) {
+    return res.json({ success: true, message: 'Boss rewards already claimed today!', alreadyClaimed: true });
+  }
+
+  h.dailyBossClaims[today] = h.dailyBossClaims[today] || [];
+  h.dailyBossClaims[today].push(gateId);
+
+  // Grant rewards
+  if (!h.conqueredGates.includes(gateId)) {
+    h.conqueredGates.push(gateId);
+  }
+  if (!h.unlockedTitles.includes(gate.rewards.title)) {
+    h.unlockedTitles.push(gate.rewards.title);
+    h.title = `⚡ ${gate.rewards.title}`;
+  }
+  if (!h.artifacts.some(a => a.id === gate.rewards.artifact.id)) {
+    h.artifacts.push({ ...gate.rewards.artifact, acquiredAt: new Date().toISOString() });
+  }
+
+  h.xp = (h.xp || 0) + gate.rewards.xp;
+  let leveledUp = false;
+  while (h.xp >= h.level * 100) {
+    h.xp -= h.level * 100;
+    h.level += 1;
+    leveledUp = true;
+  }
+
+  writeDB(db);
+
+  res.json({
+    success: true,
+    message: `RAID CLEAR! Defeated ${gate.bossName}!`,
+    xpGained: gate.rewards.xp,
+    unlockedTitle: gate.rewards.title,
+    artifact: gate.rewards.artifact,
+    level: h.level,
+    xp: h.xp,
+    leveledUp
+  });
+});
+
+app.post('/api/hunter/equip-title', (req, res) => {
+  const { title } = req.body;
+  const db = readDB();
+  const userId = getAuthUserId(req, db);
+
+  if (!db.hunterProfiles || !db.hunterProfiles[userId]) {
+    return res.status(400).json({ error: 'Hunter profile not found' });
+  }
+
+  const h = db.hunterProfiles[userId];
+  h.unlockedTitles = h.unlockedTitles || ['Novice Hunter'];
+
+  if (title && !h.unlockedTitles.includes(title) && !title.includes('Awakened')) {
+    return res.status(400).json({ error: 'Title not yet unlocked in dungeon raids' });
+  }
+
+  h.title = title || 'Novice Hunter';
+  writeDB(db);
+  res.json({ success: true, message: `Equipped Title: ${h.title}`, title: h.title });
 });
 
 app.get('/api/workout-plans', (req, res) => {

@@ -19,7 +19,13 @@ import {
   HeartPulse,
   Brain,
   RotateCcw,
-  Lock
+  Lock,
+  Swords,
+  Crown,
+  Trophy,
+  Compass,
+  Check,
+  ChevronRight
 } from 'lucide-react';
 import { api } from '../api';
 
@@ -57,6 +63,20 @@ function playSound(type) {
         osc.start(ctx.currentTime + idx * 0.08);
         osc.stop(ctx.currentTime + idx * 0.08 + 0.4);
       });
+    } else if (type === 'boss_defeat') {
+      // Deep orchestral victory strike
+      [130, 260, 390, 520, 780, 1040].forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.09);
+        gain.gain.setValueAtTime(0.3, ctx.currentTime + idx * 0.09);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + idx * 0.09 + 0.6);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime + idx * 0.09);
+        osc.stop(ctx.currentTime + idx * 0.09 + 0.6);
+      });
     }
   } catch (e) {}
 }
@@ -73,7 +93,7 @@ export default function HunterSystem({ selectedDate, currentUser }) {
       xp: 0,
       xpToNextLevel: 100,
       rank: 'E-Rank Hunter',
-      title: 'Awakened Novice',
+      title: 'Novice Hunter',
       totalQuestsCompleted: 0,
       claimedQuests: [],
       stats: { str: 40, agi: 45, vit: 35, int: 50, per: 40 },
@@ -133,6 +153,31 @@ export default function HunterSystem({ selectedDate, currentUser }) {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [awakeningMessage, setAwakeningMessage] = useState('');
 
+  // Solo Leveling Dungeon Gates & Boss Raids State
+  const [activeHunterTab, setActiveHunterTab] = useState('trials'); // 'trials' | 'raids' | 'trophies'
+  const [dungeonData, setDungeonData] = useState(null);
+  const [selectedGateId, setSelectedGateId] = useState('gate_e_goblin');
+  const [loadingDungeons, setLoadingDungeons] = useState(false);
+  const [isEnteringGate, setIsEnteringGate] = useState(false);
+  const [isClaimingBoss, setIsClaimingBoss] = useState(false);
+
+  const fetchDungeons = async () => {
+    try {
+      setLoadingDungeons(true);
+      const res = await api.getHunterDungeons(selectedDate);
+      if (res && res.success) {
+        setDungeonData(res);
+        if (res.activeGateId) {
+          setSelectedGateId(res.activeGateId);
+        }
+      }
+    } catch (e) {
+      console.warn('Dungeon fetch error:', e);
+    } finally {
+      setLoadingDungeons(false);
+    }
+  };
+
   const handleActivateAwakening = async () => {
     try {
       setIsAwakening(true);
@@ -143,7 +188,7 @@ export default function HunterSystem({ selectedDate, currentUser }) {
         setAwakeningMessage(res.message || 'System: Hunter Awakening Initialized! Welcome to Awakened Hunter Status.');
         setLevelUpAlert(true);
         setTimeout(() => setLevelUpAlert(false), 6000);
-        await fetchHunterData();
+        await Promise.all([fetchHunterData(), fetchDungeons()]);
       }
     } catch (e) {
       console.warn('Awakening error:', e);
@@ -157,13 +202,82 @@ export default function HunterSystem({ selectedDate, currentUser }) {
       const res = await api.resetHunter();
       if (res.success) {
         setShowResetConfirm(false);
-        await fetchHunterData();
+        await Promise.all([fetchHunterData(), fetchDungeons()]);
         if (typeof window !== 'undefined' && window.showToast) {
           window.showToast('Hunter System progression reset to Level 1.', 'info', 'Progression Reset');
         }
       }
     } catch (e) {
       console.warn('Reset error:', e);
+    }
+  };
+
+  const handleEnterGate = async (gateId) => {
+    setIsEnteringGate(true);
+    try {
+      const res = await api.enterHunterGate(gateId);
+      if (res && res.success) {
+        setSelectedGateId(gateId);
+        playSound('claim');
+        if (typeof window !== 'undefined' && window.showToast) {
+          window.showToast(res.message, 'info', 'Dungeon Gate');
+        }
+        await fetchDungeons();
+      } else {
+        throw new Error(res?.error || 'Failed to enter Gate');
+      }
+    } catch (e) {
+      if (typeof window !== 'undefined' && window.showToast) {
+        window.showToast(e.message, 'warning', 'Gate Locked');
+      }
+    } finally {
+      setIsEnteringGate(false);
+    }
+  };
+
+  const handleClaimBoss = async (gateId) => {
+    setIsClaimingBoss(true);
+    try {
+      const res = await api.claimBossRaid(gateId, selectedDate);
+      if (res && res.success) {
+        playSound('boss_defeat');
+        confetti({ particleCount: 160, spread: 100, origin: { y: 0.4 } });
+        if (typeof window !== 'undefined' && window.showToast) {
+          window.showToast(
+            `BOSS SLAIN! Unlocked Title "${res.unlockedTitle}" & Artifact "${res.artifact?.name}" (+${res.xpGained} XP)`,
+            'success',
+            'Raid Victory'
+          );
+        }
+        if (res.leveledUp) {
+          setLevelUpAlert(true);
+          setTimeout(() => setLevelUpAlert(false), 5000);
+        }
+        await Promise.all([fetchHunterData(), fetchDungeons()]);
+      } else {
+        throw new Error(res?.error || 'Cannot claim boss raid');
+      }
+    } catch (e) {
+      if (typeof window !== 'undefined' && window.showToast) {
+        window.showToast(e.message, 'error', 'Raid Alert');
+      }
+    } finally {
+      setIsClaimingBoss(false);
+    }
+  };
+
+  const handleEquipTitle = async (title) => {
+    try {
+      const res = await api.equipHunterTitle(title);
+      if (res && res.success) {
+        playSound('claim');
+        if (typeof window !== 'undefined' && window.showToast) {
+          window.showToast(`Title equipped: ${title}`, 'success', 'Title Changed');
+        }
+        await Promise.all([fetchHunterData(), fetchDungeons()]);
+      }
+    } catch (e) {
+      console.warn('Equip error:', e);
     }
   };
 
@@ -188,6 +302,7 @@ export default function HunterSystem({ selectedDate, currentUser }) {
 
   useEffect(() => {
     fetchHunterData();
+    fetchDungeons();
   }, [selectedDate, currentUser?.id]);
 
   const handleClaimQuest = async (questId) => {
@@ -297,7 +412,7 @@ export default function HunterSystem({ selectedDate, currentUser }) {
                 ⚔️ {hunter?.rank || 'E-Rank Hunter'}
               </span>
               <span className="text-xs font-semibold text-slate-400">
-                Title: <strong className="text-cyan-300">{hunter?.title || 'Awakened Novice'}</strong>
+                Title: <strong className="text-cyan-300">{hunter?.title || 'Novice Hunter'}</strong>
               </span>
 
               {/* ACTIVATE AWAKENING BUTTON / STATUS BADGE / LOCKED BADGE */}
@@ -387,7 +502,460 @@ export default function HunterSystem({ selectedDate, currentUser }) {
         </div>
       </div>
 
-      {/* 2-COLUMN GRID: 5-AXIS RADAR CHART & DAILY HUNTER QUESTS */}
+      {/* HUNTER SYSTEM TABS */}
+      <div className="flex items-center space-x-2 p-1.5 bg-slate-900/90 border border-slate-800 rounded-2xl overflow-x-auto">
+        <button
+          onClick={() => setActiveHunterTab('trials')}
+          className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer shrink-0 ${
+            activeHunterTab === 'trials'
+              ? 'bg-gradient-to-r from-cyan-500 to-indigo-500 text-white shadow-md shadow-cyan-500/25'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+          }`}
+        >
+          <Zap className="w-3.5 h-3.5" />
+          <span>Daily Trials & Radar</span>
+        </button>
+
+        <button
+          onClick={() => setActiveHunterTab('raids')}
+          className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer shrink-0 ${
+            activeHunterTab === 'raids'
+              ? 'bg-gradient-to-r from-rose-500 to-purple-600 text-white shadow-md shadow-rose-500/25'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+          }`}
+        >
+          <Swords className="w-3.5 h-3.5 text-rose-400" />
+          <span>Dungeon Gates & Boss Raids</span>
+          {dungeonData?.gates?.some(g => g.isDefeated && !g.isConquered) && (
+            <span className="w-2 h-2 rounded-full bg-rose-400 animate-ping" />
+          )}
+        </button>
+
+        <button
+          onClick={() => setActiveHunterTab('trophies')}
+          className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer shrink-0 ${
+            activeHunterTab === 'trophies'
+              ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 shadow-md shadow-amber-500/25'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+          }`}
+        >
+          <Trophy className="w-3.5 h-3.5" />
+          <span>Trophy Hall & S-Rank Artifacts</span>
+          {(dungeonData?.artifacts?.length || 0) > 0 && (
+            <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-amber-400/20 text-amber-300 font-mono">
+              {dungeonData?.artifacts?.length}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* TAB 2: DUNGEON GATES & BOSS RAIDS */}
+      {activeHunterTab === 'raids' && (
+        <div className="space-y-6">
+          
+          {/* LIVE DAMAGE POWER BAR BANNER */}
+          <div className="bg-gradient-to-r from-slate-900 via-rose-950/40 to-purple-950/40 border border-rose-500/30 rounded-3xl p-5 shadow-2xl space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-rose-500/20 pb-3">
+              <div className="flex items-center space-x-2.5">
+                <div className="p-2 bg-rose-500/20 text-rose-400 rounded-xl border border-rose-500/30 animate-pulse">
+                  <Swords className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-white uppercase tracking-wider">
+                    Today's Hunter Battle Power
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Real physical effort automatically inflicts damage upon active Dungeon Bosses
+                  </p>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="text-2xl font-black text-rose-400 font-mono">
+                  {(dungeonData?.damageStats?.totalDamage || 0).toLocaleString()}
+                </span>
+                <span className="text-xs text-rose-300 font-bold ml-1 uppercase">DMG</span>
+              </div>
+            </div>
+
+            {/* Damage Chips */}
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs pt-1">
+              <div className="bg-slate-950/80 border border-slate-800 p-2.5 rounded-xl text-center">
+                <span className="text-[10px] text-slate-500 block uppercase font-bold">Push-Ups / Calisthenics</span>
+                <span className="text-xs font-black text-cyan-400 font-mono">+{(dungeonData?.damageStats?.pushupDamage || 0)} DMG</span>
+                <span className="text-[10px] text-slate-400 block mt-0.5">({(dungeonData?.damageStats?.calisthenicsReps || 0)} Reps)</span>
+              </div>
+
+              <div className="bg-slate-950/80 border border-slate-800 p-2.5 rounded-xl text-center">
+                <span className="text-[10px] text-slate-500 block uppercase font-bold">Step Traversal</span>
+                <span className="text-xs font-black text-emerald-400 font-mono">+{(dungeonData?.damageStats?.stepDamage || 0)} DMG</span>
+                <span className="text-[10px] text-slate-400 block mt-0.5">({(dungeonData?.damageStats?.steps || 0).toLocaleString()} Steps)</span>
+              </div>
+
+              <div className="bg-slate-950/80 border border-slate-800 p-2.5 rounded-xl text-center">
+                <span className="text-[10px] text-slate-500 block uppercase font-bold">Gym Workouts</span>
+                <span className="text-xs font-black text-amber-400 font-mono">+{(dungeonData?.damageStats?.workoutDamage || 0)} DMG</span>
+                <span className="text-[10px] text-slate-400 block mt-0.5">(Sessions)</span>
+              </div>
+
+              <div className="bg-slate-950/80 border border-slate-800 p-2.5 rounded-xl text-center">
+                <span className="text-[10px] text-slate-500 block uppercase font-bold">Protein Intake</span>
+                <span className="text-xs font-black text-purple-400 font-mono">+{(dungeonData?.damageStats?.proteinDamage || 0)} DMG</span>
+                <span className="text-[10px] text-slate-400 block mt-0.5">({(dungeonData?.damageStats?.protein || 0)}g)</span>
+              </div>
+
+              <div className="bg-slate-950/80 border border-slate-800 p-2.5 rounded-xl text-center col-span-2 sm:col-span-1">
+                <span className="text-[10px] text-slate-500 block uppercase font-bold">Hydration</span>
+                <span className="text-xs font-black text-sky-400 font-mono">+{(dungeonData?.damageStats?.waterDamage || 0)} DMG</span>
+                <span className="text-[10px] text-slate-400 block mt-0.5">({(dungeonData?.damageStats?.waterMl || 0)}ml)</span>
+              </div>
+            </div>
+          </div>
+
+          {/* GATE SELECTION CARDS */}
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-xs font-black text-slate-300 uppercase tracking-widest flex items-center space-x-2">
+                <span>Select Dungeon Gate</span>
+              </h4>
+              <span className="text-[11px] text-slate-500">
+                Level unlocks higher-tier Red Gates
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+              {dungeonData?.gates?.map(gate => {
+                const isSelected = (selectedGateId === gate.id);
+                const isRed = gate.gateType === 'red';
+
+                return (
+                  <button
+                    key={gate.id}
+                    onClick={() => handleEnterGate(gate.id)}
+                    disabled={!gate.isUnlocked || isEnteringGate}
+                    className={`relative p-3.5 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between space-y-3 ${
+                      !gate.isUnlocked
+                        ? 'opacity-40 bg-slate-950/60 border-slate-900 cursor-not-allowed'
+                        : isSelected
+                        ? isRed
+                          ? 'bg-gradient-to-br from-rose-950/80 to-purple-950/80 border-rose-500 shadow-xl shadow-rose-500/20 scale-[1.02]'
+                          : 'bg-gradient-to-br from-cyan-950/80 to-indigo-950/80 border-cyan-400 shadow-xl shadow-cyan-500/20 scale-[1.02]'
+                        : 'bg-slate-900/70 border-slate-800 hover:border-slate-700'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${
+                          isRed 
+                            ? 'bg-rose-500/20 text-rose-300 border-rose-500/40' 
+                            : 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
+                        }`}>
+                          {gate.rank} {isRed ? 'RED GATE' : 'BLUE GATE'}
+                        </span>
+                        {gate.isConquered ? (
+                          <span className="text-[10px] font-bold text-emerald-400 flex items-center space-x-1">
+                            <Check className="w-3 h-3" />
+                            <span>Conquered</span>
+                          </span>
+                        ) : !gate.isUnlocked ? (
+                          <Lock className="w-3.5 h-3.5 text-slate-500" />
+                        ) : null}
+                      </div>
+
+                      <div className="text-2xl mt-2">{gate.avatar}</div>
+                      <div className="text-xs font-black text-white mt-1 line-clamp-1">{gate.bossName}</div>
+                      <div className="text-[10px] text-slate-400 line-clamp-1">{gate.title}</div>
+                    </div>
+
+                    <div className="w-full pt-2 border-t border-slate-800/80">
+                      <div className="flex justify-between text-[10px] font-bold">
+                        <span className="text-slate-400">Boss HP</span>
+                        <span className={gate.isDefeated ? 'text-emerald-400' : 'text-rose-400 font-mono'}>
+                          {gate.isDefeated ? 'SLAIN (0 HP)' : `${gate.hpRemaining} HP`}
+                        </span>
+                      </div>
+                      <div className="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden mt-1 border border-slate-800">
+                        <div 
+                          className={`h-full rounded-full transition-all duration-500 ${
+                            gate.isDefeated ? 'bg-emerald-500' : isRed ? 'bg-rose-500' : 'bg-cyan-500'
+                          }`}
+                          style={{ width: `${gate.damagePercent}%` }}
+                        />
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* ACTIVE BOSS RAID ARENA CARD */}
+          {(() => {
+            const selectedGate = dungeonData?.gates?.find(g => g.id === selectedGateId) || dungeonData?.gates?.[0];
+            if (!selectedGate) return null;
+
+            return (
+              <div className={`relative overflow-hidden rounded-3xl border p-6 sm:p-8 shadow-2xl ${
+                selectedGate.gateType === 'red'
+                  ? 'bg-gradient-to-br from-slate-950 via-rose-950/40 to-purple-950/50 border-rose-500/50 shadow-rose-950/40'
+                  : 'bg-gradient-to-br from-slate-950 via-cyan-950/40 to-indigo-950/50 border-cyan-500/50 shadow-cyan-950/40'
+              }`}>
+                
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                  
+                  {/* Boss Details */}
+                  <div className="space-y-3">
+                    <div className="flex items-center space-x-2">
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${
+                        selectedGate.gateType === 'red'
+                          ? 'bg-rose-500/20 text-rose-300 border-rose-500/40 animate-pulse'
+                          : 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
+                      }`}>
+                        ⚔️ {selectedGate.rank} {selectedGate.gateType === 'red' ? 'Extreme Red Gate' : 'Blue Gate Encounter'}
+                      </span>
+                      <span className="text-xs text-slate-400">
+                        Minimum Level: <strong className="text-white">Lv. {selectedGate.minLevel}</strong>
+                      </span>
+                    </div>
+
+                    <div className="flex items-center space-x-4">
+                      <div className="text-5xl shrink-0 p-3 bg-slate-900/90 rounded-2xl border border-slate-800 shadow-inner">
+                        {selectedGate.avatar}
+                      </div>
+                      <div>
+                        <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                          {selectedGate.bossName}
+                        </h2>
+                        <p className="text-xs text-slate-300 font-semibold">{selectedGate.bossSubtitle}</p>
+                        <p className="text-[11px] text-slate-400 mt-0.5">Location: {selectedGate.title}</p>
+                      </div>
+                    </div>
+
+                    {/* Raid Objectives */}
+                    <div className="pt-2">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block mb-1.5">
+                        Combat Directives (Real-World Trials)
+                      </span>
+                      <div className="space-y-1.5">
+                        {selectedGate.objectives.map((obj, i) => (
+                          <div key={i} className="flex items-center space-x-2 text-xs text-slate-300">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                            <span>{obj.text}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Boss Health Bar & Slay Button */}
+                  <div className="lg:max-w-md w-full bg-slate-900/95 border border-slate-800/90 rounded-2xl p-5 space-y-4 shadow-xl">
+                    <div>
+                      <div className="flex justify-between items-center text-xs font-bold mb-1.5">
+                        <span className="text-rose-400 flex items-center space-x-1">
+                          <Skull className="w-3.5 h-3.5" />
+                          <span>Boss Vitality</span>
+                        </span>
+                        <span className="font-mono text-white text-sm">
+                          {selectedGate.isDefeated ? (
+                            <span className="text-emerald-400 font-black">0 / {selectedGate.maxHp} HP (SLAIN!)</span>
+                          ) : (
+                            `${selectedGate.hpRemaining} / ${selectedGate.maxHp} HP`
+                          )}
+                        </span>
+                      </div>
+
+                      <div className="w-full bg-slate-950 h-4 rounded-full overflow-hidden border border-slate-800 p-0.5">
+                        <div 
+                          className={`h-full rounded-full transition-all duration-700 shadow-md ${
+                            selectedGate.isDefeated 
+                              ? 'bg-emerald-500 shadow-emerald-500/50' 
+                              : selectedGate.gateType === 'red'
+                              ? 'bg-gradient-to-r from-orange-500 to-rose-600 shadow-rose-500/50'
+                              : 'bg-gradient-to-r from-cyan-500 to-blue-600 shadow-cyan-500/50'
+                          }`}
+                          style={{ width: `${selectedGate.damagePercent}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Rewards Preview */}
+                    <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl space-y-1.5 text-xs">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                        Raid Clear Spoils
+                      </span>
+                      <div className="flex items-center justify-between">
+                        <span className="text-cyan-300 font-bold">+{selectedGate.rewards.xp} XP</span>
+                        <span className="text-purple-300 font-bold font-mono">Title: {selectedGate.rewards.title}</span>
+                      </div>
+                      <div className="text-[11px] text-amber-300 flex items-center space-x-1 font-semibold">
+                        <span>{selectedGate.rewards.artifact.icon}</span>
+                        <span>{selectedGate.rewards.artifact.name}</span>
+                        <span className="text-slate-400 font-mono text-[10px]">({selectedGate.rewards.artifact.bonus})</span>
+                      </div>
+                    </div>
+
+                    {/* Slay & Claim Button */}
+                    {selectedGate.isDefeated ? (
+                      <button
+                        onClick={() => handleClaimBoss(selectedGate.id)}
+                        disabled={isClaimingBoss}
+                        className="w-full py-3 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-black text-xs uppercase tracking-wider rounded-xl shadow-xl shadow-emerald-500/30 flex items-center justify-center space-x-2 cursor-pointer transform hover:scale-[1.02] active:scale-[0.98] transition-all animate-bounce"
+                      >
+                        <Sparkles className="w-4 h-4 text-white animate-spin" />
+                        <span>{isClaimingBoss ? 'Extracting Shadow...' : '⚔️ Slay Boss & Claim Raid Rewards'}</span>
+                      </button>
+                    ) : (
+                      <div className="p-2.5 bg-slate-950 border border-slate-800/80 rounded-xl text-center text-xs text-slate-400 space-y-1">
+                        <div className="text-rose-400 font-bold">Boss Vitality Active ({selectedGate.hpRemaining} HP Left)</div>
+                        <div className="text-[11px] text-slate-500">
+                          Hit push-ups, log meals, or walk steps to inflict the remaining {selectedGate.hpRemaining} damage!
+                        </div>
+                      </div>
+                    )}
+
+                  </div>
+
+                </div>
+
+              </div>
+            );
+          })()}
+
+        </div>
+      )}
+
+      {/* TAB 3: TROPHY HALL & S-RANK ARTIFACTS */}
+      {activeHunterTab === 'trophies' && (
+        <div className="space-y-6">
+          
+          {/* EQUIPPED TITLE BANNER */}
+          <div className="bg-gradient-to-r from-slate-900 via-amber-950/30 to-purple-950/30 border border-amber-500/30 rounded-3xl p-6 shadow-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center space-x-3.5">
+              <div className="p-3 bg-amber-500/20 text-amber-300 rounded-2xl border border-amber-500/40">
+                <Crown className="w-6 h-6" />
+              </div>
+              <div>
+                <span className="text-[10px] font-bold text-amber-400 uppercase tracking-widest block">
+                  Active Hunter Title
+                </span>
+                <h3 className="text-xl font-black text-white">
+                  {dungeonData?.equippedTitle || hunter?.title || 'Novice Hunter'}
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Displayed on your profile hero card and throughout the system.
+                </p>
+              </div>
+            </div>
+
+            <span className="px-3 py-1 bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-bold rounded-xl self-start sm:self-center">
+              Active Title
+            </span>
+          </div>
+
+          {/* 2-COLUMN: UNLOCKED TITLES & ARTIFACT INVENTORY */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            {/* LEFT: UNLOCKED TITLES (5 COLS) */}
+            <div className="lg:col-span-5 bg-slate-900/80 border border-slate-800 rounded-3xl p-6 space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div className="flex items-center space-x-2">
+                  <Award className="w-4 h-4 text-purple-400" />
+                  <h3 className="text-sm font-black text-slate-200 uppercase tracking-wider">
+                    Unlocked Titles ({dungeonData?.unlockedTitles?.length || 1})
+                  </h3>
+                </div>
+              </div>
+
+              <div className="space-y-2.5">
+                {(dungeonData?.unlockedTitles || ['Novice Hunter']).map(t => {
+                  const isEquipped = (dungeonData?.equippedTitle === t) || (hunter?.title === t);
+
+                  return (
+                    <div 
+                      key={t}
+                      className={`p-3 rounded-2xl border flex items-center justify-between transition-all ${
+                        isEquipped 
+                          ? 'bg-amber-500/10 border-amber-500/40 text-white' 
+                          : 'bg-slate-950/70 border-slate-800 text-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-2.5">
+                        <Crown className={`w-4 h-4 ${isEquipped ? 'text-amber-400' : 'text-slate-600'}`} />
+                        <span className="text-xs font-black">{t}</span>
+                      </div>
+
+                      {isEquipped ? (
+                        <span className="text-[10px] font-bold text-amber-400 bg-amber-500/20 px-2 py-0.5 rounded-lg border border-amber-500/30">
+                          Equipped
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => handleEquipTitle(t)}
+                          className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-[10px] font-bold rounded-lg transition-colors cursor-pointer"
+                        >
+                          Equip
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* RIGHT: S-RANK ARTIFACTS VAULT (7 COLS) */}
+            <div className="lg:col-span-7 bg-slate-900/80 border border-slate-800 rounded-3xl p-6 space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div className="flex items-center space-x-2">
+                  <Sparkles className="w-4 h-4 text-amber-400" />
+                  <h3 className="text-sm font-black text-slate-200 uppercase tracking-wider">
+                    Artifacts Inventory ({dungeonData?.artifacts?.length || 0})
+                  </h3>
+                </div>
+                <span className="text-[11px] text-slate-500">
+                  Acquired from Boss Raids
+                </span>
+              </div>
+
+              {(dungeonData?.artifacts?.length || 0) === 0 ? (
+                <div className="p-8 border border-dashed border-slate-800 rounded-2xl text-center space-y-2">
+                  <div className="text-3xl">🗡️</div>
+                  <h4 className="text-xs font-bold text-slate-300">No Boss Artifacts Yet</h4>
+                  <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
+                    Deplete Boss HP in the Dungeon Gates tab by logging your daily push-ups, steps, and workouts to claim rare Hunter gear.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {dungeonData.artifacts.map(art => (
+                    <div 
+                      key={art.id}
+                      className="p-3.5 bg-slate-950/80 border border-slate-800 rounded-2xl space-y-2 hover:border-slate-700 transition-all"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-2xl">{art.icon}</span>
+                        <span 
+                          className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase font-mono border"
+                          style={{ borderColor: art.color, color: art.color }}
+                        >
+                          {art.rank}
+                        </span>
+                      </div>
+                      <div>
+                        <div className="text-xs font-black text-white">{art.name}</div>
+                        <div className="text-[11px] font-semibold text-emerald-400 mt-0.5">{art.bonus}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+          </div>
+
+        </div>
+      )}
+
+      {/* TAB 1: DAILY TRIALS & RADAR PROFILE */}
+      {activeHunterTab === 'trials' && (
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
         {/* LEFT COLUMN: 5-AXIS PENTAGON RADAR CHART (5 COLS) */}
@@ -621,6 +1189,7 @@ export default function HunterSystem({ selectedDate, currentUser }) {
         </div>
 
       </div>
+      )}
 
       {/* RESET CONFIRMATION MODAL */}
       <ConfirmModal

@@ -13,6 +13,7 @@ import SettingsModal from './components/SettingsModal';
 import UniversalVoiceAssistant from './components/UniversalVoiceAssistant';
 import GlobalJarvis from './components/GlobalJarvis';
 import AuthScreen from './components/AuthScreen';
+import AppUpdaterBanner from './components/AppUpdaterBanner';
 import { api } from './api';
 import { healthConnectSync } from './utils/healthConnectSync';
 
@@ -227,6 +228,9 @@ export default function App() {
         onOpenVoice={() => setIsVoiceOpen(true)}
         onLogout={handleLogout}
       />
+
+      {/* Automatic APK Version Alert & 1-Tap In-App Updater */}
+      <AppUpdaterBanner />
 
       {/* Main App Content Body (Mobile Safe-Padding for Floating Dock) */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-28 xl:pb-12">

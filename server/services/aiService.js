@@ -76,9 +76,9 @@ export class AIService {
         const result = await model.generateContent(contentParts);
         return { result, modelId };
       } catch (err) {
-        // If API key is invalid/unauthorized (401), fail fast immediately without looping and lagging
-        if (/api key not valid|unauthorized|401|access_token/i.test(err.message)) {
-          console.warn(`[AI Fast-Fail] Invalid API key: ${err.message.slice(0, 80)}. Bypassing fallback loops.`);
+        // If API key is invalid/unauthorized (401/403/leaked), fail fast immediately without looping and lagging
+        if (/api key not valid|unauthorized|401|403|forbidden|leaked|access_token/i.test(err.message)) {
+          console.warn(`[AI Fast-Fail] Invalid/Leaked API key: ${err.message.slice(0, 80)}. Bypassing fallback loops.`);
           throw err;
         }
 

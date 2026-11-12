@@ -561,7 +561,13 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
           await parseIntentForPreview(res.transcribedText);
         }
       } else {
-        setErrorMsg(res.error || 'Could not process audio recording.');
+        const isLeaked = /leaked|403|forbidden/i.test(res.error || '');
+        if (isLeaked) {
+          setNeedsApiKey(true);
+          setErrorMsg('Your Gemini API key was reported as leaked by Google. Please enter a fresh free key below from Google AI Studio.');
+        } else {
+          setErrorMsg(res.error || 'Could not process audio recording.');
+        }
         setStateMode('idle');
       }
     } catch (err) {
