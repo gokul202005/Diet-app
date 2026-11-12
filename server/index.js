@@ -65,32 +65,106 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 const dbInitial = readDB();
 const aiService = new AIService(dbInitial.settings?.geminiApiKey || process.env.GEMINI_API_KEY || '');
 
+// --- LIVE APP & APK VERSION TRACKER ---
+let cachedVersionData = null;
+let lastVersionFetchTime = 0;
+
+async function fetchLatestGitHubRelease() {
+  const now = Date.now();
+  // Cache for 2 minutes to avoid GitHub rate limits
+  if (cachedVersionData && (now - lastVersionFetchTime) < 120000) {
+    return cachedVersionData;
+  }
+
+  try {
+    const res = await fetch('https://api.github.com/repos/gokul202005/Diet-app/releases/latest', {
+      headers: {
+        'User-Agent': 'AGY-Fit-Server',
+        'Accept': 'application/vnd.github.v3+json'
+      }
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      const tag = data.tag_name || 'v1.1.0';
+      const buildMatch = tag.match(/-b(\d+)/i) || tag.match(/build(\d+)/i);
+      const buildNumber = buildMatch ? buildMatch[1] : null;
+      const verMatch = tag.match(/v?([0-9.]+)/);
+      const appVersion = verMatch ? verMatch[1] : '1.1.0';
+
+      cachedVersionData = {
+        success: true,
+        releaseTag: tag,
+        version: appVersion,
+        buildNumber: buildNumber || 'latest',
+        releaseName: data.name || tag,
+        publishedAt: data.published_at || new Date().toISOString(),
+        apkUrl: 'https://github.com/gokul202005/Diet-app/releases/latest/download/AGY-Fit-latest.apk',
+        htmlUrl: data.html_url || 'https://github.com/gokul202005/Diet-app/releases',
+        assetsCount: (data.assets || []).length
+      };
+      lastVersionFetchTime = now;
+      return cachedVersionData;
+    }
+  } catch (e) {
+    console.warn('GitHub release fetch notice:', e.message);
+  }
+
+  // Fallback to latest known build
+  return {
+    success: true,
+    releaseTag: 'v1.1.0-b67',
+    version: '1.1.0',
+    buildNumber: '67',
+    releaseName: 'AGY Fit v1.1.0-b67',
+    publishedAt: new Date().toISOString(),
+    apkUrl: 'https://github.com/gokul202005/Diet-app/releases/latest/download/AGY-Fit-latest.apk',
+    htmlUrl: 'https://github.com/gokul202005/Diet-app/releases'
+  };
+}
+
 // --- HEALTH & STATUS ---
-app.get('/api/health', (req, res) => {
+app.get('/api/health', async (req, res) => {
   try {
     const db = readDB();
+    const verInfo = await fetchLatestGitHubRelease();
     res.json({
       status: 'running',
       uptimeSeconds: Math.round(process.uptime()),
       timestamp: new Date().toISOString(),
       database: 'connected',
       environment: process.env.NODE_ENV || 'production',
-      version: '1.0.0'
+      version: verInfo.version,
+      releaseTag: verInfo.releaseTag,
+      buildNumber: verInfo.buildNumber
     });
   } catch (err) {
     res.status(500).json({ status: 'turning-on', error: err.message });
   }
 });
 
-app.get('/api/status', (req, res) => {
+app.get('/api/status', async (req, res) => {
   const db = readDB();
+  const verInfo = await fetchLatestGitHubRelease();
   res.json({
     status: 'running',
-    version: '1.0.0',
+    version: verInfo.version,
+    releaseTag: verInfo.releaseTag,
+    buildNumber: verInfo.buildNumber,
     uptimeSeconds: Math.round(process.uptime()),
     aiEnabled: Boolean(db.settings?.geminiApiKey || process.env.GEMINI_API_KEY),
     fastrackConnected: Boolean(db.fastrackLogs && db.fastrackLogs.length > 0)
   });
+});
+
+app.get('/api/app-version', async (req, res) => {
+  const verInfo = await fetchLatestGitHubRelease();
+  res.json(verInfo);
+});
+
+app.get('/api/version', async (req, res) => {
+  const verInfo = await fetchLatestGitHubRelease();
+  res.json(verInfo);
 });
 
 // --- MULTI-TENANT USER IDENTITY & PROFILE HELPERS ---

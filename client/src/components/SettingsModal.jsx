@@ -50,6 +50,7 @@ export default function SettingsModal({ isOpen, onClose, onEditProfile, currentU
     clearPhotos: false,
     clearHunter: false
   });
+  const [releaseTag, setReleaseTag] = useState((typeof import.meta !== 'undefined' && import.meta.env?.VITE_RELEASE_TAG) || 'v1.1.0-b67');
 
   const loadDataSummary = () => {
     if (!currentUser?.id) return;
@@ -64,6 +65,9 @@ export default function SettingsModal({ isOpen, onClose, onEditProfile, currentU
 
   useEffect(() => {
     if (isOpen) {
+      api.getAppVersion().then(v => {
+        if (v?.releaseTag) setReleaseTag(v.releaseTag);
+      }).catch(() => null);
       // Remove any legacy leaking global key from localStorage
       try { localStorage.removeItem('agy_google_client_id'); } catch (e) {}
 
@@ -198,7 +202,14 @@ export default function SettingsModal({ isOpen, onClose, onEditProfile, currentU
               <Settings className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-white">App Settings & AI Token Safeguard</h2>
+              <div className="flex items-center space-x-2">
+                <h2 className="text-lg font-bold text-white">App Settings & AI Token Safeguard</h2>
+                {releaseTag && (
+                  <span className="text-[10px] font-mono font-bold bg-cyan-950/80 text-cyan-300 border border-cyan-800/60 px-1.5 py-0.5 rounded-md">
+                    {releaseTag}
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-slate-400">Manage Gemini API, Token Quota & Fastrack Watch</p>
             </div>
           </div>

@@ -54,8 +54,14 @@ jobs:
           echo "Version configured: ${RELEASE_TAG} -> ${APK_BASENAME}"
 
       - name: Build Web Application
+        env:
+          VITE_APP_VERSION: ${{ env.APP_VER }}
+          VITE_BUILD_NUMBER: ${{ env.BUILD_NUM }}
+          VITE_RELEASE_TAG: ${{ env.RELEASE_TAG }}
         run: |
           cd client
+          mkdir -p public
+          echo "{\"version\":\"${{ env.APP_VER }}\",\"buildNumber\":\"${{ env.BUILD_NUM }}\",\"releaseTag\":\"${{ env.RELEASE_TAG }}\",\"apkBasename\":\"${{ env.APK_BASENAME }}\",\"publishedAt\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > public/version.json
           npm run build
 
       - name: Sync Capacitor Android Project

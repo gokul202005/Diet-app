@@ -23,6 +23,7 @@ import {
   Shield
 } from 'lucide-react';
 import { pwaManager } from '../utils/pwaService';
+import { api } from '../api';
 
 export default function Navbar({ 
   activeTab, 
@@ -38,8 +39,22 @@ export default function Navbar({
   onLogout
 }) {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [appVersionInfo, setAppVersionInfo] = useState({
+    releaseTag: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_RELEASE_TAG) || 'v1.1.0-b67',
+    buildNumber: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_BUILD_NUMBER) || '67',
+    apkUrl: 'https://github.com/gokul202005/Diet-app/releases/latest/download/AGY-Fit-latest.apk'
+  });
   const userMenuRef = useRef(null);
   const isToday = selectedDate === new Date().toISOString().split('T')[0];
+
+  // Fetch live latest build / APK release version
+  useEffect(() => {
+    api.getAppVersion().then(data => {
+      if (data?.releaseTag) {
+        setAppVersionInfo(data);
+      }
+    }).catch(() => null);
+  }, []);
 
   // Close user dropdown when clicking outside
   useEffect(() => {
@@ -226,7 +241,7 @@ export default function Navbar({
 
                       {/* Direct Android APK Download */}
                       <a
-                        href="https://github.com/gokul202005/Diet-app/releases/latest/download/AGY-Fit-latest.apk"
+                        href={appVersionInfo.apkUrl || "https://github.com/gokul202005/Diet-app/releases/latest/download/AGY-Fit-latest.apk"}
                         download="AGY-Fit-latest.apk"
                         target="_blank"
                         rel="noopener noreferrer"
@@ -237,8 +252,9 @@ export default function Navbar({
                           <Download className="w-4 h-4 text-cyan-400" />
                           <span>Download Android APK</span>
                         </div>
-                        <span className="text-[10px] font-mono font-bold bg-cyan-950/80 text-cyan-300 border border-cyan-800/60 px-1.5 py-0.5 rounded-md">
-                          v1.1.0
+                        <span className="text-[10px] font-mono font-bold bg-cyan-950/80 text-cyan-300 border border-cyan-800/60 px-1.5 py-0.5 rounded-md flex items-center space-x-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                          <span>{appVersionInfo.releaseTag}</span>
                         </span>
                       </a>
 

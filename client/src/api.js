@@ -506,6 +506,48 @@ export const api = {
     });
   },
 
+  // App & APK Release Versioning
+  getAppVersion: async () => {
+    try {
+      const res = await safeFetch(`${BASE_URL}/app-version`, { timeout: 3500 });
+      if (res && res.releaseTag) return res;
+    } catch {}
+
+    // Fallback 1: check static /version.json
+    try {
+      const staticRes = await fetch('/version.json');
+      if (staticRes.ok) {
+        const vData = await staticRes.json();
+        if (vData.releaseTag) return { success: true, ...vData };
+      }
+    } catch {}
+
+    // Fallback 2: check GitHub API directly
+    try {
+      const ghRes = await fetch('https://api.github.com/repos/gokul202005/Diet-app/releases/latest');
+      if (ghRes.ok) {
+        const data = await ghRes.json();
+        return {
+          success: true,
+          releaseTag: data.tag_name || 'v1.1.0',
+          version: data.tag_name?.split('-')[0]?.replace('v', '') || '1.1.0',
+          buildNumber: data.tag_name?.split('-b')[1] || 'latest',
+          apkUrl: 'https://github.com/gokul202005/Diet-app/releases/latest/download/AGY-Fit-latest.apk'
+        };
+      }
+    } catch {}
+
+    // Fallback 3: Vite build env
+    const tag = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_RELEASE_TAG) || 'v1.1.0-b67';
+    return {
+      success: true,
+      releaseTag: tag,
+      version: tag.split('-')[0]?.replace('v', '') || '1.1.0',
+      buildNumber: tag.split('-b')[1] || '67',
+      apkUrl: 'https://github.com/gokul202005/Diet-app/releases/latest/download/AGY-Fit-latest.apk'
+    };
+  },
+
   // Cloud Database (Supabase / PostgreSQL)
   getDatabaseStatus: async () => {
     return safeFetch(`${BASE_URL}/database/status`);
