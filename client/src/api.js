@@ -112,6 +112,31 @@ async function safeFetch(url, options = {}) {
   } catch (err) {
     clearTimeout(timeoutId);
     console.warn(`[API] Request error for ${url}:`, err.message);
+
+    // Fallback: If local /api failed with "Failed to fetch", retry on live cloud backend
+    if (typeof url === 'string' && url.startsWith('/api') && !url.includes('onrender.com')) {
+      try {
+        console.log(`[API] Retrying on live cloud backend: ${RENDER_BACKEND}${url}`);
+        const cloudRes = await fetch(`${RENDER_BACKEND}${url}`, {
+          ...options,
+          headers,
+          signal: options.signal
+        });
+        const contentType = cloudRes.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          return await cloudRes.json();
+        }
+      } catch (cloudErr) {
+        console.warn('[API] Cloud fallback error:', cloudErr.message);
+      }
+    }
+
+    if (err.message?.includes('Failed to fetch') || err.name === 'AbortError') {
+      return { 
+        error: 'Unable to connect to server. Please check your network or try again in a moment.',
+        isNetworkError: true 
+      };
+    }
     return { error: err.message || 'Network connection failed' };
   }
 }

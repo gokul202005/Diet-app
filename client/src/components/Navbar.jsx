@@ -226,8 +226,10 @@ export default function Navbar({
 
                       {/* Direct Android APK Download */}
                       <a
-                        href="/api/download/android-apk"
-                        download="AGY-Fit-v1.1.0.apk"
+                        href="https://github.com/gokul202005/Diet-app/releases/latest/download/AGY-Fit-latest.apk"
+                        download="AGY-Fit-latest.apk"
+                        target="_blank"
+                        rel="noopener noreferrer"
                         onClick={() => setIsUserMenuOpen(false)}
                         className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10 transition-colors cursor-pointer text-left font-medium"
                       >

@@ -70,7 +70,7 @@ jobs:
       - name: Build Android Debug APK
         run: |
           cd client/android
-          ./gradlew assembleDebug --no-daemon --stacktrace
+          ./gradlew assembleDebug -PversionCode=${{ env.BUILD_NUM }} -PversionName=${{ env.APP_VER }} --no-daemon --stacktrace
 
       - name: Package & Version APK Deliverables
         run: |
