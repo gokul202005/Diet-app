@@ -262,7 +262,15 @@ app.post('/api/auth/login', async (req, res) => {
       }
     }
 
-    if (!user || user.password !== password) {
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    // If user originally signed in via Google and hasn't set a password yet, save this password for them!
+    if (!user.password && user.provider === 'google') {
+      user.password = password;
+      writeDB(db);
+    } else if (user.password !== password) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 

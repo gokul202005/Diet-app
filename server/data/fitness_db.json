@@ -74,75 +74,6 @@
   },
   "meals": [
     {
-      "id": "meal-1794483815832",
-      "userId": "user-google-110927726677822108966",
-      "date": "2026-11-12",
-      "mealType": "lunch",
-      "name": "Ennai Kathirikai Kara Kuzhambu / Karakolambu (Baby Brinjal Curry)",
-      "foods": [
-        {
-          "name": "Ennai Kathirikai Kara Kuzhambu / Karakolambu (Baby Brinjal Curry)",
-          "quantity": "1x (1 bowl (180g))",
-          "calories": 195,
-          "protein": 3.2,
-          "carbs": 16,
-          "fat": 13.5
-        }
-      ],
-      "totalCalories": 195,
-      "totalProtein": 3.2,
-      "totalCarbs": 16,
-      "totalFat": 13.5,
-      "notes": "Added from South Indian & Global Nutrition Database (0 Tokens)",
-      "loggedAt": "2026-11-12T11:43:35.832Z"
-    },
-    {
-      "id": "meal-1794483752849",
-      "userId": "user-google-110927726677822108966",
-      "date": "2026-11-12",
-      "mealType": "dinner",
-      "name": "Chettinad Kuzhi Paniyaram (Crispy Rice & Dal Dumplings)",
-      "foods": [
-        {
-          "name": "Chettinad Kuzhi Paniyaram (Crispy Rice & Dal Dumplings)",
-          "quantity": "1.5x (5 pieces (150g))",
-          "calories": 345,
-          "protein": 8.3,
-          "carbs": 54,
-          "fat": 10.5
-        }
-      ],
-      "totalCalories": 345,
-      "totalProtein": 8.3,
-      "totalCarbs": 54,
-      "totalFat": 10.5,
-      "notes": "Added from South Indian & Global Nutrition Database (0 Tokens)",
-      "loggedAt": "2026-11-12T11:42:32.849Z"
-    },
-    {
-      "id": "meal-1794483691410",
-      "userId": "user-google-110927726677822108966",
-      "date": "2026-11-12",
-      "mealType": "breakfast",
-      "name": "Ven Pongal (Ghee & Moong Dal Pongal)",
-      "foods": [
-        {
-          "name": "Ven Pongal (Ghee & Moong Dal Pongal)",
-          "quantity": "1000x (1 plate (200g))",
-          "calories": 340000,
-          "protein": 7500,
-          "carbs": 46000,
-          "fat": 14000
-        }
-      ],
-      "totalCalories": 340000,
-      "totalProtein": 7500,
-      "totalCarbs": 46000,
-      "totalFat": 14000,
-      "notes": "Added from South Indian & Global Nutrition Database (0 Tokens)",
-      "loggedAt": "2026-11-12T11:41:31.410Z"
-    },
-    {
       "id": "meal-1794479022462",
       "userId": "user-google-110927726677822108966",
       "date": "2026-11-12",
@@ -174,95 +105,23 @@
       "loggedAt": "2026-11-12T10:23:42.462Z"
     }
   ],
-  "workouts": [
-    {
-      "id": "workout-1794479022463",
-      "userId": "user-google-110927726677822108966",
-      "date": "2026-11-12",
-      "title": "Standard Push-ups Session",
-      "splitType": "Strength",
-      "exercises": [
-        {
-          "name": "Standard Push-ups",
-          "sets": [
-            {
-              "reps": 4,
-              "weight": 0,
-              "done": true
-            }
-          ]
-        }
-      ],
-      "durationMin": 2,
-      "caloriesBurned": 3,
-      "notes": "Logged via Jarvis Voice (4 push-ups)",
-      "loggedAt": "2026-11-12T10:23:42.463Z"
-    },
-    {
-      "id": "workout-1794478229423",
-      "userId": "user-google-110927726677822108966",
-      "date": "2026-11-12",
-      "title": "Outdoor Walk Session",
-      "splitType": "Cardio",
-      "exercises": [
-        {
-          "name": "Outdoor Walk (400m)",
-          "sets": [
-            {
-              "reps": 1,
-              "weight": 0,
-              "done": true
-            }
-          ]
-        }
-      ],
-      "durationMin": 5,
-      "distanceKm": 0.4,
-      "caloriesBurned": 20,
-      "notes": "Logged via Jarvis Voice: \"edit 400 metres of walking\"",
-      "loggedAt": "2026-11-12T10:10:29.423Z"
-    },
-    {
-      "id": "workout-1794476956158",
-      "userId": "user-google-110927726677822108966",
-      "date": "2026-11-12",
-      "title": "Outdoor Walking Session",
-      "splitType": "Cardio",
-      "exercises": [
-        {
-          "name": "Outdoor Walk (100m)",
-          "sets": [
-            {
-              "reps": 1,
-              "weight": 0,
-              "done": true
-            }
-          ]
-        }
-      ],
-      "durationMin": 2,
-      "distanceKm": 0.1,
-      "caloriesBurned": 5,
-      "notes": "Logged via Jarvis Voice (100 meters walking)",
-      "loggedAt": "2026-11-12T09:49:16.158Z"
-    }
-  ],
+  "workouts": [],
   "workoutPlans": [],
   "fastrackLogs": [
     {
       "id": "fastrack-1794465877785",
       "userId": "user-google-110927726677822108966",
       "date": "2026-11-12",
-      "deviceName": "Fastrack Smartwatch",
-      "steps": 6560000,
-      "activeCalories": 262400,
+      "deviceName": "Reset / Cleared",
+      "steps": 0,
+      "activeCalories": 0,
       "restingCalories": 2310,
-      "totalBurned": 264710,
-      "distanceKm": 4920,
+      "totalBurned": 2310,
+      "distanceKm": 0,
       "avgHeartRate": 72,
       "peakHeartRate": 94,
       "sleepHours": 7,
-      "syncedAt": "2026-11-12T11:41:55.374Z"
+      "syncedAt": "2026-11-12T13:03:24.380Z"
     },
     {
       "id": "fastrack-1794406895370",
