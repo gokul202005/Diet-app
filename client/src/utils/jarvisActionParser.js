@@ -153,9 +153,9 @@ export function parseJarvisVoiceAction(rawText) {
   }
 
   // 3. AUTONOMOUS DATA LOGGING INTENTS
-  // e.g. "log 3 idlis with sambar for breakfast", "i drank 2 glasses of water", "100 meters walking", "1000m run"
+  // e.g. "log 3 idlis with sambar for breakfast", "i need 3 idlis for breakfast", "i drank 2 glasses of water", "100 meters walking", "i did 4 push-ups today"
   const isExplicitLogAction = /^(log|record|add|track)\b/i.test(lower) ||
-    /\b(i ate|i had|i drank|drank|weighed myself at|morning weight)\b/i.test(lower);
+    /\b(i ate|i had|i drank|drank|weighed myself at|morning weight|i did|did|completed|performed)\b/i.test(lower);
 
   const isWaterLogging = (lower.includes('water') || lower.includes('thanni') || lower.includes('drank')) && 
     (lower.includes('ml') || lower.includes('glass') || lower.includes('bottle') || lower.includes('liter'));
@@ -163,10 +163,25 @@ export function parseJarvisVoiceAction(rawText) {
   const isCardioLogging = /\b(walk|walking|walked|run|running|ran|jog|jogging|sprint|sprinting|cycling|cycle|cardio|treadmill)\b/i.test(lower) ||
     /\b\d+\s*(?:m|meters?|metres?|km|kms?|kilometers?|kilometres?|miles?|steps?)\b/i.test(lower);
 
-  const isWorkoutLogging = (lower.includes('bench') || lower.includes('squat') || lower.includes('deadlift') || lower.includes('press') || lower.includes('curl')) &&
-    (/\b\d+\s*sets?\b/i.test(lower) || /\b\d+\s*reps?\b/i.test(lower) || /\b\d+\s*kg\b/i.test(lower));
+  const workoutKeywords = [
+    'bench', 'squat', 'deadlift', 'press', 'curl', 'pushup', 'push-up', 'pushups', 'push-ups',
+    'pullup', 'pull-up', 'pullups', 'pull-ups', 'dip', 'dips', 'lunge', 'lunges', 'crunch', 'crunches',
+    'situp', 'situps', 'plank', 'tricep', 'bicep', 'shoulder', 'dumbbell', 'barbell', 'workout'
+  ];
+  const isWorkoutLogging = workoutKeywords.some(kw => lower.includes(kw)) &&
+    (/\b\d+\s*(?:sets?|reps?|kg|push-?ups?|pull-?ups?|dips?|crunches?|sit-?ups?)\b/i.test(lower) || /\b(i did|did|completed|performed)\b/i.test(lower));
 
-  const isFoodLogging = isExplicitLogAction && !isCardioLogging && !isWorkoutLogging && !isWaterLogging && !lower.includes('timer') && !isNavPattern;
+  const foodMealKeywords = [
+    'breakfast', 'lunch', 'dinner', 'snack', 'idli', 'idlis', 'dosa', 'dosas', 'sambar', 'chutney',
+    'rice', 'curd', 'biryani', 'egg', 'eggs', 'chicken', 'paneer', 'roti', 'rotis', 'chapati', 'chapatis',
+    'dal', 'oats', 'shake', 'smoothie', 'fish', 'meat', 'tea', 'coffee'
+  ];
+  const hasFoodKeyword = foodMealKeywords.some(kw => new RegExp(`\\b${kw}\\b`, 'i').test(lower));
+  const isFoodLogging = (isExplicitLogAction || hasFoodKeyword || lower.includes('i need') || lower.includes('i want')) && 
+    hasFoodKeyword &&
+    !isCardioLogging && !isWorkoutLogging && !isWaterLogging && 
+    !lower.includes('timer') && !isNavPattern && 
+    !lower.startsWith('how') && !lower.startsWith('what') && !lower.startsWith('why') && !lower.startsWith('can i');
 
   if (isFoodLogging || isWaterLogging || isWorkoutLogging || isCardioLogging) {
     return {

@@ -786,12 +786,32 @@ function normalizeFitnessSpeech(rawText) {
   if (!rawText || typeof rawText !== 'string') return '';
   let clean = rawText;
   const replacements = [
-    // Quantities & Homophones
+    // Quantities, Number Words & Homophones
+    [/\bfor push-?ups?\b/gi, '4 push-ups'],
+    [/\bto push-?ups?\b/gi, '2 push-ups'],
+    [/\bfree push-?ups?\b/gi, '3 push-ups'],
+    [/\bfor idlis?\b/gi, '4 idlis'],
+    [/\bto idlis?\b/gi, '2 idlis'],
+    [/\bfree idlis?\b/gi, '3 idlis'],
     [/\bfree eggs\b/gi, '3 eggs'],
     [/\bto eggs\b/gi, '2 eggs'],
     [/\bfor eggs\b/gi, '4 eggs'],
-    [/\bwon\b(?=.*(?:egg|roti|dosa|idli|banana))/gi, '1'],
-    [/\bto\b(?=.*(?:eggs|rotis|dosas|idlis|bananas))/gi, '2'],
+    [/\bwon\b(?=.*(?:egg|roti|dosa|idli|banana|push-?up))/gi, '1'],
+    [/\bto\b(?=.*(?:eggs|rotis|dosas|idlis|bananas|push-?ups?))/gi, '2'],
+    [/\bi need (\d+)\b/gi, 'log $1'],
+    [/\bi need (one|two|three|four|five|six|seven|eight|nine|ten)\b/gi, 'log $1'],
+    [/\bi did (\d+)\b/gi, 'log $1'],
+    [/\bi did (one|two|three|four|five|six|seven|eight|nine|ten)\b/gi, 'log $1'],
+    [/\bone\b(?=.*(?:push-?up|idli|dosa|egg|roti|set|rep))/gi, '1'],
+    [/\btwo\b(?=.*(?:push-?ups?|idlis?|dosas?|eggs?|rotis?|sets?|reps?))/gi, '2'],
+    [/\bthree\b(?=.*(?:push-?ups?|idlis?|dosas?|eggs?|rotis?|sets?|reps?))/gi, '3'],
+    [/\bfour\b(?=.*(?:push-?ups?|idlis?|dosas?|eggs?|rotis?|sets?|reps?))/gi, '4'],
+    [/\bfive\b(?=.*(?:push-?ups?|idlis?|dosas?|eggs?|rotis?|sets?|reps?))/gi, '5'],
+    [/\bsix\b(?=.*(?:push-?ups?|idlis?|dosas?|eggs?|rotis?|sets?|reps?))/gi, '6'],
+    [/\bseven\b(?=.*(?:push-?ups?|idlis?|dosas?|eggs?|rotis?|sets?|reps?))/gi, '7'],
+    [/\beight\b(?=.*(?:push-?ups?|idlis?|dosas?|eggs?|rotis?|sets?|reps?))/gi, '8'],
+    [/\bnine\b(?=.*(?:push-?ups?|idlis?|dosas?|eggs?|rotis?|sets?|reps?))/gi, '9'],
+    [/\bten\b(?=.*(?:push-?ups?|idlis?|dosas?|eggs?|rotis?|sets?|reps?))/gi, '10'],
     // South Indian & Global Foods Phonetic Normalization
     [/\bcheap at ease\b/gi, 'chapatis'],
     [/\bcheap party\b/gi, 'chapati'],
@@ -881,24 +901,38 @@ async function parseUniversalVoiceIntent(text, date = new Date().toISOString().s
     else if (clean.includes('tricep') || clean.includes('pushdown')) exerciseName = 'Tricep Cable Rope Pushdown';
     else if (clean.includes('lat') || clean.includes('pulldown')) exerciseName = 'Wide-Grip Lat Pulldown';
     else if (clean.includes('leg press')) exerciseName = 'Leg Press (45-Degree Sled)';
-    else if (clean.includes('pushup') || clean.includes('push up')) exerciseName = 'Standard Push-ups';
-    else if (clean.includes('pullup') || clean.includes('pull up') || clean.includes('chin up')) exerciseName = 'Pull-ups / Chin-ups';
+    else if (clean.includes('pushup') || clean.includes('push up') || clean.includes('push-up')) exerciseName = 'Standard Push-ups';
+    else if (clean.includes('pullup') || clean.includes('pull up') || clean.includes('pull-up') || clean.includes('chin up')) exerciseName = 'Pull-ups / Chin-ups';
+    else if (clean.includes('dip') || clean.includes('dips')) exerciseName = 'Bodyweight Tricep / Chest Dips';
+    else if (clean.includes('crunch') || clean.includes('situp') || clean.includes('sit-up')) exerciseName = 'Abdominal Crunches';
     else if (clean.includes('lateral raise')) exerciseName = 'Dumbbell Lateral Raises';
     else if (clean.includes('row')) exerciseName = 'Bent-Over Barbell Rows';
     else if (clean.includes('lunge')) exerciseName = 'Walking Dumbbell Lunges';
 
+    const isCalisthenics = clean.includes('pushup') || clean.includes('push up') || clean.includes('push-up') || 
+                           clean.includes('pullup') || clean.includes('pull up') || clean.includes('pull-up') || 
+                           clean.includes('chin up') || clean.includes('dip') || clean.includes('dips') || 
+                           clean.includes('crunch') || clean.includes('crunches') || clean.includes('situp') || clean.includes('sit-up');
+
     const setsMatch = clean.match(/(\d+)\s*sets?/i);
-    const repsMatch = clean.match(/(\d+)\s*reps?/i);
+    let repsMatch = clean.match(/(\d+)\s*reps?/i);
+    if (!repsMatch) {
+      repsMatch = clean.match(/(\d+)\s*(?:push-?ups?|pull-?ups?|chin-?ups?|dips?|crunches?|sit-?ups?|squats?)/i);
+    }
     const weightMatch = clean.match(/(\d+(?:\.\d+)?)\s*(?:kg|kilos|kgs)\b/i);
 
-    const setsCount = setsMatch ? parseInt(setsMatch[1]) : 3;
-    const repsCount = repsMatch ? parseInt(repsMatch[1]) : 10;
-    const weightKg = weightMatch ? parseFloat(weightMatch[1]) : 50;
+    const setsCount = setsMatch ? parseInt(setsMatch[1]) : 1;
+    const repsCount = repsMatch ? parseInt(repsMatch[1]) : (isCalisthenics ? 10 : 10);
+    const weightKg = weightMatch ? parseFloat(weightMatch[1]) : (isCalisthenics ? 0 : 50);
+    const caloriesBurned = isCalisthenics ? Math.max(2, Math.round(setsCount * repsCount * 0.5)) : Math.round(setsCount * repsCount * 1.5 + 40);
+    const durationMin = isCalisthenics ? Math.max(2, Math.round(repsCount * 0.5)) : 35;
+
+    const weightDisplay = weightKg > 0 ? `@ ${weightKg} kg` : '(Bodyweight)';
 
     return {
       intent: 'workout',
       summaryTitle: exerciseName,
-      previewDetails: `${setsCount} sets × ${repsCount} reps @ ${weightKg} kg`,
+      previewDetails: `${setsCount} ${setsCount > 1 ? 'sets' : 'set'} × ${repsCount} reps ${weightDisplay}`,
       badgeText: 'Strength Workout',
       badgeColor: 'amber',
       originalText: text,
@@ -907,8 +941,8 @@ async function parseUniversalVoiceIntent(text, date = new Date().toISOString().s
         setsCount,
         repsCount,
         weightKg,
-        durationMin: 35,
-        caloriesBurned: Math.round(setsCount * repsCount * 1.5 + 80)
+        durationMin,
+        caloriesBurned
       }
     };
   }
@@ -1191,14 +1225,14 @@ async function commitUniversalVoice(intent, payload, originalText = '', date = n
       splitType: 'Strength',
       exercises: [{
         name: payload.exerciseName,
-        sets: Array.from({ length: payload.setsCount || 3 }, () => ({
+        sets: Array.from({ length: payload.setsCount || 1 }, () => ({
           reps: payload.repsCount || 10,
-          weight: payload.weightKg || 50,
+          weight: payload.weightKg !== undefined ? payload.weightKg : 0,
           done: true
         }))
       }],
-      durationMin: payload.durationMin || 35,
-      caloriesBurned: payload.caloriesBurned || 125,
+      durationMin: payload.durationMin || 20,
+      caloriesBurned: payload.caloriesBurned || 50,
       notes: `Logged via Universal Voice Assistant: "${originalText}"`,
       loggedAt: new Date().toISOString()
     };
@@ -1206,12 +1240,14 @@ async function commitUniversalVoice(intent, payload, originalText = '', date = n
     db.workouts.unshift(newWorkout);
     writeDB(db);
 
+    const weightStr = (payload.weightKg && payload.weightKg > 0) ? `@ ${payload.weightKg} kg` : '(Bodyweight)';
+    const setCountStr = `${payload.setsCount || 1} ${(payload.setsCount || 1) > 1 ? 'sets' : 'set'}`;
     return {
       success: true,
       section: 'workouts',
       action: 'log_workout',
       workout: newWorkout,
-      feedback: `Logged workout: ${payload.exerciseName} (${payload.setsCount} sets × ${payload.repsCount} reps @ ${payload.weightKg} kg)!`
+      feedback: `Logged workout: ${payload.exerciseName} (${setCountStr} × ${payload.repsCount || 10} reps ${weightStr})!`
     };
   }
 

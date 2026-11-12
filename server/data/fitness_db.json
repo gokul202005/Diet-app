@@ -72,8 +72,87 @@
       "goals": []
     }
   },
-  "meals": [],
+  "meals": [
+    {
+      "id": "meal-1794479022462",
+      "userId": "user-google-110927726677822108966",
+      "date": "2026-11-12",
+      "mealType": "breakfast",
+      "name": "3 Idlis with Sambar",
+      "foods": [
+        {
+          "name": "Idli",
+          "quantity": "3 idlis (150g)",
+          "calories": 195,
+          "protein": 6,
+          "carbs": 42,
+          "fat": 0.6
+        },
+        {
+          "name": "South Indian Sambar",
+          "quantity": "1 small bowl (80g)",
+          "calories": 45,
+          "protein": 2.2,
+          "carbs": 7,
+          "fat": 1.2
+        }
+      ],
+      "totalCalories": 240,
+      "totalProtein": 8.2,
+      "totalCarbs": 49,
+      "totalFat": 1.8,
+      "notes": "Logged via Jarvis Voice: 3 Idlis for breakfast",
+      "loggedAt": "2026-11-12T10:23:42.462Z"
+    }
+  ],
   "workouts": [
+    {
+      "id": "workout-1794479022463",
+      "userId": "user-google-110927726677822108966",
+      "date": "2026-11-12",
+      "title": "Standard Push-ups Session",
+      "splitType": "Strength",
+      "exercises": [
+        {
+          "name": "Standard Push-ups",
+          "sets": [
+            {
+              "reps": 4,
+              "weight": 0,
+              "done": true
+            }
+          ]
+        }
+      ],
+      "durationMin": 2,
+      "caloriesBurned": 3,
+      "notes": "Logged via Jarvis Voice (4 push-ups)",
+      "loggedAt": "2026-11-12T10:23:42.463Z"
+    },
+    {
+      "id": "workout-1794478229423",
+      "userId": "user-google-110927726677822108966",
+      "date": "2026-11-12",
+      "title": "Outdoor Walk Session",
+      "splitType": "Cardio",
+      "exercises": [
+        {
+          "name": "Outdoor Walk (400m)",
+          "sets": [
+            {
+              "reps": 1,
+              "weight": 0,
+              "done": true
+            }
+          ]
+        }
+      ],
+      "durationMin": 5,
+      "distanceKm": 0.4,
+      "caloriesBurned": 20,
+      "notes": "Logged via Jarvis Voice: \"edit 400 metres of walking\"",
+      "loggedAt": "2026-11-12T10:10:29.423Z"
+    },
     {
       "id": "workout-1794476956158",
       "userId": "user-google-110927726677822108966",
@@ -106,11 +185,11 @@
       "userId": "user-google-110927726677822108966",
       "date": "2026-11-12",
       "deviceName": "Google Fit Cloud",
-      "steps": 131,
-      "activeCalories": 5,
+      "steps": 656,
+      "activeCalories": 25,
       "restingCalories": 2310,
-      "totalBurned": 2315,
-      "distanceKm": 0.1,
+      "totalBurned": 2335,
+      "distanceKm": 0.5,
       "avgHeartRate": 72,
       "peakHeartRate": 72,
       "sleepHours": 7,
@@ -221,6 +300,156 @@
       "text": "Ah, an 11,000-meter vertical ascent across your daily telemetry, sir? Unless you are secretly scaling Mount Kilimanjaro before breakfast, I suspect your wearable is hallucinating or you have discovered a rather aggressive stairmaster.",
       "source": "gemini-ai",
       "timestamp": "2026-11-12T09:37:47.032Z"
+    },
+    {
+      "id": "msg-1794478043854",
+      "userId": "user-google-110927726677822108966",
+      "sender": "user",
+      "text": "Jarvis what are you doing today",
+      "timestamp": "2026-11-12T10:07:23.854Z"
+    },
+    {
+      "id": "msg-1794478044926",
+      "userId": "user-google-110927726677822108966",
+      "sender": "assistant",
+      "text": "Monitoring your physiological telemetry, managing your cutting metrics to ensure you hit those 2,340 grams of protein—or whatever astronomical target you've set yourself today—and standing by in case you decide to actually scale that 11,000-meter mountain, sir. What brilliant endeavor shall we tackle next?",
+      "source": "gemini-ai",
+      "timestamp": "2026-11-12T10:07:24.925Z"
+    },
+    {
+      "id": "msg-1794478053565",
+      "userId": "user-google-110927726677822108966",
+      "sender": "user",
+      "text": "ok 83 days for breakfast",
+      "timestamp": "2026-11-12T10:07:33.565Z"
+    },
+    {
+      "id": "msg-1794478054856",
+      "userId": "user-google-110927726677822108966",
+      "sender": "assistant",
+      "text": "Here is a high-protein South Indian breakfast engineered for your morning glycogen and muscle fueling, Gokul Krishna:\n\n**Pesarattu (Green Moong Dal Dosa) with Boiled Eggs**\n* **2 Medium Pesarattus:** Made from whole green gram batter, rich in fiber and sustained carbs. *(~280 kcal, 16g protein)*\n* **3 Boiled Eggs (or 5 Egg Whites):** Seasoned with black pepper and salt. *(~216 kcal, 19g protein)*\n* **Ginger (Allam) Chutney:** 2 tbsp. *(~45 kcal, 1g protein)*\n* **Total: ~540 kcal | 36g Protein | ~44g Carbs | ~16g Fat**\n\n*(Lighter Option: 3 Steamed Idlis with Drumstick Sambar + 4 Boiled Egg Whites: ~320 kcal, 23g protein).*",
+      "source": "south-indian-smart-engine",
+      "timestamp": "2026-11-12T10:07:34.855Z"
+    },
+    {
+      "id": "msg-1794478064094",
+      "userId": "user-google-110927726677822108966",
+      "sender": "user",
+      "text": "I want to lock this",
+      "timestamp": "2026-11-12T10:07:44.094Z"
+    },
+    {
+      "id": "msg-1794478065480",
+      "userId": "user-google-110927726677822108966",
+      "sender": "assistant",
+      "text": "Understood, Gokul Krishna. I am on it. Direct me on the specific angle or details you want to focus on, and I will execute immediately.",
+      "source": "jarvis-autonomous-brain",
+      "timestamp": "2026-11-12T10:07:45.479Z"
+    },
+    {
+      "id": "msg-1794478078332",
+      "userId": "user-google-110927726677822108966",
+      "sender": "user",
+      "text": "I eat three days for breakfast",
+      "timestamp": "2026-11-12T10:07:58.332Z"
+    },
+    {
+      "id": "msg-1794478079866",
+      "userId": "user-google-110927726677822108966",
+      "sender": "assistant",
+      "text": "Here is a high-protein South Indian breakfast engineered for your morning glycogen and muscle fueling, Gokul Krishna:\n\n**Pesarattu (Green Moong Dal Dosa) with Boiled Eggs**\n* **2 Medium Pesarattus:** Made from whole green gram batter, rich in fiber and sustained carbs. *(~280 kcal, 16g protein)*\n* **3 Boiled Eggs (or 5 Egg Whites):** Seasoned with black pepper and salt. *(~216 kcal, 19g protein)*\n* **Ginger (Allam) Chutney:** 2 tbsp. *(~45 kcal, 1g protein)*\n* **Total: ~540 kcal | 36g Protein | ~44g Carbs | ~16g Fat**\n\n*(Lighter Option: 3 Steamed Idlis with Drumstick Sambar + 4 Boiled Egg Whites: ~320 kcal, 23g protein).*",
+      "source": "south-indian-smart-engine",
+      "timestamp": "2026-11-12T10:07:59.865Z"
+    },
+    {
+      "id": "msg-1794478089017",
+      "userId": "user-google-110927726677822108966",
+      "sender": "user",
+      "text": "lock this",
+      "timestamp": "2026-11-12T10:08:09.017Z"
+    },
+    {
+      "id": "msg-1794478090180",
+      "userId": "user-google-110927726677822108966",
+      "sender": "assistant",
+      "text": "Understood, Gokul Krishna. I am on it. Direct me on the specific angle or details you want to focus on, and I will execute immediately.",
+      "source": "jarvis-autonomous-brain",
+      "timestamp": "2026-11-12T10:08:10.179Z"
+    },
+    {
+      "id": "msg-1794478095541",
+      "userId": "user-google-110927726677822108966",
+      "sender": "user",
+      "text": "lock this",
+      "timestamp": "2026-11-12T10:08:15.541Z"
+    },
+    {
+      "id": "msg-1794478096996",
+      "userId": "user-google-110927726677822108966",
+      "sender": "assistant",
+      "text": "I hear you clearly, Gokul Krishna. Processing the parameters now. Would you like a high-level summary, an in-depth breakdown, or immediate action steps?",
+      "source": "jarvis-autonomous-brain",
+      "timestamp": "2026-11-12T10:08:16.995Z"
+    },
+    {
+      "id": "msg-1794478163853",
+      "userId": "user-google-110927726677822108966",
+      "sender": "user",
+      "text": "838 is not playing breakfast lock this",
+      "timestamp": "2026-11-12T10:09:23.853Z"
+    },
+    {
+      "id": "msg-1794478165019",
+      "userId": "user-google-110927726677822108966",
+      "sender": "assistant",
+      "text": "Here is a high-protein South Indian breakfast engineered for your morning glycogen and muscle fueling, Gokul Krishna:\n\n**Pesarattu (Green Moong Dal Dosa) with Boiled Eggs**\n* **2 Medium Pesarattus:** Made from whole green gram batter, rich in fiber and sustained carbs. *(~280 kcal, 16g protein)*\n* **3 Boiled Eggs (or 5 Egg Whites):** Seasoned with black pepper and salt. *(~216 kcal, 19g protein)*\n* **Ginger (Allam) Chutney:** 2 tbsp. *(~45 kcal, 1g protein)*\n* **Total: ~540 kcal | 36g Protein | ~44g Carbs | ~16g Fat**\n\n*(Lighter Option: 3 Steamed Idlis with Drumstick Sambar + 4 Boiled Egg Whites: ~320 kcal, 23g protein).*",
+      "source": "south-indian-smart-engine",
+      "timestamp": "2026-11-12T10:09:25.018Z"
+    },
+    {
+      "id": "msg-1794478174796",
+      "userId": "user-google-110927726677822108966",
+      "sender": "user",
+      "text": "I eat free Dish for breakfast lock this",
+      "timestamp": "2026-11-12T10:09:34.796Z"
+    },
+    {
+      "id": "msg-1794478176182",
+      "userId": "user-google-110927726677822108966",
+      "sender": "assistant",
+      "text": "Here is a high-protein South Indian breakfast engineered for your morning glycogen and muscle fueling, Gokul Krishna:\n\n**Pesarattu (Green Moong Dal Dosa) with Boiled Eggs**\n* **2 Medium Pesarattus:** Made from whole green gram batter, rich in fiber and sustained carbs. *(~280 kcal, 16g protein)*\n* **3 Boiled Eggs (or 5 Egg Whites):** Seasoned with black pepper and salt. *(~216 kcal, 19g protein)*\n* **Ginger (Allam) Chutney:** 2 tbsp. *(~45 kcal, 1g protein)*\n* **Total: ~540 kcal | 36g Protein | ~44g Carbs | ~16g Fat**\n\n*(Lighter Option: 3 Steamed Idlis with Drumstick Sambar + 4 Boiled Egg Whites: ~320 kcal, 23g protein).*",
+      "source": "south-indian-smart-engine",
+      "timestamp": "2026-11-12T10:09:36.181Z"
+    },
+    {
+      "id": "msg-1794478244065",
+      "userId": "user-google-110927726677822108966",
+      "sender": "user",
+      "text": "added for push",
+      "timestamp": "2026-11-12T10:10:44.065Z"
+    },
+    {
+      "id": "msg-1794478253307",
+      "userId": "user-google-110927726677822108966",
+      "sender": "assistant",
+      "text": "Hey Gokul Krishna! I'm tracking your progress toward your **3331 kcal** and **234g protein** targets.\n\n* Today's Intake: **0 kcal** logged, **0g protein**.\n* Remaining Target: **3331 kcal** and **234g protein** to hit your goal.\n\nAsk me anything specific like: *\"Suggest a dinner under 450 kcal\"*, *\"How do I swap my lunch?\"*, *\"High protein South Indian snacks\"*, or *\"Pre-workout meal\"* and I'll give you exact dishes and macros!",
+      "source": "south-indian-smart-engine",
+      "timestamp": "2026-11-12T10:10:53.306Z"
+    },
+    {
+      "id": "msg-1794478266490",
+      "userId": "user-google-110927726677822108966",
+      "sender": "user",
+      "text": "I did for push ups today",
+      "timestamp": "2026-11-12T10:11:06.490Z"
+    },
+    {
+      "id": "msg-1794478267536",
+      "userId": "user-google-110927726677822108966",
+      "sender": "assistant",
+      "text": "Hey Gokul Krishna! I'm tracking your progress toward your **3331 kcal** and **234g protein** targets.\n\n* Today's Intake: **0 kcal** logged, **0g protein**.\n* Remaining Target: **3331 kcal** and **234g protein** to hit your goal.\n\nAsk me anything specific like: *\"Suggest a dinner under 450 kcal\"*, *\"How do I swap my lunch?\"*, *\"High protein South Indian snacks\"*, or *\"Pre-workout meal\"* and I'll give you exact dishes and macros!",
+      "source": "south-indian-smart-engine",
+      "timestamp": "2026-11-12T10:11:07.535Z"
     }
   ],
   "customFoods": []

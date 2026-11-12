@@ -420,7 +420,7 @@ export default function GlobalJarvis({ profile, selectedDate, onActionCompleted,
           try { recognitionRef.current.abort(); } catch {}
         }
         const rec = new SpeechRec();
-        rec.lang = 'en-US';
+        rec.lang = 'en-IN'; // Indian English handles South Indian phonetics (idli, sambar, dosa, accent) seamlessly
         rec.continuous = false;
         rec.interimResults = true;
 
@@ -432,11 +432,11 @@ export default function GlobalJarvis({ profile, selectedDate, onActionCompleted,
           capturedTextRef.current = text;
           setLiveTranscript(text);
 
-          // Fast 800ms silence detector: auto-submit when user stops talking
+          // 1300ms natural speech pause detector: avoids cutting off mid-sentence
           if (silenceTimeoutRef.current) clearTimeout(silenceTimeoutRef.current);
           silenceTimeoutRef.current = setTimeout(() => {
             finishListeningAndProcess();
-          }, 800);
+          }, 1300);
         };
 
         rec.onerror = (e) => {
