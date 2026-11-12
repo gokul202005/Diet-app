@@ -74,6 +74,29 @@
   },
   "meals": [
     {
+      "id": "meal-1794483815832",
+      "userId": "user-google-110927726677822108966",
+      "date": "2026-11-12",
+      "mealType": "lunch",
+      "name": "Ennai Kathirikai Kara Kuzhambu / Karakolambu (Baby Brinjal Curry)",
+      "foods": [
+        {
+          "name": "Ennai Kathirikai Kara Kuzhambu / Karakolambu (Baby Brinjal Curry)",
+          "quantity": "1x (1 bowl (180g))",
+          "calories": 195,
+          "protein": 3.2,
+          "carbs": 16,
+          "fat": 13.5
+        }
+      ],
+      "totalCalories": 195,
+      "totalProtein": 3.2,
+      "totalCarbs": 16,
+      "totalFat": 13.5,
+      "notes": "Added from South Indian & Global Nutrition Database (0 Tokens)",
+      "loggedAt": "2026-11-12T11:43:35.832Z"
+    },
+    {
       "id": "meal-1794483752849",
       "userId": "user-google-110927726677822108966",
       "date": "2026-11-12",
@@ -318,21 +341,17 @@
   "hunterProfiles": {
     "user-google-110927726677822108966": {
       "level": 2,
-      "xp": 180,
-      "totalQuestsCompleted": 7,
+      "xp": 40,
+      "totalQuestsCompleted": 1,
       "claimedQuests": {
-        "2026-11-11": [
-          "quest_vit_protein",
-          "quest_str_gym",
-          "quest_per_log",
-          "quest_agi_steps"
-        ],
         "2026-11-12": [
-          "quest_str_gym",
-          "quest_vit_protein",
-          "quest_agi_steps"
+          "quest_vit_protein"
         ]
-      }
+      },
+      "isAwakened": true,
+      "title": "Awakened Novice",
+      "resetAt": "2026-11-12T12:11:36.129Z",
+      "awakenedAt": "2026-11-12T12:11:38.961Z"
     }
   },
   "chatHistory": [

@@ -555,7 +555,7 @@ export default function CoachChat({ profile, selectedDate }) {
         }
 
         const recognition = new SpeechRec();
-        recognition.lang = 'en-US';
+        recognition.lang = 'en-IN'; // Indian English natively handles Tamil & South Indian speech
         recognition.continuous = true;
         recognition.interimResults = true;
 
@@ -640,7 +640,11 @@ export default function CoachChat({ profile, selectedDate }) {
             } else {
               setInputText('');
               if (typeof window !== 'undefined' && window.showToast) {
-                window.showToast(res.error || 'Could not detect clear words. Please try speaking closer to your microphone.', 'warning', 'No Speech Detected');
+                const isLeaked = /leaked|403|forbidden/i.test(res.error || '');
+                const cleanError = isLeaked
+                  ? 'Your Gemini API key was reported as leaked by Google. Please enter a fresh free key in Settings, or speak via browser recognition.'
+                  : (res.error || 'Could not detect clear words. Please try speaking closer to your microphone.');
+                window.showToast(cleanError, 'warning', isLeaked ? 'Gemini API Key Notice' : 'No Speech Detected');
               }
             }
           } catch (e) {

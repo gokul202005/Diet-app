@@ -513,5 +513,17 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ questId, date })
     });
+  },
+  awakenHunter: async () => {
+    return safeFetch(`${BASE_URL}/hunter/awaken`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+  },
+  resetHunter: async () => {
+    return safeFetch(`${BASE_URL}/hunter/reset`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 };

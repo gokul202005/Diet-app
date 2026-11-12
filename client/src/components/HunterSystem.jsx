@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import confetti from 'canvas-confetti';
+import ConfirmModal from './ConfirmModal';
 import { 
   Shield, 
   Zap, 
@@ -15,7 +17,8 @@ import {
   Dumbbell,
   Footprints,
   HeartPulse,
-  Brain
+  Brain,
+  RotateCcw
 } from 'lucide-react';
 import { api } from '../api';
 
@@ -125,6 +128,43 @@ export default function HunterSystem({ selectedDate, currentUser }) {
   const [syncError, setSyncError] = useState('');
   const [claimingId, setClaimingId] = useState(null);
   const [levelUpAlert, setLevelUpAlert] = useState(false);
+  const [isAwakening, setIsAwakening] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [awakeningMessage, setAwakeningMessage] = useState('');
+
+  const handleActivateAwakening = async () => {
+    try {
+      setIsAwakening(true);
+      const res = await api.awakenHunter();
+      if (res.success) {
+        playSound('levelup');
+        confetti({ particleCount: 100, spread: 80, origin: { y: 0.5 } });
+        setAwakeningMessage(res.message || 'System: Hunter Awakening Initialized! Welcome to Awakened Hunter Status.');
+        setLevelUpAlert(true);
+        setTimeout(() => setLevelUpAlert(false), 6000);
+        await fetchHunterData();
+      }
+    } catch (e) {
+      console.warn('Awakening error:', e);
+    } finally {
+      setIsAwakening(false);
+    }
+  };
+
+  const handleResetHunter = async () => {
+    try {
+      const res = await api.resetHunter();
+      if (res.success) {
+        setShowResetConfirm(false);
+        await fetchHunterData();
+        if (typeof window !== 'undefined' && window.showToast) {
+          window.showToast('Hunter System progression reset to Level 1.', 'info', 'Progression Reset');
+        }
+      }
+    } catch (e) {
+      console.warn('Reset error:', e);
+    }
+  };
 
   const fetchHunterData = async () => {
     try {
@@ -251,22 +291,53 @@ export default function HunterSystem({ selectedDate, currentUser }) {
         
         <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2">
-            <div className="flex items-center space-x-3">
+            <div className="flex flex-wrap items-center gap-2.5">
               <span className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest border shadow-lg ${getRankBadgeColor(hunter?.rank || 'E-Rank')}`}>
                 ⚔️ {hunter?.rank || 'E-Rank Hunter'}
               </span>
               <span className="text-xs font-semibold text-slate-400">
                 Title: <strong className="text-cyan-300">{hunter?.title || 'Awakened Novice'}</strong>
               </span>
-              <button
-                onClick={fetchHunterData}
-                disabled={loading}
-                className="p-1 rounded-lg text-slate-500 hover:text-cyan-400 transition-colors ml-auto flex items-center space-x-1 text-xs"
-                title="Sync Hunter Stats"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-cyan-400' : ''}`} />
-                <span className="text-[10px] hidden sm:inline">{loading ? 'Syncing...' : 'Sync'}</span>
-              </button>
+
+              {/* ACTIVATE AWAKENING BUTTON / STATUS BADGE */}
+              {!hunter?.isAwakened ? (
+                <button
+                  onClick={handleActivateAwakening}
+                  disabled={isAwakening}
+                  className="px-3.5 py-1 rounded-xl bg-gradient-to-r from-amber-500 via-purple-600 to-cyan-500 text-white font-black text-xs tracking-wider uppercase shadow-lg shadow-purple-500/30 hover:scale-105 active:scale-95 transition-all cursor-pointer flex items-center space-x-1.5 animate-pulse border border-amber-300/40"
+                  title="Click to activate your Hunter Awakening breakthrough"
+                >
+                  <Zap className="w-3.5 h-3.5 text-yellow-300 fill-yellow-300" />
+                  <span>{isAwakening ? 'Awakening...' : '⚡ Activate Awakening'}</span>
+                </button>
+              ) : (
+                <span className="px-2.5 py-1 rounded-xl bg-purple-950/80 text-purple-300 border border-purple-500/50 text-[11px] font-black tracking-wider uppercase flex items-center space-x-1 shadow-md shadow-purple-500/30">
+                  <Sparkles className="w-3.5 h-3.5 text-yellow-400 animate-spin" />
+                  <span>Awakening Active</span>
+                </span>
+              )}
+
+              {/* SYNC & RESET PROGRESS BUTTONS */}
+              <div className="flex items-center space-x-1.5 ml-auto">
+                <button
+                  onClick={fetchHunterData}
+                  disabled={loading}
+                  className="p-1 rounded-lg text-slate-500 hover:text-cyan-400 transition-colors flex items-center space-x-1 text-xs cursor-pointer"
+                  title="Sync Hunter Stats"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-cyan-400' : ''}`} />
+                  <span className="text-[10px] hidden sm:inline">{loading ? 'Syncing...' : 'Sync'}</span>
+                </button>
+
+                <button
+                  onClick={() => setShowResetConfirm(true)}
+                  className="p-1 rounded-lg text-slate-500 hover:text-rose-400 transition-colors flex items-center space-x-1 text-xs cursor-pointer"
+                  title="Reset Hunter Progression back to Level 1"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span className="text-[10px] hidden sm:inline">Reset</span>
+                </button>
+              </div>
             </div>
 
             <h1 className="text-3xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-cyan-100 to-cyan-400 tracking-tight">
@@ -541,6 +612,18 @@ export default function HunterSystem({ selectedDate, currentUser }) {
         </div>
 
       </div>
+
+      {/* RESET CONFIRMATION MODAL */}
+      <ConfirmModal
+        isOpen={showResetConfirm}
+        onClose={() => setShowResetConfirm(false)}
+        onConfirm={handleResetHunter}
+        title="Reset Hunter Progression?"
+        message="Are you sure you want to reset your Hunter level back to Level 1 and clear your claimed quests? This allows you to start your awakening journey completely fresh."
+        confirmText="Yes, Reset to Level 1"
+        cancelText="Keep My Level"
+        danger={true}
+      />
     </div>
   );
 }

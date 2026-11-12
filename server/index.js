@@ -1501,10 +1501,13 @@ app.post('/api/ai/universal-voice-audio', upload.single('audio'), async (req, re
       transcribedText = await aiService.transcribeAudio(req.file.buffer, mimeType);
     } catch (transcribeErr) {
       console.warn('Audio transcription error:', transcribeErr.message);
+      const isLeaked = /leaked|403|forbidden/i.test(transcribeErr.message);
       return res.json({
         success: false,
         needsApiKey: true,
-        error: 'Gemini Transcription: ' + transcribeErr.message,
+        error: isLeaked 
+          ? 'Your Gemini API key was reported as leaked by Google. Please enter a fresh free key in Settings, or tap to speak via browser recognition.' 
+          : 'Gemini Transcription: ' + transcribeErr.message,
         details: 'Could not transcribe with this Gemini API key. Ensure your key is valid in Google AI Studio, or tap the microphone to use browser speech recognition.'
       });
     }
@@ -1861,15 +1864,34 @@ app.get('/api/hunter/stats', async (req, res) => {
     }
   ];
 
-  // Rank Calculation
+  // Rank & Title Calculation (Rewarding progression with Awakening support)
+  const lv = hProfile.level || 1;
+  const isAwakened = Boolean(hProfile.isAwakened);
   let rank = 'E-Rank Hunter';
   let title = 'E-Rank Novice';
-  const lv = hProfile.level || 1;
-  if (lv >= 75) { rank = 'S-Rank Hunter'; title = 'Shadow Monarch / S-Rank Elite'; }
-  else if (lv >= 50) { rank = 'A-Rank Hunter'; title = 'Dungeon Raid Leader'; }
-  else if (lv >= 30) { rank = 'B-Rank Hunter'; title = 'High-Tier Awakened'; }
-  else if (lv >= 15) { rank = 'C-Rank Hunter'; title = 'Dungeon Striker'; }
-  else if (lv >= 6) { rank = 'D-Rank Hunter'; title = 'Awakened Fighter'; }
+
+  if (lv >= 15) { 
+    rank = 'S-Rank Hunter'; 
+    title = isAwakened ? '⚡ Awakened Shadow Monarch' : 'Shadow Monarch / S-Rank Elite'; 
+  } else if (lv >= 10) { 
+    rank = 'A-Rank Hunter'; 
+    title = isAwakened ? '⚡ Awakened Raid Commander' : 'Dungeon Raid Leader'; 
+  } else if (lv >= 7) { 
+    rank = 'B-Rank Hunter'; 
+    title = isAwakened ? '⚡ Awakened High-Tier' : 'High-Tier Awakened'; 
+  } else if (lv >= 5) { 
+    rank = 'C-Rank Hunter'; 
+    title = isAwakened ? '⚡ Awakened Striker' : 'Dungeon Striker'; 
+  } else if (lv >= 3) { 
+    rank = 'D-Rank Hunter'; 
+    title = isAwakened ? '⚡ Awakened Shadow Fighter' : 'D-Rank Awakened Fighter'; 
+  } else if (lv >= 2) {
+    rank = 'E-Rank Elite';
+    title = isAwakened ? '⚡ Awakened Scout' : 'E-Rank Scout';
+  } else {
+    rank = 'E-Rank Hunter';
+    title = isAwakened ? '⚡ Awakened Novice' : 'Awakened Novice';
+  }
 
   // Check penalty condition (Past 10 PM and quests unfinished)
   const currentHour = new Date().getHours();
@@ -1885,6 +1907,7 @@ app.get('/api/hunter/stats', async (req, res) => {
       xpToNextLevel: lv * 100,
       rank,
       title,
+      isAwakened,
       totalQuestsCompleted: hProfile.totalQuestsCompleted || 0,
       claimedQuests: hProfile.claimedQuests?.[today] || [],
       stats: {
@@ -1933,6 +1956,55 @@ app.post('/api/hunter/claim-quest', (req, res) => {
 
   writeDB(db);
   res.json({ success: true, level: h.level, xp: h.xp, leveledUp });
+});
+
+// Activate Hunter Awakening (Solo Leveling Breakthrough)
+app.post('/api/hunter/awaken', (req, res) => {
+  const db = readDB();
+  const userId = getAuthUserId(req, db);
+  if (!db.hunterProfiles) db.hunterProfiles = {};
+  if (!db.hunterProfiles[userId]) {
+    db.hunterProfiles[userId] = { level: 1, xp: 0, totalQuestsCompleted: 0, claimedQuests: {} };
+  }
+  const h = db.hunterProfiles[userId];
+  h.isAwakened = true;
+  h.awakenedAt = new Date().toISOString();
+  h.xp = (h.xp || 0) + 100;
+
+  let leveledUp = false;
+  while (h.xp >= h.level * 100) {
+    h.xp -= h.level * 100;
+    h.level += 1;
+    leveledUp = true;
+  }
+
+  writeDB(db);
+  res.json({ 
+    success: true, 
+    message: 'System: Hunter Awakening Breakthrough Initialized!', 
+    isAwakened: true, 
+    level: h.level, 
+    xp: h.xp,
+    leveledUp 
+  });
+});
+
+// Reset Hunter Progression back to Level 1
+app.post('/api/hunter/reset', (req, res) => {
+  const db = readDB();
+  const userId = getAuthUserId(req, db);
+  if (!db.hunterProfiles) db.hunterProfiles = {};
+  db.hunterProfiles[userId] = {
+    level: 1,
+    xp: 0,
+    totalQuestsCompleted: 0,
+    claimedQuests: {},
+    isAwakened: false,
+    title: 'Awakened Novice',
+    resetAt: new Date().toISOString()
+  };
+  writeDB(db);
+  res.json({ success: true, message: 'Hunter progress has been reset to Level 1.', hunter: db.hunterProfiles[userId] });
 });
 
 app.get('/api/workout-plans', (req, res) => {
