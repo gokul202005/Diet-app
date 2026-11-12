@@ -1898,6 +1898,9 @@ app.get('/api/hunter/stats', async (req, res) => {
   const allQuestsCompleted = quests.every(q => q.isCompleted);
   const isPenaltyActive = currentHour >= 22 && !allQuestsCompleted;
 
+  // Awakening availability: Only available when reaching Level 2+ and not yet awakened for current level
+  const canAwaken = (lv >= 2 && !hProfile.isAwakened) || (lv > (hProfile.lastAwakenedLevel || 1));
+
   res.json({
     success: true,
     hunter: {
@@ -1908,6 +1911,8 @@ app.get('/api/hunter/stats', async (req, res) => {
       rank,
       title,
       isAwakened,
+      canAwaken,
+      lastAwakenedLevel: hProfile.lastAwakenedLevel || 0,
       totalQuestsCompleted: hProfile.totalQuestsCompleted || 0,
       claimedQuests: hProfile.claimedQuests?.[today] || [],
       stats: {
@@ -1964,10 +1969,21 @@ app.post('/api/hunter/awaken', (req, res) => {
   const userId = getAuthUserId(req, db);
   if (!db.hunterProfiles) db.hunterProfiles = {};
   if (!db.hunterProfiles[userId]) {
-    db.hunterProfiles[userId] = { level: 1, xp: 0, totalQuestsCompleted: 0, claimedQuests: {} };
+    db.hunterProfiles[userId] = { level: 1, xp: 0, totalQuestsCompleted: 0, claimedQuests: {}, isAwakened: false };
   }
   const h = db.hunterProfiles[userId];
+
+  // Awakening requires reaching at least Level 2 (or a level higher than previous awakening)
+  const canAwaken = (h.level >= 2 && !h.isAwakened) || (h.level > (h.lastAwakenedLevel || 1));
+  if (!canAwaken) {
+    return res.status(400).json({
+      success: false,
+      error: `Awakening breakthrough is locked. Complete daily trials and reach Level ${(h.lastAwakenedLevel || 1) + 1} to unlock!`
+    });
+  }
+
   h.isAwakened = true;
+  h.lastAwakenedLevel = h.level;
   h.awakenedAt = new Date().toISOString();
   h.xp = (h.xp || 0) + 100;
 
@@ -1981,10 +1997,12 @@ app.post('/api/hunter/awaken', (req, res) => {
   writeDB(db);
   res.json({ 
     success: true, 
-    message: 'System: Hunter Awakening Breakthrough Initialized!', 
+    message: `System: Hunter Awakening Breakthrough Initialized at Level ${h.level}!`, 
     isAwakened: true, 
+    canAwaken: false,
     level: h.level, 
     xp: h.xp,
+    lastAwakenedLevel: h.lastAwakenedLevel,
     leveledUp 
   });
 });
@@ -2000,6 +2018,7 @@ app.post('/api/hunter/reset', (req, res) => {
     totalQuestsCompleted: 0,
     claimedQuests: {},
     isAwakened: false,
+    lastAwakenedLevel: 0,
     title: 'Awakened Novice',
     resetAt: new Date().toISOString()
   };

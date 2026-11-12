@@ -340,18 +340,13 @@
   },
   "hunterProfiles": {
     "user-google-110927726677822108966": {
-      "level": 2,
-      "xp": 40,
-      "totalQuestsCompleted": 1,
-      "claimedQuests": {
-        "2026-11-12": [
-          "quest_vit_protein"
-        ]
-      },
-      "isAwakened": true,
+      "level": 1,
+      "xp": 0,
+      "totalQuestsCompleted": 0,
+      "claimedQuests": {},
+      "isAwakened": false,
       "title": "Awakened Novice",
-      "resetAt": "2026-11-12T12:11:36.129Z",
-      "awakenedAt": "2026-11-12T12:11:38.961Z"
+      "resetAt": "2026-11-12T12:11:59.240Z"
     }
   },
   "chatHistory": [

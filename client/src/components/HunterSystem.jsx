@@ -18,7 +18,8 @@ import {
   Footprints,
   HeartPulse,
   Brain,
-  RotateCcw
+  RotateCcw,
+  Lock
 } from 'lucide-react';
 import { api } from '../api';
 
@@ -299,22 +300,30 @@ export default function HunterSystem({ selectedDate, currentUser }) {
                 Title: <strong className="text-cyan-300">{hunter?.title || 'Awakened Novice'}</strong>
               </span>
 
-              {/* ACTIVATE AWAKENING BUTTON / STATUS BADGE */}
-              {!hunter?.isAwakened ? (
+              {/* ACTIVATE AWAKENING BUTTON / STATUS BADGE / LOCKED BADGE */}
+              {hunter?.canAwaken ? (
                 <button
                   onClick={handleActivateAwakening}
                   disabled={isAwakening}
                   className="px-3.5 py-1 rounded-xl bg-gradient-to-r from-amber-500 via-purple-600 to-cyan-500 text-white font-black text-xs tracking-wider uppercase shadow-lg shadow-purple-500/30 hover:scale-105 active:scale-95 transition-all cursor-pointer flex items-center space-x-1.5 animate-pulse border border-amber-300/40"
-                  title="Click to activate your Hunter Awakening breakthrough"
+                  title="Level breakthrough ready! Click to activate Hunter Awakening"
                 >
                   <Zap className="w-3.5 h-3.5 text-yellow-300 fill-yellow-300" />
                   <span>{isAwakening ? 'Awakening...' : '⚡ Activate Awakening'}</span>
                 </button>
-              ) : (
+              ) : hunter?.isAwakened ? (
                 <span className="px-2.5 py-1 rounded-xl bg-purple-950/80 text-purple-300 border border-purple-500/50 text-[11px] font-black tracking-wider uppercase flex items-center space-x-1 shadow-md shadow-purple-500/30">
                   <Sparkles className="w-3.5 h-3.5 text-yellow-400 animate-spin" />
-                  <span>Awakening Active</span>
+                  <span>Awakened (Next at Lv. {(hunter?.level || 1) + 1})</span>
                 </span>
+              ) : (
+                <div 
+                  className="px-2.5 py-1 rounded-xl bg-slate-900/90 text-slate-500 border border-slate-800 text-[11px] font-bold uppercase tracking-wider flex items-center space-x-1.5 cursor-not-allowed select-none"
+                  title="Complete daily trials and reach Level 2 to unlock your Awakening Breakthrough"
+                >
+                  <Lock className="w-3 h-3 text-slate-600" />
+                  <span>Awakening Locked (Reach Lv. 2)</span>
+                </div>
               )}
 
               {/* SYNC & RESET PROGRESS BUTTONS */}
