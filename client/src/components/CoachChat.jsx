@@ -22,11 +22,11 @@ import {
 } from 'lucide-react';
 import { api } from '../api';
 
-// Markdown text & inline parser for rich AI Coach responses (bold, italics, lists, code)
+// Markdown text & inline parser for rich AI Coach responses (bold, italics, links, images, code)
 function formatInline(str, isUser) {
   if (!str) return '';
   const tokens = [];
-  const regex = /(\*\*(?:[^*]|\*(?!\*))+\*\*|`[^`]+`|(?<=\s|^|\()\*([^*]+)\*(?=\s|[.,!?:;)]|$)|(?<=\s|^|\()_([^_]+)_(?=\s|[.,!?:;)]|$))/g;
+  const regex = /(\!\[([^\]]*)\]\(([^)]+)\)|\[([^\]]+)\]\(([^)]+)\)|\*\*(?:[^*]|\*(?!\*))+\*\*|`[^`]+`|(?<=\s|^|\()\*([^*]+)\*(?=\s|[.,!?:;)]|$)|(?<=\s|^|\()_([^_]+)_(?=\s|[.,!?:;)]|$)|https?:\/\/[^\s)]+)/g;
   let lastIndex = 0;
   let match;
 
@@ -35,7 +35,55 @@ function formatInline(str, isUser) {
       tokens.push(str.substring(lastIndex, match.index));
     }
     const token = match[0];
-    if (token.startsWith('**') && token.endsWith('**')) {
+
+    // Image: ![alt](url)
+    if (token.startsWith('![') && token.includes('](')) {
+      const alt = match[2] || 'Image preview';
+      const url = match[3];
+      tokens.push(
+        <div key={match.index} className="my-2">
+          <img 
+            src={url} 
+            alt={alt} 
+            className="rounded-xl max-h-52 w-auto object-cover border border-cyan-500/30 shadow-lg shadow-cyan-950/40" 
+            onError={(e) => { e.target.style.display = 'none'; }}
+          />
+          {alt && <span className="block text-[10px] text-slate-400 mt-1 italic">{alt}</span>}
+        </div>
+      );
+    }
+    // Link: [label](url)
+    else if (token.startsWith('[') && token.includes('](')) {
+      const label = match[4];
+      const url = match[5];
+      tokens.push(
+        <a 
+          key={match.index} 
+          href={url} 
+          target="_blank" 
+          rel="noopener noreferrer" 
+          className="text-cyan-400 hover:text-cyan-300 underline font-bold inline-flex items-center space-x-1"
+        >
+          <span>{label}</span>
+          <span className="text-[10px]">↗</span>
+        </a>
+      );
+    }
+    // Bare URL: https://...
+    else if (token.startsWith('http://') || token.startsWith('https://')) {
+      tokens.push(
+        <a 
+          key={match.index} 
+          href={token} 
+          target="_blank" 
+          rel="noopener noreferrer" 
+          className="text-cyan-400 hover:text-cyan-300 underline font-medium break-all"
+        >
+          {token}
+        </a>
+      );
+    }
+    else if (token.startsWith('**') && token.endsWith('**')) {
       tokens.push(
         <strong key={match.index} className={isUser ? "font-black text-slate-950" : "font-bold text-white tracking-wide"}>
           {token.slice(2, -2)}
@@ -653,9 +701,7 @@ export default function CoachChat({ profile, selectedDate }) {
       const res = await api.sendCoachMessage(text);
       if (res.success && res.message) {
         setMessages(prev => [...prev, res.message]);
-        if (isJarvisMode) {
-          speakText(res.message.text, res.message.id, true);
-        }
+        speakText(res.message.text, res.message.id, isJarvisMode);
       }
     } catch (err) {
       if (typeof window !== 'undefined' && window.showToast) {

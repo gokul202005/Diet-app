@@ -1043,6 +1043,36 @@ async function commitUniversalVoice(intent, payload, originalText = '', date = n
 
   // Commit MEAL
   if (intent === 'meal') {
+    // Auto-learn unrecognized food items into custom food database
+    db.customFoods = db.customFoods || [];
+    const items = payload.foods && payload.foods.length > 0 
+      ? payload.foods 
+      : [{ name: payload.name || originalText, quantity: '1 serving', calories: payload.totalCalories, protein: payload.totalProtein, carbs: payload.totalCarbs, fat: payload.totalFat }];
+
+    for (const item of items) {
+      const cleanName = (item.name || '').trim();
+      if (cleanName.length > 2) {
+        const alreadyInCustom = db.customFoods.some(f => f.name.toLowerCase() === cleanName.toLowerCase());
+        if (!alreadyInCustom) {
+          const customFoodItem = {
+            id: `food-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            name: cleanName,
+            aliases: [cleanName.toLowerCase()],
+            serving: item.quantity || '1 serving',
+            calories: Number(item.calories) || 200,
+            protein: Number(item.protein) || 10,
+            carbs: Number(item.carbs) || 25,
+            fat: Number(item.fat) || 5,
+            category: 'Auto-Learned User Food',
+            addedVia: 'voice-jarvis-learning',
+            createdAt: new Date().toISOString()
+          };
+          db.customFoods.push(customFoodItem);
+          console.log(`[Auto-Learned Food] Added "${cleanName}" to custom food database.`);
+        }
+      }
+    }
+
     const newMeal = {
       id: `meal-${Date.now()}`,
       userId,

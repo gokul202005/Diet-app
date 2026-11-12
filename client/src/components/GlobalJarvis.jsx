@@ -13,9 +13,15 @@ import {
   Settings2,
   Check,
   Play,
-  Activity
+  Activity,
+  Timer,
+  Pause,
+  RotateCcw,
+  Plus,
+  Minus
 } from 'lucide-react';
 import { api } from '../api';
+import { parseJarvisVoiceAction } from '../utils/jarvisActionParser';
 
 export default function GlobalJarvis({ profile, selectedDate, onActionCompleted, onOpenCoach }) {
   const [isActive, setIsActive] = useState(() => {
@@ -39,6 +45,67 @@ export default function GlobalJarvis({ profile, selectedDate, onActionCompleted,
   const [liveTranscript, setLiveTranscript] = useState('');
   const [lastJarvisReply, setLastJarvisReply] = useState('');
   const [audioVolume, setAudioVolume] = useState(0);
+
+  // Holographic Rest Timer State
+  const [restTimer, setRestTimer] = useState({
+    active: false,
+    totalSeconds: 0,
+    remainingSeconds: 0,
+    isPaused: false
+  });
+
+  const playChimeSound = () => {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(1760, ctx.currentTime + 0.28);
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.45);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.45);
+    } catch (e) {}
+  };
+
+  const startRestTimer = (seconds) => {
+    setRestTimer({
+      active: true,
+      totalSeconds: seconds,
+      remainingSeconds: seconds,
+      isPaused: false
+    });
+  };
+
+  useEffect(() => {
+    if (!restTimer.active || restTimer.isPaused) return;
+
+    if (restTimer.remainingSeconds <= 0) {
+      playChimeSound();
+      speakResponse("Rest period complete, sir. Time for your next set.");
+      setRestTimer({ active: false, totalSeconds: 0, remainingSeconds: 0, isPaused: false });
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setRestTimer(prev => {
+        if (!prev.active || prev.isPaused) return prev;
+        if (prev.remainingSeconds <= 1) {
+          playChimeSound();
+          speakResponse("Rest period complete, sir. Time for your next set.");
+          return { active: false, totalSeconds: 0, remainingSeconds: 0, isPaused: false };
+        }
+        return { ...prev, remainingSeconds: prev.remainingSeconds - 1 };
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [restTimer.active, restTimer.isPaused, restTimer.remainingSeconds]);
 
   // Audio Devices & Voices
   const [audioDevices, setAudioDevices] = useState([]);
@@ -457,6 +524,70 @@ export default function GlobalJarvis({ profile, selectedDate, onActionCompleted,
     setJarvisState('thinking');
     setLiveTranscript(query);
 
+    // 1. Check for autonomous action intents first (rest timer, app navigation, data logging)
+    const action = parseJarvisVoiceAction(query);
+
+    // ACTION: REST TIMER
+    if (action?.type === 'timer') {
+      if (action.subAction === 'cancel') {
+        setRestTimer({ active: false, totalSeconds: 0, remainingSeconds: 0, isPaused: false });
+        speakResponse(action.speechReply);
+        return;
+      }
+      if (action.subAction === 'pause') {
+        setRestTimer(prev => ({ ...prev, isPaused: true }));
+        speakResponse(action.speechReply);
+        return;
+      }
+      if (action.subAction === 'resume') {
+        setRestTimer(prev => ({ ...prev, isPaused: false }));
+        speakResponse(action.speechReply);
+        return;
+      }
+      if (action.subAction === 'start') {
+        startRestTimer(action.seconds);
+        speakResponse(action.speechReply);
+        return;
+      }
+    }
+
+    // ACTION: APP NAVIGATION
+    if (action?.type === 'navigate') {
+      if (action.tab) {
+        window.dispatchEvent(new CustomEvent('agy-navigate-tab', { detail: { tab: action.tab } }));
+      } else if (action.modal) {
+        window.dispatchEvent(new CustomEvent('agy-navigate-tab', { detail: { modal: action.modal } }));
+      }
+      speakResponse(action.speechReply);
+      return;
+    }
+
+    // ACTION: AUTONOMOUS DATA LOGGING (Meals, Water, Workouts)
+    if (action?.type === 'log_data') {
+      try {
+        const res = await api.universalVoiceCommand(action.payloadText || query, selectedDate);
+        if (res.success) {
+          window.dispatchEvent(new CustomEvent('agy-action-completed', { detail: res }));
+          if (onActionCompleted) onActionCompleted();
+
+          let replyText = res.feedback || "Action logged and synced successfully, sir.";
+          if (res.action === 'log_meal' && res.meal) {
+            replyText = `Logged to ${res.meal.mealType.toUpperCase()}: ${res.meal.name}. Added ${res.meal.totalCalories} calories and ${res.meal.totalProtein} grams of protein, sir.`;
+          } else if (res.action === 'log_workout' && res.workout) {
+            replyText = `Logged workout: ${res.workout.exercises?.[0]?.name || 'strength session'}. Telemetry updated, sir.`;
+          } else if (res.action === 'log_water') {
+            replyText = `Hydration logged, sir. Current daily water intake updated.`;
+          }
+
+          speakResponse(replyText);
+          return;
+        }
+      } catch (err) {
+        console.warn('[GlobalJarvis] Direct action log fallback:', err);
+      }
+    }
+
+    // GENERAL CONVERSATION & INTELLIGENCE
     try {
       const res = await api.sendCoachMessage(query);
       if (res.success && res.message) {
@@ -464,7 +595,7 @@ export default function GlobalJarvis({ profile, selectedDate, onActionCompleted,
         if (onActionCompleted) onActionCompleted();
         speakResponse(res.message.text);
       } else {
-        speakResponse("I have processed your query, sir. All parameters are updated.");
+        speakResponse("I am listening and ready, sir. What are we taking on?");
       }
     } catch (err) {
       speakResponse("Apologies, I encountered an issue connecting to the central mainframe: " + err.message);
@@ -531,10 +662,22 @@ export default function GlobalJarvis({ profile, selectedDate, onActionCompleted,
                 ? 'bg-cyan-500 text-slate-950 font-bold shadow-md shadow-cyan-500/50'
                 : 'bg-slate-800 hover:bg-slate-700 text-cyan-300'
             }`}
-            title={jarvisState === 'listening' ? 'Send Query' : 'Speak to Jarvis'}
+            title={jarvisState === 'listening' ? 'Send Query' : 'Command Jarvis'}
           >
             <Mic className="w-3.5 h-3.5" />
           </button>
+
+          {/* Active Rest Timer Mini Badge */}
+          {restTimer.active && (
+            <div 
+              onClick={() => setIsCollapsed(false)}
+              className="flex items-center space-x-1 px-2 py-0.5 rounded-full bg-cyan-950/90 border border-cyan-500/60 text-[10px] text-cyan-300 font-mono font-bold cursor-pointer animate-pulse"
+              title="Rest Timer Active - Click to View HUD"
+            >
+              <Timer className="w-3 h-3 text-cyan-400" />
+              <span>{Math.floor(restTimer.remainingSeconds / 60).toString().padStart(2, '0')}:{(restTimer.remainingSeconds % 60).toString().padStart(2, '0')}</span>
+            </div>
+          )}
 
           {/* Expand Button */}
           <button
@@ -599,16 +742,16 @@ export default function GlobalJarvis({ profile, selectedDate, onActionCompleted,
               </div>
               <div className="text-xs text-slate-400 flex items-center space-x-1.5 mt-0.5">
                 {jarvisState === 'listening' && (
-                  <span className="text-cyan-400 font-semibold animate-pulse">● Listening to mic...</span>
+                  <span className="text-cyan-400 font-semibold animate-pulse">● Listening to command...</span>
                 )}
                 {jarvisState === 'speaking' && (
                   <span className="text-emerald-400 font-semibold">● Jarvis is speaking...</span>
                 )}
                 {jarvisState === 'thinking' && (
-                  <span className="text-purple-400 font-semibold">● Processing request...</span>
+                  <span className="text-purple-400 font-semibold">● Executing instruction...</span>
                 )}
                 {jarvisState === 'idle' && (
-                  <span>Ready • Tap mic to speak</span>
+                  <span>Ready • Tap to speak</span>
                 )}
               </div>
             </div>
@@ -642,7 +785,7 @@ export default function GlobalJarvis({ profile, selectedDate, onActionCompleted,
               <button
                 onClick={onOpenCoach}
                 className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-cyan-300 border border-slate-700 text-xs transition-colors cursor-pointer"
-                title="Open Full AI Coach Chat"
+                title="Open JARVIS Console"
               >
                 <MessageSquare className="w-4 h-4" />
               </button>
@@ -665,6 +808,67 @@ export default function GlobalJarvis({ profile, selectedDate, onActionCompleted,
             </button>
           </div>
         </div>
+
+        {/* HOLOGRAPHIC REST TIMER (If Active) */}
+        {restTimer.active && (
+          <div className="bg-slate-900/95 border border-cyan-500/50 rounded-2xl p-3.5 space-y-2 shadow-lg shadow-cyan-950/60">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Timer className="w-4 h-4 text-cyan-400 animate-spin" />
+                <span className="text-xs font-black tracking-wider uppercase text-cyan-300">Holographic Rest Timer</span>
+              </div>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${restTimer.isPaused ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' : 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'}`}>
+                {restTimer.isPaused ? 'Paused' : 'Active'}
+              </span>
+            </div>
+
+            {/* Countdown Display & Controls */}
+            <div className="flex items-center justify-between">
+              <span className="font-mono text-3xl font-black text-white tracking-widest">
+                {Math.floor(restTimer.remainingSeconds / 60).toString().padStart(2, '0')}:{(restTimer.remainingSeconds % 60).toString().padStart(2, '0')}
+              </span>
+              
+              <div className="flex items-center space-x-1.5">
+                <button
+                  onClick={() => setRestTimer(prev => ({ ...prev, remainingSeconds: Math.max(5, prev.remainingSeconds - 30) }))}
+                  className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 font-bold"
+                  title="Subtract 30s"
+                >
+                  -30s
+                </button>
+                <button
+                  onClick={() => setRestTimer(prev => ({ ...prev, remainingSeconds: prev.remainingSeconds + 30 }))}
+                  className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 font-bold"
+                  title="Add 30s"
+                >
+                  +30s
+                </button>
+                <button
+                  onClick={() => setRestTimer(prev => ({ ...prev, isPaused: !prev.isPaused }))}
+                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-300"
+                  title={restTimer.isPaused ? 'Resume' : 'Pause'}
+                >
+                  {restTimer.isPaused ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
+                </button>
+                <button
+                  onClick={() => setRestTimer({ active: false, totalSeconds: 0, remainingSeconds: 0, isPaused: false })}
+                  className="p-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/40"
+                  title="Cancel Timer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Glowing Progress Track */}
+            <div className="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden border border-slate-800">
+              <div
+                className="h-full bg-gradient-to-r from-cyan-400 to-emerald-400 transition-all duration-300"
+                style={{ width: `${Math.max(0, Math.min(100, (restTimer.remainingSeconds / (restTimer.totalSeconds || 1)) * 100))}%` }}
+              />
+            </div>
+          </div>
+        )}
 
         {/* SETTINGS PANEL: Voice & Input Microphone Pickers */}
         {showSettings && (
@@ -738,30 +942,8 @@ export default function GlobalJarvis({ profile, selectedDate, onActionCompleted,
           </div>
         )}
 
-        {/* Row 2: Live Mic Bar & Big Speak Button */}
-        <div className="flex items-center justify-between gap-3 bg-slate-900/60 border border-slate-800/80 rounded-2xl p-3">
-          <div className="flex-1 space-y-1">
-            <div className="flex items-center justify-between text-[11px]">
-              <span className="text-slate-400 font-bold uppercase tracking-wider">Microphone Input</span>
-              <span className={jarvisState === 'listening' ? 'text-cyan-400 font-bold' : 'text-slate-500'}>
-                {jarvisState === 'listening' ? `${audioVolume}% Level` : 'Standby'}
-              </span>
-            </div>
-            
-            {/* Visualizer Bar */}
-            <div className="w-full bg-slate-950 h-2 rounded-full overflow-hidden border border-slate-800">
-              <div
-                className={`h-full rounded-full transition-all duration-75 ${
-                  jarvisState === 'listening' 
-                    ? 'bg-gradient-to-r from-cyan-500 to-indigo-500' 
-                    : 'bg-slate-800'
-                }`}
-                style={{ width: `${jarvisState === 'listening' ? Math.max(8, audioVolume) : 0}%` }}
-              />
-            </div>
-          </div>
-
-          {/* Primary Action Button */}
+        {/* Row 2: Sleek Interactive Voice Reactor Control (No clumsy standby) */}
+        <div className="flex items-center justify-between gap-3 bg-slate-900/70 border border-cyan-500/30 rounded-2xl p-3">
           <button
             onClick={() => {
               if (jarvisState === 'listening') {
@@ -770,34 +952,54 @@ export default function GlobalJarvis({ profile, selectedDate, onActionCompleted,
                 startListening();
               }
             }}
-            className={`px-4 py-2.5 rounded-xl font-black text-xs flex items-center space-x-2 transition-all cursor-pointer shadow-lg shrink-0 ${
+            className={`flex-1 py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center space-x-2.5 transition-all cursor-pointer shadow-md ${
               jarvisState === 'listening'
-                ? 'bg-gradient-to-r from-cyan-400 to-cyan-500 text-slate-950 shadow-cyan-500/40 animate-pulse'
-                : 'bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-cyan-500/30 hover:border-cyan-400'
+                ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950 shadow-cyan-500/40 animate-pulse'
+                : 'bg-slate-800 hover:bg-slate-700 text-cyan-300 hover:text-white border border-cyan-500/40'
             }`}
           >
-            <Mic className="w-4 h-4" />
-            <span>{jarvisState === 'listening' ? 'Send Query' : 'Speak to Jarvis'}</span>
+            <Mic className={`w-4 h-4 ${jarvisState === 'listening' ? 'animate-bounce' : ''}`} />
+            <span>{jarvisState === 'listening' ? 'Listening... Tap to Send' : 'Tap to Command Jarvis'}</span>
           </button>
         </div>
 
-        {/* Row 3: Transcript / Spoken Preview Area */}
-        {(liveTranscript || lastJarvisReply) && (
-          <div className="space-y-2 pt-1 border-t border-slate-800/80">
-            {liveTranscript && (
-              <div className="bg-slate-950/70 border border-cyan-500/20 p-2.5 rounded-xl text-xs space-y-0.5">
-                <span className="text-[10px] font-black uppercase tracking-wider text-cyan-400">You Said:</span>
-                <p className="text-slate-200 leading-relaxed">{liveTranscript}</p>
-              </div>
-            )}
-            {lastJarvisReply && (
-              <div className="bg-slate-950/70 border border-emerald-500/20 p-2.5 rounded-xl text-xs space-y-0.5">
-                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400">Jarvis:</span>
-                <p className="text-slate-200 leading-relaxed max-h-24 overflow-y-auto">{lastJarvisReply}</p>
-              </div>
-            )}
+        {/* Row 3: Live Synchronized Subtitles & Contextual Stream */}
+        <div className="space-y-2 pt-1 border-t border-slate-800/80">
+          <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-slate-400">
+            <span>Live Subtitles</span>
+            <span className="text-cyan-400 font-mono">Real-Time Sync</span>
           </div>
-        )}
+
+          {liveTranscript && (
+            <div className="bg-slate-950/80 border border-cyan-500/30 p-2.5 rounded-xl text-xs space-y-0.5 animate-fadeIn">
+              <span className="text-[10px] font-black uppercase tracking-wider text-cyan-400">You Said:</span>
+              <p className="text-slate-100 font-medium leading-relaxed">{liveTranscript}</p>
+            </div>
+          )}
+
+          {lastJarvisReply && (
+            <div className="bg-slate-950/80 border border-emerald-500/30 p-2.5 rounded-xl text-xs space-y-1 animate-fadeIn">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400">JARVIS:</span>
+                {jarvisState === 'speaking' && (
+                  <span className="text-[9px] text-emerald-300 flex items-center space-x-1 animate-pulse">
+                    <Volume2 className="w-3 h-3" />
+                    <span>Speaking</span>
+                  </span>
+                )}
+              </div>
+              <p className="text-slate-200 leading-relaxed max-h-32 overflow-y-auto custom-scrollbar whitespace-pre-line">
+                {lastJarvisReply}
+              </p>
+            </div>
+          )}
+
+          {!liveTranscript && !lastJarvisReply && (
+            <div className="text-center py-2 text-[11px] text-slate-400 italic">
+              "Jarvis, log 3 idlis for breakfast" • "Start 90s rest timer" • "Switch to workouts"
+            </div>
+          )}
+        </div>
 
       </div>
     </div>

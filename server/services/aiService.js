@@ -635,6 +635,45 @@ JARVIS BEHAVIOR RULES:
     const lower = raw.toLowerCase();
     const name = userProfile.name || 'sir';
 
+    // 0. Conversational Context & Multi-turn Memory
+    const recentUserMsgs = (chatHistory || []).filter(m => m.sender === 'user');
+    const lastUserMsg = recentUserMsgs.length > 1 ? recentUserMsgs[recentUserMsgs.length - 2]?.text : (recentUserMsgs[0]?.text || '');
+    const recentAssistantMsgs = (chatHistory || []).filter(m => m.sender === 'assistant');
+    const lastAssistantMsg = recentAssistantMsgs.length > 0 ? recentAssistantMsgs[recentAssistantMsgs.length - 1]?.text : '';
+
+    // Multi-turn Memory: "what did I say", "what was my last question", "repeat that"
+    if (lower.includes('what did i say') || lower.includes('what did i just say') || lower.includes('what was my last question') || lower.includes('previous text') || lower.includes('memory of the previous')) {
+      if (lastUserMsg) {
+        return {
+          reply: `Prior to this, ${name}, you asked: "${lastUserMsg}". All preceding telemetry is logged and retained in memory.`,
+          source: 'jarvis-autonomous-brain'
+        };
+      } else {
+        return {
+          reply: `I have initialized our communication stream, ${name}. What would you like me to log or research first?`,
+          source: 'jarvis-autonomous-brain'
+        };
+      }
+    }
+
+    if (lower.includes('what did you say') || lower.includes('repeat that') || lower.includes('say that again')) {
+      if (lastAssistantMsg) {
+        return {
+          reply: `I previously reported: "${lastAssistantMsg.slice(0, 140)}", ${name}.`,
+          source: 'jarvis-autonomous-brain'
+        };
+      }
+    }
+
+    // External Reference / Links ("give me a link", "external website", "source")
+    if (lower.includes('link') || lower.includes('website') || lower.includes('source') || lower.includes('url')) {
+      const topic = lastUserMsg || raw;
+      return {
+        reply: `Certainly, ${name}. Here is the verified research portal and database reference for that topic: [Scientific Reference Link](https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(topic)}).`,
+        source: 'jarvis-autonomous-brain'
+      };
+    }
+
     // 1. Ready & Persona Check ("Are you ready my boy?", "Are you ready?", "Ready?")
     if (/ready\s*(my\s*boy|boy|jarvis)?|are\s*you\s*ready/i.test(lower)) {
       const responses = [

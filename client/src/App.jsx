@@ -93,6 +93,34 @@ export default function App() {
     initProfileAndAuth();
   }, []);
 
+  // Listen for autonomous voice action navigation and modal triggers
+  useEffect(() => {
+    const handleNav = (e) => {
+      if (e.detail?.tab) {
+        setActiveTab(e.detail.tab);
+      }
+      if (e.detail?.modal === 'settings') {
+        setIsSettingsOpen(true);
+      } else if (e.detail?.modal === 'profile') {
+        setIsOnboardingOpen(true);
+      }
+    };
+
+    const handleActionSync = (e) => {
+      setRefreshKey(k => k + 1);
+      if (e.detail?.section && ['diet', 'workouts', 'fastrack', 'progress'].includes(e.detail.section)) {
+        setActiveTab(e.detail.section);
+      }
+    };
+
+    window.addEventListener('agy-navigate-tab', handleNav);
+    window.addEventListener('agy-action-completed', handleActionSync);
+    return () => {
+      window.removeEventListener('agy-navigate-tab', handleNav);
+      window.removeEventListener('agy-action-completed', handleActionSync);
+    };
+  }, []);
+
   const handleProfileSaved = (updatedProfile) => {
     setProfile(updatedProfile);
     if (currentUser?.id && updatedProfile?.isConfigured) {
