@@ -209,17 +209,55 @@ export async function getPhotosFromSupabase(userId) {
 /**
  * Retrieves a user's profile from Supabase 'profiles' PostgreSQL table
  */
-export async function getProfileFromSupabase(userId) {
-  if (!isSupabaseReady() || !userId) return null;
+export async function getProfileFromSupabase(userId, email = null) {
+  if (!isSupabaseReady()) return null;
   try {
-    const cleanUserId = String(userId).replace(/[^a-zA-Z0-9_-]/g, '_');
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('user_id', cleanUserId)
-      .maybeSingle();
+    let cleanUserId = userId ? String(userId).replace(/[^a-zA-Z0-9_-]/g, '_') : null;
+    let data = null;
 
-    if (error || !data) return null;
+    if (cleanUserId) {
+      const { data: byId } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', cleanUserId)
+        .maybeSingle();
+      data = byId;
+    }
+
+    // Fallback: If profile not found by user_id and email is provided, lookup by email in users table
+    if (!data && email) {
+      const { data: u } = await supabase
+        .from('users')
+        .select('id')
+        .eq('email', email.toLowerCase())
+        .maybeSingle();
+      if (u?.id) {
+        const { data: p } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('user_id', u.id)
+          .maybeSingle();
+        data = p;
+      }
+    }
+
+    if (!data) return null;
+
+    // Extract saved settings from focus_areas metadata payload if present
+    let extractedApiKey = '';
+    let extractedClientId = '';
+    const cleanFocusAreas = [];
+
+    if (Array.isArray(data.focus_areas)) {
+      data.focus_areas.forEach(item => {
+        if (typeof item === 'object' && item !== null && (item.__key || item.__client)) {
+          if (item.__key) extractedApiKey = item.__key;
+          if (item.__client) extractedClientId = item.__client;
+        } else if (typeof item === 'string') {
+          cleanFocusAreas.push(item);
+        }
+      });
+    }
 
     return {
       name: data.name || '',
@@ -237,10 +275,12 @@ export async function getProfileFromSupabase(userId) {
       dailyTargetWater: data.daily_target_water || 3000,
       dailyTargetSteps: data.daily_target_steps || 10000,
       dietaryTags: Array.isArray(data.dietary_tags) ? data.dietary_tags : [],
-      focusAreas: Array.isArray(data.focus_areas) ? data.focus_areas : [],
+      focusAreas: cleanFocusAreas.length > 0 ? cleanFocusAreas : ['🛡️ Full Body Balance'],
       goals: Array.isArray(data.goals) ? data.goals : (data.goal ? [data.goal] : []),
       recalculateTargets: Boolean(data.recalculate_targets),
-      isConfigured: Boolean(data.is_configured)
+      isConfigured: Boolean(data.is_configured),
+      geminiApiKey: extractedApiKey || undefined,
+      googleClientId: extractedClientId || undefined
     };
   } catch (err) {
     console.warn('[Supabase getProfile] Exception:', err.message);
@@ -264,10 +304,19 @@ export async function saveProfileToSupabase(userId, p) {
           id: cleanUserId,
           email: p.email || `${cleanUserId}@agyfit.local`,
           name: p.name || 'User',
-          provider: 'local'
+          provider: 'google'
         });
       }
     } catch (e) {}
+
+    // Embed api key & client id securely into focus_areas jsonb metadata so it persists across all devices
+    const rawFocusAreas = Array.isArray(p.focusAreas) ? p.focusAreas.filter(f => typeof f === 'string') : [];
+    if (p.geminiApiKey || p.googleClientId) {
+      rawFocusAreas.push({
+        __key: p.geminiApiKey || '',
+        __client: p.googleClientId || ''
+      });
+    }
 
     const { error } = await supabase.from('profiles').upsert({
       user_id: cleanUserId,
@@ -286,10 +335,10 @@ export async function saveProfileToSupabase(userId, p) {
       daily_target_water: p.dailyTargetWater || 3000,
       daily_target_steps: p.dailyTargetSteps || 10000,
       dietary_tags: Array.isArray(p.dietaryTags) ? p.dietaryTags : [],
-      focus_areas: Array.isArray(p.focusAreas) ? p.focusAreas : [],
+      focus_areas: rawFocusAreas,
       goals: Array.isArray(p.goals) ? p.goals : (p.goal ? [p.goal] : []),
       recalculate_targets: Boolean(p.recalculateTargets),
-      is_configured: Boolean(p.isConfigured)
+      is_configured: Boolean(p.isConfigured !== false && (p.age || p.heightCm || p.weightKg || p.dailyTargetCalories))
     }, { onConflict: 'user_id' });
 
     if (error) {

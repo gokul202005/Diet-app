@@ -217,7 +217,7 @@ export default function GlobalJarvis({ profile, selectedDate, onActionCompleted,
     }
   };
 
-  // Get currently selected voice object
+  // Get currently selected voice object (with intelligent mobile device fallback)
   const getCurrentVoice = () => {
     if (typeof window === 'undefined' || !window.speechSynthesis) return null;
     const voices = window.speechSynthesis.getVoices() || [];
@@ -226,7 +226,14 @@ export default function GlobalJarvis({ profile, selectedDate, onActionCompleted,
       const match = voices.find(v => v.name === selectedVoiceName);
       if (match) return match;
     }
-    return voices[0];
+    // Smart mobile fallback: Look for ANY British male or natural English voice on the mobile device
+    const britishMobile = voices.find(v => 
+      (v.lang.startsWith('en-GB') || v.lang.startsWith('en_GB') || /united kingdom|british|ryan|george|male/i.test(v.name)) &&
+      !/female/i.test(v.name)
+    ) || voices.find(v => v.lang.startsWith('en-GB') || v.lang.startsWith('en_GB'))
+      || voices.find(v => v.lang.startsWith('en') && !/female/i.test(v.name))
+      || voices.find(v => v.lang.startsWith('en'));
+    return britishMobile || voices[0];
   };
 
   // Speak response aloud

@@ -377,16 +377,22 @@ app.post('/api/auth/google', async (req, res) => {
     db.currentUser = { id: user.id, name: user.name, email: user.email, picture: user.picture, provider: 'google' };
     db.profiles = db.profiles || {};
 
-    // Check Supabase Cloud for saved configured profile
+    // Check Supabase Cloud for saved configured profile (checks by ID AND email)
     let cloudProfile = null;
     if (isSupabaseReady()) {
       try {
-        cloudProfile = await getProfileFromSupabase(user.id);
+        cloudProfile = await getProfileFromSupabase(user.id, user.email);
       } catch (e) {}
     }
 
     if (cloudProfile && cloudProfile.isConfigured) {
       db.profiles[user.id] = { ...cloudProfile, name: user.name };
+      if (cloudProfile.geminiApiKey) {
+        db.userSettings = db.userSettings || {};
+        db.userSettings[user.id] = db.userSettings[user.id] || {};
+        db.userSettings[user.id].geminiApiKey = cloudProfile.geminiApiKey;
+        user.geminiApiKey = cloudProfile.geminiApiKey;
+      }
       isNewUser = false;
     } else if (!db.profiles[user.id]) {
       // 100% clean slate: Zero pre-filled values
