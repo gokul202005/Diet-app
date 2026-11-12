@@ -77,7 +77,7 @@
   "workoutPlans": [],
   "fastrackLogs": [
     {
-      "id": "fastrack-1794492306756",
+      "id": "fastrack-1794493621225",
       "userId": "user-google-110927726677822108966",
       "date": "2026-11-12",
       "deviceName": "Google Fit Cloud",
@@ -91,8 +91,8 @@
       "sleepHours": 7,
       "batteryLevel": null,
       "isAutoSynced": true,
-      "lastAutoSyncAt": "2026-11-12T14:18:30.846Z",
-      "syncedAt": "2026-11-12T14:18:30.846Z"
+      "lastAutoSyncAt": "2026-11-12T14:47:40.916Z",
+      "syncedAt": "2026-11-12T14:47:40.916Z"
     }
   ],
   "waterLogs": [],
@@ -148,12 +148,21 @@
     "user-google-110927726677822108966": {
       "level": 1,
       "xp": 0,
-      "totalQuestsCompleted": 0,
-      "claimedQuests": {},
+      "rank": "E-Rank Hunter",
+      "title": "Novice Hunter",
       "isAwakened": false,
       "lastAwakenedLevel": 0,
-      "title": "Novice Hunter",
-      "resetAt": "2026-11-12T12:33:31.400Z"
+      "totalQuestsCompleted": 0,
+      "claimedQuests": {},
+      "conqueredGates": [],
+      "shadowArmy": [],
+      "artifacts": [],
+      "unlockedTitles": [
+        "Novice Hunter"
+      ],
+      "dailyBossClaims": {},
+      "activeGateId": "gate_e_goblin",
+      "resetAt": "2026-11-12T14:44:57.425Z"
     }
   },
   "chatHistory": [],

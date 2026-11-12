@@ -98,6 +98,36 @@ function playSound(type) {
   } catch (e) {}
 }
 
+// Sung Jin-woo "ARISE" (일어서라) Voice Synthesizer
+function speakSungJinWooVoice() {
+  if (typeof window === 'undefined') return;
+  try {
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+      
+      // Sung Jin-woo's deep, authoritative, calm Monarch command
+      const utterance = new SpeechSynthesisUtterance("Arise.");
+      utterance.pitch = 0.55; // Low, deep monarch pitch
+      utterance.rate = 0.75;  // Slow, deliberate command
+      utterance.volume = 1.0;
+      
+      const voices = window.speechSynthesis.getVoices();
+      const deepVoice = voices.find(v => 
+        (v.lang.startsWith('en') || v.lang.startsWith('ko')) && 
+        (v.name.includes('Male') || v.name.includes('David') || v.name.includes('Guy') || v.name.includes('Natural') || v.name.includes('George') || v.name.includes('Google UK English Male'))
+      ) || voices[0];
+      
+      if (deepVoice) utterance.voice = deepVoice;
+      
+      setTimeout(() => {
+        try { window.speechSynthesis.speak(utterance); } catch {}
+      }, 200);
+    }
+  } catch (e) {
+    console.warn('Monarch voice notice:', e);
+  }
+}
+
 export default function HunterSystem({ selectedDate, currentUser }) {
   const getInitialHunter = () => {
     try {
@@ -304,6 +334,7 @@ export default function HunterSystem({ selectedDate, currentUser }) {
     setExtractingGateId(gateId);
     try {
       playSound('arise');
+      speakSungJinWooVoice();
       const res = await api.extractShadow(gateId);
       if (res && res.success) {
         confetti({ 
@@ -1506,12 +1537,23 @@ export default function HunterSystem({ selectedDate, currentUser }) {
               </div>
             </div>
 
-            <button
-              onClick={() => setAriseCinematic(null)}
-              className="w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-purple-500/30 cursor-pointer transform hover:scale-[1.02] active:scale-[0.98] transition-all"
-            >
-              Command Shadow Soldier to Stand Guard
-            </button>
+            <div className="flex flex-col sm:flex-row items-center gap-2">
+              <button
+                type="button"
+                onClick={() => { playSound('arise'); speakSungJinWooVoice(); }}
+                className="w-full sm:w-1/2 py-2.5 bg-slate-900 hover:bg-slate-800 border border-purple-500/40 text-purple-200 font-bold text-xs rounded-xl flex items-center justify-center space-x-1.5 cursor-pointer transition-all"
+              >
+                <span>🔊</span>
+                <span>Replay "ARISE" Voice</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setAriseCinematic(null)}
+                className="w-full sm:w-1/2 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-purple-500/30 cursor-pointer transform hover:scale-[1.02] active:scale-[0.98] transition-all"
+              >
+                Deploy into Legion
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1522,9 +1564,9 @@ export default function HunterSystem({ selectedDate, currentUser }) {
         onClose={() => setShowResetConfirm(false)}
         onConfirm={handleResetHunter}
         title="Reset Hunter Progression?"
-        message="Are you sure you want to reset your Hunter level back to Level 1 and clear your claimed quests? This allows you to start your awakening journey completely fresh."
-        confirmText="Yes, Reset to Level 1"
-        cancelText="Keep My Level"
+        message="Are you sure you want to completely reset your Hunter progression back to Level 1? This will clear all levels, daily claimed quests, defeated Dungeon Gates, S-Rank Artifacts, and your entire Shadow Army."
+        confirmText="Yes, Reset Everything"
+        cancelText="Keep My Hunter State"
         danger={true}
       />
     </div>

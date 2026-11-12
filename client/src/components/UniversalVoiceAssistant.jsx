@@ -632,20 +632,29 @@ export default function UniversalVoiceAssistant({ selectedDate, onActionComplete
         parsedData: { amountMl: 500 }
       });
     } else if (newCategory === 'workout') {
+      const match = text.match(/(\d+)\s*(?:push-?ups?|push\s+ups?|pull-?ups?|pull\s+ups?|reps?)/i);
+      const isPush = /push/i.test(text);
+      const isPull = /pull/i.test(text);
+      const reps = match ? parseInt(match[1]) : 15;
+      const exName = isPush ? 'Standard Push-ups' : isPull ? 'Pull-ups' : 'Strength Workout Session';
+      const isBodyweight = isPush || isPull;
+      const wt = isBodyweight ? 0 : 50;
+      const wtDisplay = wt > 0 ? `@ ${wt} kg` : '(Bodyweight)';
+
       setPreviewData({
         ...previewData,
         intent: 'workout',
-        badgeText: 'Strength Workout',
-        badgeColor: 'amber',
-        summaryTitle: 'Strength Workout Session',
-        previewDetails: '3 sets × 10 reps @ 50 kg',
+        badgeText: isBodyweight ? 'Calisthenics' : 'Strength Workout',
+        badgeColor: isBodyweight ? 'emerald' : 'amber',
+        summaryTitle: exName,
+        previewDetails: `1 set × ${reps} reps ${wtDisplay}`,
         parsedData: {
-          exerciseName: 'Strength Workout Session',
-          setsCount: 3,
-          repsCount: 10,
-          weightKg: 50,
-          durationMin: 35,
-          caloriesBurned: 125
+          exerciseName: exName,
+          setsCount: 1,
+          repsCount: reps,
+          weightKg: wt,
+          durationMin: Math.max(2, Math.round(reps * 0.5)),
+          caloriesBurned: Math.round(reps * 0.5)
         }
       });
     } else if (newCategory === 'weight') {

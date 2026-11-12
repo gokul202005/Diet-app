@@ -915,7 +915,12 @@ function normalizeFitnessSpeech(rawText) {
     [/\bbiriyani\b/gi, 'biryani'],
     [/\bcard\b(?=.*(?:rice|curd))/gi, 'curd'],
     [/\bcurds\b/gi, 'curd'],
-    // Gym Exercises
+    // Gym & Calisthenics Exercises
+    [/\bpush\s+ups?\b/gi, 'push-ups'],
+    [/\bpull\s+ups?\b/gi, 'pull-ups'],
+    [/\bchin\s+ups?\b/gi, 'chin-ups'],
+    [/\bsit\s+ups?\b/gi, 'sit-ups'],
+    [/\bjumping\s+jacks?\b/gi, 'jumping-jacks'],
     [/\bbench past\b/gi, 'bench press'],
     [/\bbench price\b/gi, 'bench press'],
     [/\bbench fresh\b/gi, 'bench press'],
@@ -963,12 +968,14 @@ async function parseUniversalVoiceIntent(text, date = new Date().toISOString().s
   // 2. INTENT: GYM WORKOUT & BIOMECHANICS PROGRESSION
   const gymKeywords = [
     'bench', 'squat', 'deadlift', 'press', 'curl', 'dumbbell', 'barbell', 'sets', 'reps',
-    'workout', 'pushups', 'push-ups', 'pullups', 'pull-ups', 'flyes', 'pulldown', 'lunges',
+    'workout', 'pushups', 'push-ups', 'push up', 'push ups', 'pullups', 'pull-ups', 'pull up', 'pull ups',
+    'chin-up', 'chin up', 'chinups', 'flyes', 'pulldown', 'lunges',
     'tricep', 'bicep', 'shoulder', 'chest', 'leg', 'rows', 'incline', 'plank', 'dip', 'dips',
-    'lateral raise', 'overhead press', 'ohp', 'hip thrust', 'leg press', 'abs'
+    'lateral raise', 'overhead press', 'ohp', 'hip thrust', 'leg press', 'abs', 'crunches', 'situps', 'sit-ups'
   ];
+  const hasCalisthenicsCount = /\b\d+\s*(?:push-?ups?|push\s+ups?|pull-?ups?|pull\s+ups?|chin-?ups?|sit-?ups?|sit\s+ups?|dips?|squats?|jumping\s+jacks?)\b/i.test(clean);
   const hasSetRepPattern = /\b\d+\s*(?:sets|reps|x)\b/i.test(clean) || /\b\d+\s*sets?\s*(?:of\s*)?\d+\s*reps?\b/i.test(clean);
-  const isWorkout = gymKeywords.some(kw => clean.includes(kw)) || hasSetRepPattern;
+  const isWorkout = gymKeywords.some(kw => clean.includes(kw)) || hasSetRepPattern || hasCalisthenicsCount;
 
   if (isWorkout) {
     let exerciseName = 'Barbell Flat Bench Press';
@@ -999,7 +1006,7 @@ async function parseUniversalVoiceIntent(text, date = new Date().toISOString().s
     const setsMatch = clean.match(/(\d+)\s*sets?/i);
     let repsMatch = clean.match(/(\d+)\s*reps?/i);
     if (!repsMatch) {
-      repsMatch = clean.match(/(\d+)\s*(?:push-?ups?|pull-?ups?|chin-?ups?|dips?|crunches?|sit-?ups?|squats?)/i);
+      repsMatch = clean.match(/(\d+)\s*(?:push-?ups?|push\s+ups?|pull-?ups?|pull\s+ups?|chin-?ups?|dips?|crunches?|sit-?ups?|sit\s+ups?|squats?)/i);
     }
     const weightMatch = clean.match(/(\d+(?:\.\d+)?)\s*(?:kg|kilos|kgs)\b/i);
 
@@ -1015,8 +1022,8 @@ async function parseUniversalVoiceIntent(text, date = new Date().toISOString().s
       intent: 'workout',
       summaryTitle: exerciseName,
       previewDetails: `${setsCount} ${setsCount > 1 ? 'sets' : 'set'} × ${repsCount} reps ${weightDisplay}`,
-      badgeText: 'Strength Workout',
-      badgeColor: 'amber',
+      badgeText: isCalisthenics ? 'Calisthenics' : 'Strength Workout',
+      badgeColor: isCalisthenics ? 'emerald' : 'amber',
       originalText: text,
       parsedData: {
         exerciseName,
@@ -1324,12 +1331,15 @@ async function commitUniversalVoice(intent, payload, originalText = '', date = n
 
     const weightStr = (payload.weightKg && payload.weightKg > 0) ? `@ ${payload.weightKg} kg` : '(Bodyweight)';
     const setCountStr = `${payload.setsCount || 1} ${(payload.setsCount || 1) > 1 ? 'sets' : 'set'}`;
+    const isPushupOrCal = (payload.exerciseName || '').toLowerCase().includes('push') || (payload.exerciseName || '').toLowerCase().includes('pull');
+    const dmg = isPushupOrCal ? Math.round((payload.repsCount || 10) * 3.5) : 150;
+    const gateFeedback = ` Inflicted +${dmg} Battle Power DMG on active Dungeon Gate!`;
     return {
       success: true,
       section: 'workouts',
       action: 'log_workout',
       workout: newWorkout,
-      feedback: `Logged workout: ${payload.exerciseName} (${setCountStr} × ${payload.repsCount || 10} reps ${weightStr})!`
+      feedback: `Logged workout: ${payload.exerciseName} (${setCountStr} × ${payload.repsCount || 10} reps ${weightStr})!${gateFeedback}`
     };
   }
 
@@ -2117,13 +2127,18 @@ app.post('/api/hunter/reset', (req, res) => {
   db.hunterProfiles[userId] = {
     level: 1,
     xp: 0,
-    totalQuestsCompleted: 0,
-    claimedQuests: {},
+    rank: 'E-Rank Hunter',
+    title: 'Novice Hunter',
     isAwakened: false,
     lastAwakenedLevel: 0,
-    title: 'Novice Hunter',
+    totalQuestsCompleted: 0,
+    claimedQuests: {},
     conqueredGates: [],
     shadowArmy: [],
+    artifacts: [],
+    unlockedTitles: ['Novice Hunter'],
+    dailyBossClaims: {},
+    activeGateId: 'gate_e_goblin',
     resetAt: new Date().toISOString()
   };
   writeDB(db);
@@ -3566,6 +3581,9 @@ app.get('/api/user/data-summary', (req, res) => {
   const weightCount = (db.weightLogs || []).filter(isUserMatch).length;
   const chatCount = (db.chatHistory || []).filter(isUserMatch).length;
   const photosCount = (db.physiqueVault || []).filter(isUserMatch).length;
+  const hunterProfile = db.hunterProfiles?.[userId] || {};
+  const hunterLevel = hunterProfile.level || 1;
+  const shadowsCount = (hunterProfile.shadowArmy || []).length;
 
   res.json({
     success: true,
@@ -3577,6 +3595,8 @@ app.get('/api/user/data-summary', (req, res) => {
     weightCount,
     chatCount,
     photosCount,
+    hunterLevel,
+    shadowsCount,
     totalRecords: mealsCount + workoutsCount + walkingCount + waterCount + weightCount + chatCount + photosCount
   });
 });
@@ -3676,20 +3696,27 @@ app.post('/api/user/clear-data', async (req, res) => {
       }
     }
 
-    // 8. Hunter Quest Claims / Awakening reset (if requested)
-    if (clearHunter && db.hunterProfiles && db.hunterProfiles[userId]) {
+    // 8. Hunter Progression, Dungeon Gates, Artifacts & Shadow Army
+    if (clearHunter) {
+      if (!db.hunterProfiles) db.hunterProfiles = {};
       db.hunterProfiles[userId] = {
         level: 1,
         xp: 0,
-        rank: 'E-Rank',
-        rankTier: 'Bronze',
-        totalQuestsCompleted: 0,
-        claimedQuests: {},
+        rank: 'E-Rank Hunter',
+        title: 'Novice Hunter',
         isAwakened: false,
         lastAwakenedLevel: 0,
-        title: 'Novice Hunter',
+        totalQuestsCompleted: 0,
+        claimedQuests: {},
+        conqueredGates: [],
+        shadowArmy: [],
+        artifacts: [],
+        unlockedTitles: ['Novice Hunter'],
+        dailyBossClaims: {},
+        activeGateId: 'gate_e_goblin',
         resetAt: new Date().toISOString()
       };
+      deletedCounts.hunter = 1;
     }
 
     writeDB(db);

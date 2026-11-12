@@ -48,7 +48,7 @@ export default function SettingsModal({ isOpen, onClose, onEditProfile, currentU
     clearWeight: true,
     clearChat: true,
     clearPhotos: false,
-    clearHunter: false
+    clearHunter: true
   });
   const [releaseTag, setReleaseTag] = useState((typeof import.meta !== 'undefined' && import.meta.env?.VITE_RELEASE_TAG) || 'v1.1.0-b67');
 
@@ -536,13 +536,25 @@ export default function SettingsModal({ isOpen, onClose, onEditProfile, currentU
                   📸 Vault Photos <strong className="text-rose-400 font-mono">({dataSummary?.photosCount || 0})</strong>
                 </span>
               </label>
+
+              <label className="flex items-center space-x-2.5 p-2 rounded-xl bg-purple-950/40 border border-purple-500/40 hover:border-purple-400 cursor-pointer sm:col-span-2">
+                <input
+                  type="checkbox"
+                  checked={deleteOptions.clearHunter}
+                  onChange={(e) => setDeleteOptions(prev => ({ ...prev, clearHunter: e.target.checked }))}
+                  className="rounded border-slate-700 text-purple-500 focus:ring-purple-500/20 bg-slate-950"
+                />
+                <span className="text-purple-200 font-bold">
+                  ⚔️ Hunter Progression & Shadow Army <strong className="text-purple-300 font-mono">(Level {dataSummary?.hunterLevel || 1}, {dataSummary?.shadowsCount || 0} Shadows)</strong>
+                </span>
+              </label>
             </div>
 
             <div className="flex items-center justify-between pt-2 border-t border-rose-500/20">
               <button
                 type="button"
                 onClick={() => {
-                  const allSelected = deleteOptions.clearMeals && deleteOptions.clearWorkouts && deleteOptions.clearWalking;
+                  const allSelected = deleteOptions.clearMeals && deleteOptions.clearWorkouts && deleteOptions.clearWalking && deleteOptions.clearHunter;
                   setDeleteOptions({
                     clearMeals: !allSelected,
                     clearWorkouts: !allSelected,
@@ -551,18 +563,18 @@ export default function SettingsModal({ isOpen, onClose, onEditProfile, currentU
                     clearWeight: !allSelected,
                     clearChat: !allSelected,
                     clearPhotos: !allSelected,
-                    clearHunter: false
+                    clearHunter: !allSelected
                   });
                 }}
                 className="text-[11px] text-slate-400 hover:text-white underline cursor-pointer"
               >
-                {deleteOptions.clearMeals && deleteOptions.clearWorkouts && deleteOptions.clearWalking ? 'Deselect All' : 'Select All'}
+                {deleteOptions.clearMeals && deleteOptions.clearWorkouts && deleteOptions.clearWalking && deleteOptions.clearHunter ? 'Deselect All' : 'Select All'}
               </button>
 
               <button
                 type="button"
                 onClick={() => setShowConfirmDelete(true)}
-                disabled={isDeletingData || (!deleteOptions.clearMeals && !deleteOptions.clearWorkouts && !deleteOptions.clearWalking && !deleteOptions.clearWater && !deleteOptions.clearChat && !deleteOptions.clearPhotos)}
+                disabled={isDeletingData || (!deleteOptions.clearMeals && !deleteOptions.clearWorkouts && !deleteOptions.clearWalking && !deleteOptions.clearWater && !deleteOptions.clearWeight && !deleteOptions.clearChat && !deleteOptions.clearPhotos && !deleteOptions.clearHunter)}
                 className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white font-bold rounded-xl text-xs transition-all flex items-center space-x-1.5 shadow-md shadow-rose-600/20 cursor-pointer"
               >
                 <Trash2 className="w-3.5 h-3.5" />

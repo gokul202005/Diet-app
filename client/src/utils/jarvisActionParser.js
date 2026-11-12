@@ -164,12 +164,13 @@ export function parseJarvisVoiceAction(rawText) {
     /\b\d+\s*(?:m|meters?|metres?|km|kms?|kilometers?|kilometres?|miles?|steps?)\b/i.test(lower);
 
   const workoutKeywords = [
-    'bench', 'squat', 'deadlift', 'press', 'curl', 'pushup', 'push-up', 'pushups', 'push-ups',
-    'pullup', 'pull-up', 'pullups', 'pull-ups', 'dip', 'dips', 'lunge', 'lunges', 'crunch', 'crunches',
-    'situp', 'situps', 'plank', 'tricep', 'bicep', 'shoulder', 'dumbbell', 'barbell', 'workout'
+    'bench', 'squat', 'deadlift', 'press', 'curl', 'pushup', 'push-up', 'pushups', 'push-ups', 'push up', 'push ups',
+    'pullup', 'pull-up', 'pullups', 'pull-ups', 'pull up', 'pull ups', 'chin-up', 'chin up', 'chinups',
+    'dip', 'dips', 'lunge', 'lunges', 'crunch', 'crunches',
+    'situp', 'situps', 'sit up', 'sit ups', 'plank', 'tricep', 'bicep', 'shoulder', 'dumbbell', 'barbell', 'workout'
   ];
   const isWorkoutLogging = workoutKeywords.some(kw => lower.includes(kw)) &&
-    (/\b\d+\s*(?:sets?|reps?|kg|push-?ups?|pull-?ups?|dips?|crunches?|sit-?ups?)\b/i.test(lower) || /\b(i did|did|completed|performed)\b/i.test(lower));
+    (/\b\d+\s*(?:sets?|reps?|kg|push-?ups?|push\s+ups?|pull-?ups?|pull\s+ups?|dips?|crunches?|sit-?ups?|sit\s+ups?)\b/i.test(lower) || /\b(i did|did|completed|performed|log|add)\b/i.test(lower));
 
   const foodMealKeywords = [
     'breakfast', 'lunch', 'dinner', 'snack', 'idli', 'idlis', 'dosa', 'dosas', 'sambar', 'chutney',
