@@ -348,6 +348,9 @@ export default function App() {
         currentUser={currentUser}
         onClose={() => setIsSettingsOpen(false)}
         onEditProfile={() => setIsOnboardingOpen(true)}
+        onDataCleared={() => {
+          setRefreshKey(prev => prev + 1);
+        }}
       />
 
     </div>

@@ -492,6 +492,20 @@ export const api = {
     });
   },
 
+  // User Data Deletion & Activity Reset
+  getUserDataSummary: async (userId) => {
+    const customHeaders = userId ? { 'x-user-id': userId } : {};
+    return safeFetch(`${BASE_URL}/user/data-summary`, { headers: customHeaders });
+  },
+  clearUserData: async (options = {}, userId) => {
+    const customHeaders = userId ? { 'x-user-id': userId } : {};
+    return safeFetch(`${BASE_URL}/user/clear-data`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...customHeaders },
+      body: JSON.stringify(options)
+    });
+  },
+
   // Cloud Database (Supabase / PostgreSQL)
   getDatabaseStatus: async () => {
     return safeFetch(`${BASE_URL}/database/status`);

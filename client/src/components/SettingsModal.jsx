@@ -11,11 +11,14 @@ import {
   ExternalLink,
   Flame,
   Info,
-  Activity
+  Activity,
+  Trash2,
+  AlertTriangle
 } from 'lucide-react';
 import { api } from '../api';
+import ConfirmModal from './ConfirmModal';
 
-export default function SettingsModal({ isOpen, onClose, onEditProfile, currentUser }) {
+export default function SettingsModal({ isOpen, onClose, onEditProfile, currentUser, onDataCleared }) {
   const [settings, setSettings] = useState(null);
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [deviceName, setDeviceName] = useState('Fastrack Reflex Curve');
@@ -32,10 +35,39 @@ export default function SettingsModal({ isOpen, onClose, onEditProfile, currentU
   const [isMigrating, setIsMigrating] = useState(false);
   const [migrationResult, setMigrationResult] = useState(null);
 
+  // User activity data summary & deletion state
+  const [dataSummary, setDataSummary] = useState(null);
+  const [isLoadingSummary, setIsLoadingSummary] = useState(false);
+  const [isDeletingData, setIsDeletingData] = useState(false);
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+  const [deleteOptions, setDeleteOptions] = useState({
+    clearMeals: true,
+    clearWorkouts: true,
+    clearWalking: true,
+    clearWater: true,
+    clearWeight: true,
+    clearChat: true,
+    clearPhotos: false,
+    clearHunter: false
+  });
+
+  const loadDataSummary = () => {
+    if (!currentUser?.id) return;
+    setIsLoadingSummary(true);
+    api.getUserDataSummary(currentUser.id)
+      .then((data) => {
+        if (data?.success) setDataSummary(data);
+      })
+      .catch(() => null)
+      .finally(() => setIsLoadingSummary(false));
+  };
+
   useEffect(() => {
     if (isOpen) {
       // Remove any legacy leaking global key from localStorage
       try { localStorage.removeItem('agy_google_client_id'); } catch (e) {}
+
+      loadDataSummary();
 
       api.getSettings(currentUser?.id).then((data) => {
         setSettings(data);
@@ -54,6 +86,41 @@ export default function SettingsModal({ isOpen, onClose, onEditProfile, currentU
       }).catch(() => null);
     }
   }, [isOpen, currentUser?.id]);
+
+  const handleConfirmClearData = async () => {
+    setIsDeletingData(true);
+    try {
+      const res = await api.clearUserData(deleteOptions, currentUser?.id);
+      if (res?.success) {
+        try {
+          localStorage.removeItem('agy_local_steps_today');
+          if (deleteOptions.clearHunter) {
+            localStorage.removeItem('agy_hunter_profile');
+          }
+        } catch (e) {}
+
+        if (typeof window !== 'undefined' && window.showToast) {
+          window.showToast(
+            `Data deleted: ${res.totalDeleted || 0} records cleared successfully.`,
+            'success',
+            'Data Reset Complete'
+          );
+        }
+        loadDataSummary();
+        if (onDataCleared) {
+          onDataCleared();
+        }
+      } else {
+        throw new Error(res?.error || 'Failed to clear user data');
+      }
+    } catch (err) {
+      if (typeof window !== 'undefined' && window.showToast) {
+        window.showToast(err.message || 'Error deleting data', 'error', 'Error');
+      }
+    } finally {
+      setIsDeletingData(false);
+    }
+  };
 
   const handleMigrateToSupabase = async () => {
     setIsMigrating(true);
@@ -359,11 +426,138 @@ export default function SettingsModal({ isOpen, onClose, onEditProfile, currentU
                 onClose();
                 onEditProfile();
               }}
-              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5"
+              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer"
             >
               <User className="w-3.5 h-3.5 text-emerald-400" />
               <span>Edit Bio Profile</span>
             </button>
+          </div>
+
+          {/* USER DATA RESET & DELETION (DANGER ZONE) */}
+          <div className="p-4 bg-rose-950/20 border border-rose-500/30 rounded-2xl space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Trash2 className="w-4 h-4 text-rose-400" />
+                <span className="text-xs font-bold text-rose-300">Delete User Activity Data</span>
+              </div>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                {isLoadingSummary ? 'Counting...' : `${dataSummary?.totalRecords || 0} Records`}
+              </span>
+            </div>
+
+            <p className="text-[11px] text-slate-300 leading-relaxed">
+              Permanently delete logged activity for <strong>{currentUser?.name || 'your account'}</strong> without deleting your login account or macro targets:
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pt-1">
+              <label className="flex items-center space-x-2.5 p-2 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={deleteOptions.clearMeals}
+                  onChange={(e) => setDeleteOptions(prev => ({ ...prev, clearMeals: e.target.checked }))}
+                  className="rounded border-slate-700 text-rose-500 focus:ring-rose-500/20 bg-slate-950"
+                />
+                <span className="text-slate-200">
+                  🍲 Meals & Food <strong className="text-rose-400 font-mono">({dataSummary?.mealsCount || 0})</strong>
+                </span>
+              </label>
+
+              <label className="flex items-center space-x-2.5 p-2 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={deleteOptions.clearWorkouts}
+                  onChange={(e) => setDeleteOptions(prev => ({ ...prev, clearWorkouts: e.target.checked }))}
+                  className="rounded border-slate-700 text-rose-500 focus:ring-rose-500/20 bg-slate-950"
+                />
+                <span className="text-slate-200">
+                  🏋️ Workouts & Gym <strong className="text-rose-400 font-mono">({dataSummary?.workoutsCount || 0})</strong>
+                </span>
+              </label>
+
+              <label className="flex items-center space-x-2.5 p-2 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={deleteOptions.clearWalking}
+                  onChange={(e) => setDeleteOptions(prev => ({ ...prev, clearWalking: e.target.checked }))}
+                  className="rounded border-slate-700 text-rose-500 focus:ring-rose-500/20 bg-slate-950"
+                />
+                <span className="text-slate-200">
+                  🚶 Steps & Walking <strong className="text-rose-400 font-mono">({dataSummary?.walkingCount || 0})</strong>
+                </span>
+              </label>
+
+              <label className="flex items-center space-x-2.5 p-2 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={deleteOptions.clearWater}
+                  onChange={(e) => setDeleteOptions(prev => ({ 
+                    ...prev, 
+                    clearWater: e.target.checked,
+                    clearWeight: e.target.checked 
+                  }))}
+                  className="rounded border-slate-700 text-rose-500 focus:ring-rose-500/20 bg-slate-950"
+                />
+                <span className="text-slate-200">
+                  💧 Water & Weight <strong className="text-rose-400 font-mono">({(dataSummary?.waterCount || 0) + (dataSummary?.weightCount || 0)})</strong>
+                </span>
+              </label>
+
+              <label className="flex items-center space-x-2.5 p-2 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={deleteOptions.clearChat}
+                  onChange={(e) => setDeleteOptions(prev => ({ ...prev, clearChat: e.target.checked }))}
+                  className="rounded border-slate-700 text-rose-500 focus:ring-rose-500/20 bg-slate-950"
+                />
+                <span className="text-slate-200">
+                  💬 Coach Chat <strong className="text-rose-400 font-mono">({dataSummary?.chatCount || 0})</strong>
+                </span>
+              </label>
+
+              <label className="flex items-center space-x-2.5 p-2 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={deleteOptions.clearPhotos}
+                  onChange={(e) => setDeleteOptions(prev => ({ ...prev, clearPhotos: e.target.checked }))}
+                  className="rounded border-slate-700 text-rose-500 focus:ring-rose-500/20 bg-slate-950"
+                />
+                <span className="text-slate-200">
+                  📸 Vault Photos <strong className="text-rose-400 font-mono">({dataSummary?.photosCount || 0})</strong>
+                </span>
+              </label>
+            </div>
+
+            <div className="flex items-center justify-between pt-2 border-t border-rose-500/20">
+              <button
+                type="button"
+                onClick={() => {
+                  const allSelected = deleteOptions.clearMeals && deleteOptions.clearWorkouts && deleteOptions.clearWalking;
+                  setDeleteOptions({
+                    clearMeals: !allSelected,
+                    clearWorkouts: !allSelected,
+                    clearWalking: !allSelected,
+                    clearWater: !allSelected,
+                    clearWeight: !allSelected,
+                    clearChat: !allSelected,
+                    clearPhotos: !allSelected,
+                    clearHunter: false
+                  });
+                }}
+                className="text-[11px] text-slate-400 hover:text-white underline cursor-pointer"
+              >
+                {deleteOptions.clearMeals && deleteOptions.clearWorkouts && deleteOptions.clearWalking ? 'Deselect All' : 'Select All'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowConfirmDelete(true)}
+                disabled={isDeletingData || (!deleteOptions.clearMeals && !deleteOptions.clearWorkouts && !deleteOptions.clearWalking && !deleteOptions.clearWater && !deleteOptions.clearChat && !deleteOptions.clearPhotos)}
+                className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white font-bold rounded-xl text-xs transition-all flex items-center space-x-1.5 shadow-md shadow-rose-600/20 cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>{isDeletingData ? 'Deleting...' : 'Delete Selected Data'}</span>
+              </button>
+            </div>
           </div>
 
           {/* Footer Save Button */}
@@ -388,6 +582,18 @@ export default function SettingsModal({ isOpen, onClose, onEditProfile, currentU
         </form>
 
       </div>
+
+      {/* Confirmation Modal */}
+      <ConfirmModal
+        isOpen={showConfirmDelete}
+        onClose={() => setShowConfirmDelete(false)}
+        onConfirm={handleConfirmClearData}
+        title="Permanently Delete Activity Records?"
+        message="Are you sure you want to delete your selected activity records (meals, workouts, walking data)? Your user account and bio macro targets will remain safe, but selected logged entries will be permanently deleted from local and cloud storage."
+        confirmText="Yes, Delete My Data"
+        cancelText="Cancel"
+        danger={true}
+      />
     </div>
   );
 }

@@ -2881,6 +2881,197 @@ app.post('/api/database/migrate-to-supabase', async (req, res) => {
   res.json(result);
 });
 
+// --- USER DATA DELETION & RESET (MEALS, WORKOUTS, WALKING, WATER, CHAT) ---
+app.get('/api/user/data-summary', (req, res) => {
+  const db = readDB();
+  const userId = getAuthUserId(req, db);
+  if (!userId) {
+    return res.status(401).json({ success: false, error: 'Unauthorized: User not identified' });
+  }
+
+  const isUserMatch = (item) => {
+    if (!item) return false;
+    if (item.userId === userId) return true;
+    if (!item.userId && (db.users || []).length <= 1) return true;
+    return false;
+  };
+
+  const mealsCount = (db.meals || []).filter(isUserMatch).length;
+  const workoutsCount = (db.workouts || []).filter(isUserMatch).length;
+  const walkingCount = (db.fastrackLogs || []).filter(isUserMatch).length;
+  const waterCount = (db.waterLogs || []).filter(isUserMatch).length;
+  const weightCount = (db.weightLogs || []).filter(isUserMatch).length;
+  const chatCount = (db.chatHistory || []).filter(isUserMatch).length;
+  const photosCount = (db.physiqueVault || []).filter(isUserMatch).length;
+
+  res.json({
+    success: true,
+    userId,
+    mealsCount,
+    workoutsCount,
+    walkingCount,
+    waterCount,
+    weightCount,
+    chatCount,
+    photosCount,
+    totalRecords: mealsCount + workoutsCount + walkingCount + waterCount + weightCount + chatCount + photosCount
+  });
+});
+
+app.post('/api/user/clear-data', async (req, res) => {
+  try {
+    const db = readDB();
+    const userId = getAuthUserId(req, db);
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'Unauthorized: User not identified' });
+    }
+
+    const { 
+      clearMeals = true, 
+      clearWorkouts = true, 
+      clearWalking = true, 
+      clearWater = true, 
+      clearWeight = true,
+      clearChat = true,
+      clearPhotos = false,
+      clearHunter = false
+    } = req.body || {};
+
+    const deletedCounts = {
+      meals: 0,
+      workouts: 0,
+      walking: 0,
+      water: 0,
+      weight: 0,
+      chat: 0,
+      photos: 0
+    };
+
+    const isUserMatch = (item) => {
+      if (!item) return false;
+      if (item.userId === userId) return true;
+      if (!item.userId && (db.users || []).length <= 1) return true;
+      return false;
+    };
+
+    // 1. Meals
+    if (clearMeals && Array.isArray(db.meals)) {
+      const before = db.meals.length;
+      db.meals = db.meals.filter(m => !isUserMatch(m));
+      deletedCounts.meals = before - db.meals.length;
+    }
+
+    // 2. Workouts & Plans
+    if (clearWorkouts) {
+      if (Array.isArray(db.workouts)) {
+        const before = db.workouts.length;
+        db.workouts = db.workouts.filter(w => !isUserMatch(w));
+        deletedCounts.workouts = before - db.workouts.length;
+      }
+      if (Array.isArray(db.workoutPlans)) {
+        db.workoutPlans = db.workoutPlans.filter(wp => !isUserMatch(wp));
+      }
+    }
+
+    // 3. Walking / Steps / Fastrack Logs
+    if (clearWalking && Array.isArray(db.fastrackLogs)) {
+      const before = db.fastrackLogs.length;
+      db.fastrackLogs = db.fastrackLogs.filter(l => !isUserMatch(l));
+      deletedCounts.walking = before - db.fastrackLogs.length;
+    }
+
+    // 4. Water Logs
+    if (clearWater && Array.isArray(db.waterLogs)) {
+      const before = db.waterLogs.length;
+      db.waterLogs = db.waterLogs.filter(w => !isUserMatch(w));
+      deletedCounts.water = before - db.waterLogs.length;
+    }
+
+    // 5. Weight Logs
+    if (clearWeight && Array.isArray(db.weightLogs)) {
+      const before = db.weightLogs.length;
+      db.weightLogs = db.weightLogs.filter(w => !isUserMatch(w));
+      deletedCounts.weight = before - db.weightLogs.length;
+    }
+
+    // 6. Coach & Jarvis Chat History
+    if (clearChat && Array.isArray(db.chatHistory)) {
+      const before = db.chatHistory.length;
+      db.chatHistory = db.chatHistory.filter(c => !isUserMatch(c));
+      deletedCounts.chat = before - db.chatHistory.length;
+    }
+
+    // 7. Physique Photos (optional)
+    if (clearPhotos) {
+      if (Array.isArray(db.physiqueVault)) {
+        const before = db.physiqueVault.length;
+        db.physiqueVault = db.physiqueVault.filter(p => !isUserMatch(p));
+        deletedCounts.photos = before - db.physiqueVault.length;
+      }
+      if (Array.isArray(db.progressPhotos)) {
+        db.progressPhotos = db.progressPhotos.filter(p => !isUserMatch(p));
+      }
+    }
+
+    // 8. Hunter Quest Claims / Awakening reset (if requested)
+    if (clearHunter && db.hunterProfiles && db.hunterProfiles[userId]) {
+      db.hunterProfiles[userId] = {
+        level: 1,
+        xp: 0,
+        rank: 'E-Rank',
+        rankTier: 'Bronze',
+        totalQuestsCompleted: 0,
+        claimedQuests: {},
+        isAwakened: false,
+        lastAwakenedLevel: 0,
+        title: 'Novice Hunter',
+        resetAt: new Date().toISOString()
+      };
+    }
+
+    writeDB(db);
+
+    // Sync deletion to Supabase Cloud if connected
+    if (isSupabaseReady()) {
+      try {
+        const supabase = getSupabase();
+        if (clearMeals) {
+          await supabase.from('meals').delete().eq('user_id', userId);
+        }
+        if (clearWorkouts) {
+          await supabase.from('workouts').delete().eq('user_id', userId);
+        }
+        if (clearWalking) {
+          await supabase.from('watch_logs').delete().eq('user_id', userId);
+        }
+        if (clearWater) {
+          await supabase.from('water_logs').delete().eq('user_id', userId);
+        }
+        if (clearWeight) {
+          await supabase.from('weight_logs').delete().eq('user_id', userId);
+        }
+        if (clearPhotos) {
+          await supabase.from('vault_photos').delete().eq('user_id', userId);
+        }
+      } catch (sbErr) {
+        console.warn('[Supabase Cloud Delete Notice]:', sbErr.message);
+      }
+    }
+
+    const totalDeleted = Object.values(deletedCounts).reduce((a, b) => a + b, 0);
+
+    res.json({
+      success: true,
+      deletedCounts,
+      totalDeleted,
+      message: `Successfully deleted ${totalDeleted} activity records for your account.`
+    });
+  } catch (err) {
+    console.error('Clear user data error:', err);
+    res.status(500).json({ success: false, error: err.message || 'Failed to clear user data' });
+  }
+});
+
 // Direct APK Download Endpoint (Always serves or redirects to direct .apk binary download)
 app.get('/api/download/android-apk', (req, res) => {
   const localApkPath = path.join(__dirname, 'uploads/agy-fit-release.apk');
