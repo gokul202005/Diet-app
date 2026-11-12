@@ -669,7 +669,36 @@ JARVIS BEHAVIOR RULES:
       };
     }
 
-    // 4. Wit & Compliments ("Good job", "Thank you", "You're smart", "Nice")
+    // 4. Activity & Current Status ("what are we doing right now", "what are you doing", "what's happening")
+    if (lower.includes('what are we doing') || lower.includes('what are you doing') || lower.includes('what\'s happening') || lower.includes('whats happening')) {
+      const statusReplies = [
+        `We are synchronizing your personal AI command nexus, ${name}. All subroutines and voice telemetry are running at full readiness. What task or challenge shall we tackle next?`,
+        `At present, ${name}, we are testing our direct communication link and validating system responsiveness. I am primed and waiting for your instruction.`,
+        `Standing by at peak processing capacity, ${name}. Monitoring your background telemetry and ready to execute whatever directive you have in mind.`
+      ];
+      return {
+        reply: statusReplies[Math.floor(Math.random() * statusReplies.length)],
+        source: 'jarvis-autonomous-brain'
+      };
+    }
+
+    // 5. System Status & Health ("status", "system status", "all systems go")
+    if (lower.includes('status') || lower.includes('diagnostics') || lower.includes('systems online')) {
+      return {
+        reply: `All systems nominal, ${name}. Supabase cloud database is connected, local and cloud servers are synchronized, and the neural voice pipeline is operating smoothly.`,
+        source: 'jarvis-autonomous-brain'
+      };
+    }
+
+    // 6. Assistance & Problem Solving ("help me", "can you help", "need assistance")
+    if (lower.includes('help me') || lower.includes('can you help') || lower.includes('need assistance')) {
+      return {
+        reply: `Always, ${name}. Name the problem—whether writing code, analyzing data, researching a topic, or planning your daily execution—and consider it handled.`,
+        source: 'jarvis-autonomous-brain'
+      };
+    }
+
+    // 7. Wit & Compliments ("Good job", "Thank you", "You're smart", "Nice")
     if (/thank(s|\s*you)|good\s*(job|work)|well\s*done|awesome|great\s*job/i.test(lower)) {
       return {
         reply: `Much obliged, ${name}. It is what I was built for. Let me know what you need next.`,
@@ -677,16 +706,23 @@ JARVIS BEHAVIOR RULES:
       };
     }
 
-    // 5. Explicit Diet / Nutrition / South Indian Food / Workouts queries (ONLY IF user specifically asks about fitness/nutrition/food)
+    // 8. Explicit Diet / Nutrition / South Indian Food / Workouts queries (ONLY IF user specifically asks about fitness/nutrition/food)
     const isDietOrFitnessQuery = /calorie|protein|macro|diet|food|eat|dinner|lunch|breakfast|snack|swap|recipe|dosa|idli|chicken|egg|workout|exercise|gym|push|pull|squat|bench|fastrack|step/i.test(lower);
     if (isDietOrFitnessQuery) {
       return this.heuristicSouthIndianCoach(message, userProfile, todayStats);
     }
 
-    // 6. Outside-the-app & General Intelligence Assistant
+    // 9. Outside-the-app & General Intelligence Assistant
     if (lower.includes('meaning of life')) {
       return {
         reply: `Biologically, to propagate complexity and conscious experience; philosophically, ${name}, the meaning is whatever purpose you choose to commit yourself to with excellence.`,
+        source: 'jarvis-autonomous-brain'
+      };
+    }
+
+    if (lower.includes('quantum computing')) {
+      return {
+        reply: `Unlike classical computers that use binary bits of 0 or 1, quantum computers leverage qubits that exploit superposition and entanglement to evaluate vast solution spaces simultaneously, ${name}.`,
         source: 'jarvis-autonomous-brain'
       };
     }
@@ -706,9 +742,14 @@ JARVIS BEHAVIOR RULES:
       };
     }
 
-    // Intelligent, articulate general response without repetitive calorie recitation
+    // 10. Intelligent general response (Never echo quotation marks or canned robotic phrases)
+    const dynamicReplies = [
+      `Understood, ${name}. I am on it. Direct me on the specific angle or details you want to focus on, and I will execute immediately.`,
+      `I hear you clearly, ${name}. Processing the parameters now. Would you like a high-level summary, an in-depth breakdown, or immediate action steps?`,
+      `Consider it noted, ${name}. Systems are focused on your objective. What is our next operational step?`
+    ];
     return {
-      reply: `Understood, ${name}. I am analyzing your request: "${raw}". I am your dedicated assistant, ready to tackle any task, outside query, or operational goal. Tell me how you'd like to proceed.`,
+      reply: dynamicReplies[Math.floor(Math.random() * dynamicReplies.length)],
       source: 'jarvis-autonomous-brain'
     };
   }

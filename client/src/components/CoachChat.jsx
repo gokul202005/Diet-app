@@ -434,7 +434,7 @@ export default function CoachChat({ profile, selectedDate }) {
     localStorage.setItem('agy_jarvis_voice_mode', String(next));
     window.dispatchEvent(new CustomEvent('agy-jarvis-external-toggle', { detail: { isActive: next, persona: voicePersona } }));
     if (next) {
-      speakText("Jarvis Mode Activated. I am listening! Ask me anything about your South Indian diet, Fastrack watch steps, or gym workouts.", null, true);
+      speakText("Jarvis Mode Activated. All systems are online and dedicated to you, sir. Ask me anything—science, tech, daily tasks, or fitness.", null, true);
     } else {
       stopSpeaking();
       stopListening();
@@ -678,11 +678,11 @@ export default function CoachChat({ profile, selectedDate }) {
   };
 
   const quickPrompts = [
+    'What are we doing right now?',
+    'Yo Yo Jarvis what are you doing',
+    'Explain quantum computing in simple terms',
     'Suggest a high-protein South Indian dinner under 450 kcal',
-    'How do I swap a meal in my South Indian diet plan?',
-    'What is a good South Indian pre-workout snack?',
-    'I have 35g protein left to reach my goal. What are my quickest options?',
-    'What are the best South Indian breakfast options with eggs?'
+    'How do I swap a meal in my South Indian diet plan?'
   ];
 
   return (
@@ -691,16 +691,16 @@ export default function CoachChat({ profile, selectedDate }) {
       {/* Header */}
       <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-5 shadow-xl flex items-center justify-between">
         <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center text-slate-950 shadow-md shadow-emerald-500/20 shrink-0">
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-cyan-500 to-blue-500 flex items-center justify-center text-slate-950 shadow-md shadow-cyan-500/20 shrink-0">
             <Bot className="w-6 h-6" />
           </div>
           <div>
             <h2 className="text-sm sm:text-base font-bold text-white flex items-center space-x-1.5">
-              <span>AGY Fitness & Nutrition AI Coach</span>
-              <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+              <span>JARVIS Autonomous Personal Assistant</span>
+              <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
             </h2>
             <p className="text-[10px] sm:text-[11px] text-slate-400">
-              Personalized for your 100% South Indian diet, Fastrack watch, and bio targets.
+              Autonomous General Intelligence • Science, Programming, Life & Physical Conditioning
             </p>
           </div>
         </div>
@@ -820,10 +820,10 @@ export default function CoachChat({ profile, selectedDate }) {
 
             <div className="space-y-1">
               <h3 className="text-base font-extrabold text-white">
-                Namaste, {profile?.name || 'Athlete'}! 🙏
+                Greetings, {profile?.name || 'sir'}!
               </h3>
               <p className="text-xs text-slate-400 leading-relaxed">
-                I'm your dedicated South Indian Nutrition & Biomechanics AI Coach. Ask me about high-protein meal swaps, dosa/idli calibrations, Fastrack burns, or workout splits.
+                I am JARVIS, your dedicated autonomous personal AI assistant. Ask me anything across any domain—science, technology, programming, daily planning, or health optimization.
               </p>
             </div>
 
@@ -1000,7 +1000,7 @@ export default function CoachChat({ profile, selectedDate }) {
           type="text"
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
-          placeholder={isListening ? 'Listening to your voice...' : 'Ask anything about South Indian foods, meal swaps, Fastrack burn...'}
+          placeholder={isListening ? 'Listening to your voice...' : 'Ask JARVIS anything — coding, science, daily tasks, life, or fitness...'}
           className="flex-1 bg-transparent px-2.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none"
         />
 
