@@ -153,19 +153,22 @@ export function parseJarvisVoiceAction(rawText) {
   }
 
   // 3. AUTONOMOUS DATA LOGGING INTENTS
-  // e.g. "log 3 idlis with sambar for breakfast", "i drank 2 glasses of water", "log bench press 3 sets 10 reps 70kg"
+  // e.g. "log 3 idlis with sambar for breakfast", "i drank 2 glasses of water", "100 meters walking", "1000m run"
   const isExplicitLogAction = /^(log|record|add|track)\b/i.test(lower) ||
     /\b(i ate|i had|i drank|drank|weighed myself at|morning weight)\b/i.test(lower);
 
   const isWaterLogging = (lower.includes('water') || lower.includes('thanni') || lower.includes('drank')) && 
     (lower.includes('ml') || lower.includes('glass') || lower.includes('bottle') || lower.includes('liter'));
 
+  const isCardioLogging = /\b(walk|walking|walked|run|running|ran|jog|jogging|sprint|sprinting|cycling|cycle|cardio|treadmill)\b/i.test(lower) ||
+    /\b\d+\s*(?:m|meters?|metres?|km|kms?|kilometers?|kilometres?|miles?|steps?)\b/i.test(lower);
+
   const isWorkoutLogging = (lower.includes('bench') || lower.includes('squat') || lower.includes('deadlift') || lower.includes('press') || lower.includes('curl')) &&
     (/\b\d+\s*sets?\b/i.test(lower) || /\b\d+\s*reps?\b/i.test(lower) || /\b\d+\s*kg\b/i.test(lower));
 
-  const isFoodLogging = isExplicitLogAction && !lower.includes('timer') && !isNavPattern;
+  const isFoodLogging = isExplicitLogAction && !isCardioLogging && !isWorkoutLogging && !isWaterLogging && !lower.includes('timer') && !isNavPattern;
 
-  if (isFoodLogging || isWaterLogging || isWorkoutLogging) {
+  if (isFoodLogging || isWaterLogging || isWorkoutLogging || isCardioLogging) {
     return {
       type: 'log_data',
       payloadText: clean,

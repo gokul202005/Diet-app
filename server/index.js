@@ -977,7 +977,88 @@ async function parseUniversalVoiceIntent(text, date = new Date().toISOString().s
     };
   }
 
-  // 5. INTENT: FASTRACK STEPS
+  // 5. INTENT: CARDIO, WALKING, RUNNING, CYCLING & DISTANCE/STEPS ACTIVITY
+  const cardioKeywords = ['walk', 'walking', 'walked', 'run', 'running', 'ran', 'jog', 'jogging', 'sprint', 'sprinting', 'cycling', 'cycled', 'cycle', 'treadmill', 'elliptical', 'cardio', 'hike', 'hiking'];
+  const hasCardioKeyword = cardioKeywords.some(kw => new RegExp(`\\b${kw}\\b`, 'i').test(clean));
+  const hasDistancePattern = /\b(\d+(?:\.\d+)?)\s*(?:m|meters?|metres?|km|kms?|kilometers?|kilometres?|miles?|k)\b/i.test(clean);
+  const hasStepPattern = /\b(\d+[\d,]*)\s*steps?\b/i.test(clean);
+
+  if (hasCardioKeyword || hasStepPattern || (hasDistancePattern && (clean.includes('track') || clean.includes('treadmill') || clean.includes('outdoor')))) {
+    let activityName = 'Outdoor Walk';
+    const isRunning = clean.includes('run') || clean.includes('jog') || clean.includes('sprint') || clean.includes('ran');
+    const isCycling = clean.includes('cycling') || clean.includes('cycle') || clean.includes('bike');
+    if (isRunning) activityName = clean.includes('sprint') ? 'Sprint Interval Session' : 'Outdoor Run';
+    else if (isCycling) activityName = 'Cycling Session';
+    else if (clean.includes('treadmill')) activityName = 'Treadmill Session';
+    else if (clean.includes('hike') || clean.includes('hiking')) activityName = 'Hiking Trail';
+
+    // Parse distance
+    let distanceKm = 0;
+    let distanceMeters = 0;
+    const kmMatch = clean.match(/(\d+(?:\.\d+)?)\s*(?:km|kms?|kilometers?|kilometres?|k)\b/i);
+    const meterMatch = clean.match(/(\d+(?:\.\d+)?)\s*(?:m|meters?|metres?)\b/i);
+    const mileMatch = clean.match(/(\d+(?:\.\d+)?)\s*(?:miles?|mi)\b/i);
+    const stepMatch = clean.match(/(\d+[\d,]*)\s*steps?\b/i);
+
+    if (kmMatch) {
+      distanceKm = parseFloat(kmMatch[1]);
+      distanceMeters = Math.round(distanceKm * 1000);
+    } else if (meterMatch) {
+      distanceMeters = parseFloat(meterMatch[1]);
+      distanceKm = parseFloat((distanceMeters / 1000).toFixed(3));
+    } else if (mileMatch) {
+      distanceKm = parseFloat((parseFloat(mileMatch[1]) * 1.60934).toFixed(2));
+      distanceMeters = Math.round(distanceKm * 1000);
+    }
+
+    // Steps calculation
+    let steps = 0;
+    if (stepMatch) {
+      steps = parseInt(stepMatch[1].replace(/,/g, ''), 10);
+      if (!distanceKm) {
+        distanceKm = parseFloat((steps * 0.000762).toFixed(2));
+        distanceMeters = Math.round(distanceKm * 1000);
+      }
+    } else if (distanceMeters > 0) {
+      steps = Math.max(1, Math.round(distanceMeters / 0.762));
+    } else {
+      steps = 1500;
+      distanceKm = 1.1;
+      distanceMeters = 1100;
+    }
+
+    // Calories calculation
+    let activeCalories = 0;
+    if (isRunning) {
+      activeCalories = Math.max(15, Math.round(distanceKm * 75 || steps * 0.065));
+    } else if (isCycling) {
+      activeCalories = Math.max(20, Math.round(distanceKm * 35));
+    } else {
+      activeCalories = Math.max(5, Math.round(distanceKm * 50 || steps * 0.04));
+    }
+
+    const durationMin = Math.max(2, Math.round(isRunning ? (distanceKm * 6) : (distanceKm * 12)));
+    const distanceDisplay = distanceMeters < 1000 ? `${distanceMeters} meters` : `${distanceKm} km`;
+
+    return {
+      intent: 'cardio',
+      summaryTitle: `${activityName} (${distanceDisplay})`,
+      previewDetails: `${distanceDisplay} • ~${steps.toLocaleString()} steps • +${activeCalories} active kcal`,
+      badgeText: 'Cardio & Steps',
+      badgeColor: 'emerald',
+      originalText: text,
+      parsedData: {
+        activityName,
+        distanceKm,
+        distanceMeters,
+        steps,
+        activeCalories,
+        durationMin
+      }
+    };
+  }
+
+  // 6. INTENT: FASTRACK STEPS
   if ((clean.includes('step') || clean.includes('steps') || clean.includes('walked')) && !clean.includes('bench')) {
     const stepsMatch = clean.match(/(\d+[\d,]*)\s*(?:steps)?/);
     if (stepsMatch) {
@@ -1177,6 +1258,73 @@ async function commitUniversalVoice(intent, payload, originalText = '', date = n
       action: 'log_weight',
       weightKg: numWeight,
       feedback: `Recorded your scale weight: ${numWeight} kg!`
+    };
+  }
+
+  // Commit CARDIO & DISTANCE/STEPS
+  if (intent === 'cardio') {
+    const steps = payload.steps || 1000;
+    const distanceKm = payload.distanceKm || 0.8;
+    const distanceMeters = payload.distanceMeters || Math.round(distanceKm * 1000);
+    const activeCalories = payload.activeCalories || Math.round(steps * 0.04);
+    const durationMin = payload.durationMin || 15;
+    const activityName = payload.activityName || 'Cardio Activity';
+
+    // 1. Update Fastrack smartwatch activity log
+    db.fastrackLogs = db.fastrackLogs || [];
+    let log = db.fastrackLogs.find(l => (!l.userId || l.userId === userId) && l.date === date);
+    if (log) {
+      log.steps = (log.steps || 0) + steps;
+      log.distanceKm = Number(((log.distanceKm || 0) + distanceKm).toFixed(2));
+      log.activeCalories = (log.activeCalories || 0) + activeCalories;
+      log.totalBurned = (log.restingCalories || 2310) + log.activeCalories;
+    } else {
+      log = {
+        date,
+        userId,
+        deviceName: 'Fastrack Smartwatch',
+        steps,
+        distanceKm,
+        activeCalories,
+        restingCalories: 2310,
+        totalBurned: 2310 + activeCalories,
+        batteryLevel: 85,
+        syncedAt: new Date().toISOString()
+      };
+      db.fastrackLogs.unshift(log);
+    }
+
+    // 2. Add cardio session to workouts
+    const cardioWorkout = {
+      id: `workout-${Date.now()}`,
+      userId,
+      date,
+      title: `${activityName} Session`,
+      splitType: 'Cardio',
+      exercises: [{
+        name: `${activityName} (${distanceMeters < 1000 ? distanceMeters + 'm' : distanceKm + 'km'})`,
+        sets: [{ reps: 1, weight: 0, done: true }]
+      }],
+      durationMin,
+      distanceKm,
+      caloriesBurned: activeCalories,
+      notes: `Logged via Jarvis Voice: "${originalText}"`,
+      loggedAt: new Date().toISOString()
+    };
+    db.workouts = db.workouts || [];
+    db.workouts.unshift(cardioWorkout);
+    writeDB(db);
+
+    const distStr = distanceMeters < 1000 ? `${distanceMeters} meters` : `${distanceKm} km`;
+    return {
+      success: true,
+      section: 'fastrack',
+      action: 'log_cardio',
+      steps,
+      distanceKm,
+      activeCalories,
+      workout: cardioWorkout,
+      feedback: `Logged ${activityName} (${distStr})! Added ~${steps.toLocaleString()} steps and ${activeCalories} active kcal to your telemetry, sir.`
     };
   }
 

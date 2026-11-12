@@ -1,40 +1,227 @@
 {
-  "users": [],
-  "currentUser": null,
-  "profiles": {},
+  "users": [
+    {
+      "id": "user-google-110927726677822108966",
+      "name": "Gokul Krishna",
+      "email": "jn.gokulkrishna@gmail.com",
+      "picture": "https://lh3.googleusercontent.com/a/ACg8ocLRZRfLuZEzw1tLbTqySyGi50w9k6HSSOVAw--gwFiiSwhOnvCZ=s96-c",
+      "googleId": "110927726677822108966",
+      "provider": "google",
+      "createdAt": "2026-11-11T14:06:12.4798+00:00",
+      "geminiApiKey": "AIzaSyCUKIHu7GkNg0YqNsmOU_RORiEjyuQ4614"
+    }
+  ],
+  "currentUser": {
+    "id": "user-google-110927726677822108966",
+    "name": "Gokul Krishna",
+    "email": "jn.gokulkrishna@gmail.com",
+    "picture": "https://lh3.googleusercontent.com/a/ACg8ocLRZRfLuZEzw1tLbTqySyGi50w9k6HSSOVAw--gwFiiSwhOnvCZ=s96-c",
+    "provider": "google"
+  },
+  "profiles": {
+    "user-google-110927726677822108966": {
+      "name": "Gokul Krishna",
+      "age": 21,
+      "gender": "male",
+      "heightCm": 207.204,
+      "weightKg": 111.5,
+      "targetWeightKg": "",
+      "goal": "cutting",
+      "activityLevel": "moderately_active",
+      "dailyTargetCalories": 3331,
+      "dailyTargetProtein": 234,
+      "dailyTargetCarbs": 390,
+      "dailyTargetFat": 93,
+      "dailyTargetWater": 4200,
+      "dailyTargetSteps": 10000,
+      "dietaryTags": [
+        "🥗 Pure Veg",
+        "🍗 Non-Veg",
+        "🥚 Eggetarian"
+      ],
+      "focusAreas": [
+        "🛡️ Full Body Balance"
+      ],
+      "goals": [
+        "cutting",
+        "recomp"
+      ],
+      "recalculateTargets": false,
+      "isConfigured": true,
+      "geminiApiKey": "AIzaSyCUKIHu7GkNg0YqNsmOU_RORiEjyuQ4614",
+      "googleClientId": "916527076312-pmpo77mrp2h83fsl5dkb4u8s2v30ulf8.apps.googleusercontent.com"
+    },
+    "null": {
+      "isConfigured": false,
+      "name": "",
+      "age": "",
+      "gender": "",
+      "heightCm": "",
+      "weightKg": "",
+      "goal": "",
+      "activityLevel": "",
+      "dailyTargetCalories": 2000,
+      "dailyTargetProtein": 130,
+      "dailyTargetCarbs": 200,
+      "dailyTargetFat": 55,
+      "dailyTargetWater": 3000,
+      "dailyTargetSteps": 10000,
+      "recalculateTargets": true,
+      "dietaryTags": [],
+      "focusAreas": [],
+      "goals": []
+    }
+  },
   "meals": [],
-  "workouts": [],
+  "workouts": [
+    {
+      "id": "workout-1794476956158",
+      "userId": "user-google-110927726677822108966",
+      "date": "2026-11-12",
+      "title": "Outdoor Walking Session",
+      "splitType": "Cardio",
+      "exercises": [
+        {
+          "name": "Outdoor Walk (100m)",
+          "sets": [
+            {
+              "reps": 1,
+              "weight": 0,
+              "done": true
+            }
+          ]
+        }
+      ],
+      "durationMin": 2,
+      "distanceKm": 0.1,
+      "caloriesBurned": 5,
+      "notes": "Logged via Jarvis Voice (100 meters walking)",
+      "loggedAt": "2026-11-12T09:49:16.158Z"
+    }
+  ],
   "workoutPlans": [],
-  "fastrackLogs": [],
-  "waterLogs": [],
+  "fastrackLogs": [
+    {
+      "id": "fastrack-1794465877785",
+      "userId": "user-google-110927726677822108966",
+      "date": "2026-11-12",
+      "deviceName": "Google Fit Cloud",
+      "steps": 131,
+      "activeCalories": 5,
+      "restingCalories": 2310,
+      "totalBurned": 2315,
+      "distanceKm": 0.1,
+      "avgHeartRate": 72,
+      "peakHeartRate": 72,
+      "sleepHours": 7,
+      "batteryLevel": null,
+      "isAutoSynced": true,
+      "lastAutoSyncAt": "2026-11-12T09:32:29.348Z",
+      "syncedAt": "2026-11-12T09:32:29.348Z"
+    },
+    {
+      "id": "fastrack-1794406895370",
+      "userId": "user-google-110927726677822108966",
+      "date": "2026-11-11",
+      "deviceName": "Google Fit Cloud",
+      "steps": 1362,
+      "activeCalories": 1104,
+      "restingCalories": 2310,
+      "totalBurned": 3414,
+      "distanceKm": 1.02,
+      "avgHeartRate": 72,
+      "peakHeartRate": 94,
+      "sleepHours": 7,
+      "batteryLevel": null,
+      "isAutoSynced": true,
+      "lastAutoSyncAt": "2026-11-11T16:54:49.117Z",
+      "syncedAt": "2026-11-11T16:54:49.117Z"
+    }
+  ],
+  "waterLogs": [
+    {
+      "userId": "user-google-110927726677822108966",
+      "date": "2026-11-11",
+      "amountMl": 0
+    }
+  ],
   "weightLogs": [],
   "physiqueVault": [],
   "settings": {
     "theme": "dark",
-    "fastrackDeviceName": "Fastrack Reflex Curve",
     "useHeuristicFallback": true
   },
   "profile": {
-    "isConfigured": false,
-    "name": "",
-    "age": "",
-    "gender": "",
-    "heightCm": "",
-    "weightKg": "",
-    "goal": "",
-    "activityLevel": "",
-    "dailyTargetCalories": 2000,
-    "dailyTargetProtein": 130,
-    "dailyTargetCarbs": 200,
-    "dailyTargetFat": 55,
-    "dailyTargetWater": 3000,
+    "name": "Gokul Krishna",
+    "age": 21,
+    "gender": "male",
+    "heightCm": 207.204,
+    "weightKg": 111.5,
+    "targetWeightKg": "",
+    "goal": "cutting",
+    "activityLevel": "moderately_active",
+    "dailyTargetCalories": 3331,
+    "dailyTargetProtein": 234,
+    "dailyTargetCarbs": 390,
+    "dailyTargetFat": 93,
+    "dailyTargetWater": 4200,
     "dailyTargetSteps": 10000,
-    "recalculateTargets": true,
-    "dietaryTags": [],
-    "focusAreas": [],
-    "goals": []
+    "dietaryTags": [
+      "🥗 Pure Veg",
+      "🍗 Non-Veg",
+      "🥚 Eggetarian"
+    ],
+    "focusAreas": [
+      "🛡️ Full Body Balance"
+    ],
+    "goals": [
+      "cutting",
+      "recomp"
+    ],
+    "recalculateTargets": false,
+    "isConfigured": true
   },
   "progressPhotos": [],
   "dayCheckins": [],
-  "userSettings": {}
+  "userSettings": {
+    "user-google-110927726677822108966": {
+      "geminiApiKey": "AIzaSyCUKIHu7GkNg0YqNsmOU_RORiEjyuQ4614",
+      "googleClientId": "916527076312-pmpo77mrp2h83fsl5dkb4u8s2v30ulf8.apps.googleusercontent.com",
+      "fastrackDeviceName": "Fastrack Reflex Curve",
+      "useHeuristicFallback": true
+    }
+  },
+  "hunterProfiles": {
+    "user-google-110927726677822108966": {
+      "level": 2,
+      "xp": 60,
+      "totalQuestsCompleted": 4,
+      "claimedQuests": {
+        "2026-11-11": [
+          "quest_vit_protein",
+          "quest_str_gym",
+          "quest_per_log",
+          "quest_agi_steps"
+        ]
+      }
+    }
+  },
+  "chatHistory": [
+    {
+      "id": "msg-1794476262412",
+      "userId": "user-google-110927726677822108966",
+      "sender": "user",
+      "text": "Jarvis 11000 M stand",
+      "timestamp": "2026-11-12T09:37:42.412Z"
+    },
+    {
+      "id": "msg-1794476267033",
+      "userId": "user-google-110927726677822108966",
+      "sender": "assistant",
+      "text": "Ah, an 11,000-meter vertical ascent across your daily telemetry, sir? Unless you are secretly scaling Mount Kilimanjaro before breakfast, I suspect your wearable is hallucinating or you have discovered a rather aggressive stairmaster.",
+      "source": "gemini-ai",
+      "timestamp": "2026-11-12T09:37:47.032Z"
+    }
+  ],
+  "customFoods": []
 }

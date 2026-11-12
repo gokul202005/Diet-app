@@ -5,14 +5,19 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build-apk:
-    name: Build & Package Android APK
+    name: Build, Version & Package Android APK
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js 22 (LTS)
         uses: actions/setup-node@v4
@@ -35,6 +40,19 @@ jobs:
           cd client
           npm install
 
+      - name: Extract Semantic Version
+        id: get_version
+        run: |
+          APP_VER=$(node -p "require('./client/package.json').version || '1.1.0'")
+          BUILD_NUM=${{ github.run_number }}
+          RELEASE_TAG="v${APP_VER}-b${BUILD_NUM}"
+          APK_BASENAME="AGY-Fit-v${APP_VER}-build${BUILD_NUM}.apk"
+          echo "APP_VER=${APP_VER}" >> $GITHUB_ENV
+          echo "BUILD_NUM=${BUILD_NUM}" >> $GITHUB_ENV
+          echo "RELEASE_TAG=${RELEASE_TAG}" >> $GITHUB_ENV
+          echo "APK_BASENAME=${APK_BASENAME}" >> $GITHUB_ENV
+          echo "Version configured: ${RELEASE_TAG} -> ${APK_BASENAME}"
+
       - name: Build Web Application
         run: |
           cd client
@@ -54,13 +72,41 @@ jobs:
           cd client/android
           ./gradlew assembleDebug --no-daemon --stacktrace
 
-      - name: Rename APK with Official App Name
+      - name: Package & Version APK Deliverables
         run: |
-          cp client/android/app/build/outputs/apk/debug/app-debug.apk client/android/app/build/outputs/apk/debug/AGY-Fit-v1.0.apk
+          mkdir -p dist-apk
+          ORIG_APK="client/android/app/build/outputs/apk/debug/app-debug.apk"
+          cp "$ORIG_APK" "dist-apk/${{ env.APK_BASENAME }}"
+          cp "$ORIG_APK" "dist-apk/AGY-Fit-latest.apk"
+          cp "$ORIG_APK" "dist-apk/AGY-Fit-release.apk"
+          ls -la dist-apk/
 
-      - name: Upload Android APK Artifact
+      - name: Upload Versioned APK Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: AGY-Fit-v1.0-APK
-          path: client/android/app/build/outputs/apk/debug/AGY-Fit-v1.0.apk
-          retention-days: 14
+          name: AGY-Fit-${{ env.RELEASE_TAG }}
+          path: dist-apk/*
+          retention-days: 30
+
+      - name: Publish Automated GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: github.ref == 'refs/heads/main'
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: "AGY Fit ${{ env.RELEASE_TAG }}"
+          body: |
+            ### Automated Build Release ${{ env.RELEASE_TAG }}
+            - **App Version**: `${{ env.APP_VER }}`
+            - **Build Number**: `${{ env.BUILD_NUM }}`
+            - **Commit SHA**: `${{ github.sha }}`
+            - **Build Timestamp**: `${{ github.event.head_commit.timestamp || 'Automated CI' }}`
+            
+            #### Assets
+            - `${{ env.APK_BASENAME }}` (Version-tagged release)
+            - `AGY-Fit-latest.apk` (Always points to this build)
+          files: |
+            dist-apk/${{ env.APK_BASENAME }}
+            dist-apk/AGY-Fit-latest.apk
+            dist-apk/AGY-Fit-release.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

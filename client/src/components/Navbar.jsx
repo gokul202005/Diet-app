@@ -227,12 +227,17 @@ export default function Navbar({
                       {/* Direct Android APK Download */}
                       <a
                         href="/api/download/android-apk"
-                        download="AGY-Fit-release.apk"
+                        download="AGY-Fit-v1.1.0.apk"
                         onClick={() => setIsUserMenuOpen(false)}
-                        className="w-full flex items-center space-x-2.5 px-3 py-2 rounded-xl text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10 transition-colors cursor-pointer text-left font-medium"
+                        className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10 transition-colors cursor-pointer text-left font-medium"
                       >
-                        <Download className="w-4 h-4 text-cyan-400" />
-                        <span>Download Android APK</span>
+                        <div className="flex items-center space-x-2.5">
+                          <Download className="w-4 h-4 text-cyan-400" />
+                          <span>Download Android APK</span>
+                        </div>
+                        <span className="text-[10px] font-mono font-bold bg-cyan-950/80 text-cyan-300 border border-cyan-800/60 px-1.5 py-0.5 rounded-md">
+                          v1.1.0
+                        </span>
                       </a>
 
                       {/* Server Status Trigger inside Dropdown */}

@@ -20,11 +20,13 @@ import {
   Trophy,
   Award,
   Bell,
-  Volume2
+  Volume2,
+  Zap
 } from 'lucide-react';
 import { api } from '../api';
 import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
 import AnatomicalMuscleHeatmap from './AnatomicalMuscleHeatmap';
+import GymHUD from './GymHUD';
 
 // Safe native Android & mobile web haptic vibration trigger
 const triggerHapticFeedback = async (isWarning = false) => {
@@ -659,9 +661,50 @@ Day 7 - Rest: Mobility & Meal Prep`);
               <Layers className="w-3.5 h-3.5 text-cyan-400" />
               <span>3D Muscle Heatmap</span>
             </button>
+            <button
+              onClick={() => setViewMode('hud')}
+              className={`px-3 py-1.5 text-xs font-bold rounded-xl flex items-center space-x-1.5 transition-all ${
+                viewMode === 'hud'
+                  ? 'bg-gradient-to-r from-cyan-500 to-emerald-400 text-slate-950 shadow-md shadow-cyan-500/25 font-black scale-102'
+                  : 'text-cyan-400 hover:text-cyan-300 bg-cyan-950/40 border border-cyan-800/40'
+              }`}
+            >
+              <Zap className="w-3.5 h-3.5 text-cyan-400 fill-cyan-400" />
+              <span>Gym HUD</span>
+            </button>
           </div>
         </div>
       </div>
+
+      {/* VIEW: STARK HANDS-FREE GYM HUD & AUDIO SET TRACKER */}
+      {viewMode === 'hud' && (
+        <GymHUD 
+          onExit={() => setViewMode('logger')}
+          onLogCompletedSet={async (setRecord) => {
+            try {
+              const workoutPayload = {
+                title: `${setRecord.exercise} Session`,
+                splitType: 'Strength',
+                exercises: [{
+                  name: setRecord.exercise,
+                  sets: [{
+                    reps: setRecord.reps,
+                    weight: setRecord.weight,
+                    done: true
+                  }]
+                }],
+                durationMin: 20,
+                caloriesBurned: Math.round(setRecord.weight * 0.5 + 40),
+                notes: `Logged via Hands-Free Gym HUD (Set ${setRecord.setNumber})`
+              };
+              await api.addWorkout(selectedDate, workoutPayload);
+              loadData();
+            } catch (err) {
+              console.warn('Auto set log save:', err);
+            }
+          }}
+        />
+      )}
 
       {/* VIEW: 3D ANATOMICAL MUSCLE HEATMAP */}
       {viewMode === 'heatmap' && (

@@ -573,10 +573,14 @@ export default function GlobalJarvis({ profile, selectedDate, onActionCompleted,
           let replyText = res.feedback || "Action logged and synced successfully, sir.";
           if (res.action === 'log_meal' && res.meal) {
             replyText = `Logged to ${res.meal.mealType.toUpperCase()}: ${res.meal.name}. Added ${res.meal.totalCalories} calories and ${res.meal.totalProtein} grams of protein, sir.`;
+          } else if (res.action === 'log_cardio') {
+            replyText = res.feedback || `Cardio activity recorded. Steps and active calorie burn updated, sir.`;
           } else if (res.action === 'log_workout' && res.workout) {
             replyText = `Logged workout: ${res.workout.exercises?.[0]?.name || 'strength session'}. Telemetry updated, sir.`;
           } else if (res.action === 'log_water') {
             replyText = `Hydration logged, sir. Current daily water intake updated.`;
+          } else if (res.action === 'log_steps') {
+            replyText = res.feedback || `Fastrack steps updated, sir.`;
           }
 
           speakResponse(replyText);
