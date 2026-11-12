@@ -2037,7 +2037,20 @@ app.post('/api/hunter/claim-quest', (req, res) => {
   }
 
   h.claimedQuests[today].push(questId);
-  h.xp = (h.xp || 0) + 40;
+  
+  // Calculate base XP + Shadow Army Passive Buffs
+  let baseXP = 40;
+  const shadowArmy = h.shadowArmy || [];
+  // 1. Shadow Goblin Scout: +15 XP on all daily trials
+  if (shadowArmy.some(s => s.id === 'shadow_goblin')) {
+    baseXP += 15;
+  }
+  // 2. Shadow Commander Igris: +25% bonus XP on Strength / Calisthenics trials
+  if (shadowArmy.some(s => s.id === 'shadow_igris') && (questId.includes('str') || questId.includes('gym') || questId.includes('push'))) {
+    baseXP = Math.round(baseXP * 1.25);
+  }
+
+  h.xp = (h.xp || 0) + baseXP;
   h.totalQuestsCompleted = (h.totalQuestsCompleted || 0) + 1;
 
   // Level up calculation
@@ -2109,6 +2122,8 @@ app.post('/api/hunter/reset', (req, res) => {
     isAwakened: false,
     lastAwakenedLevel: 0,
     title: 'Novice Hunter',
+    conqueredGates: [],
+    shadowArmy: [],
     resetAt: new Date().toISOString()
   };
   writeDB(db);
@@ -2258,6 +2273,85 @@ const DUNGEON_GATES = [
   }
 ];
 
+// --- SOLO LEVELING SHADOW SOLDIER DATABASE (ARISE / 일어서라) ---
+const SHADOW_SOLDIER_DATA = {
+  gate_e_goblin: {
+    id: 'shadow_goblin',
+    gateId: 'gate_e_goblin',
+    bossName: 'Goblin Chieftain',
+    name: 'Shadow Goblin Scout',
+    koreanName: '그림자 고블린',
+    title: 'Vanguard Shadow',
+    rank: 'E-Rank Shadow',
+    avatar: '👤',
+    quote: 'Scouting the dungeon paths for the Monarch.',
+    perkText: '+15 XP bonus on all completed trials',
+    perkType: 'quest_xp',
+    perkValue: 15,
+    color: '#38bdf8'
+  },
+  gate_d_kasaka: {
+    id: 'shadow_kasaka',
+    gateId: 'gate_d_kasaka',
+    bossName: 'Blue Venom-Fanged Kasaka',
+    name: 'Shadow Venom Fang',
+    koreanName: '그림자 카사카',
+    title: 'Toxic Shadow Serpent',
+    rank: 'D-Rank Shadow',
+    avatar: '🐍',
+    quote: "Venom coats the Monarch's strikes.",
+    perkText: '+35 Passive Poison DMG dealt to all daily Dungeon Gates',
+    perkType: 'poison_dmg',
+    perkValue: 35,
+    color: '#06b6d4'
+  },
+  gate_c_baruka: {
+    id: 'shadow_baruka',
+    gateId: 'gate_c_baruka',
+    bossName: 'Ice Elf Monarch Baruka',
+    name: 'Shadow Frostblade Baruka',
+    koreanName: '그림자 바루카',
+    title: 'Glacial Shadow Warlord',
+    rank: 'C-Rank Shadow',
+    avatar: '❄️',
+    quote: 'My frozen dual blades serve your will.',
+    perkText: '+15% Workout DMG multiplier on all gym sessions',
+    perkType: 'workout_boost',
+    perkValue: 15,
+    color: '#818cf8'
+  },
+  gate_b_kaiser: {
+    id: 'shadow_kaiser',
+    gateId: 'gate_b_kaiser',
+    bossName: 'Sky Wyvern Kaiser',
+    name: 'Shadow Drake Kaiser',
+    koreanName: '그림자 카이셀',
+    title: 'Sovereign Sky Wyvern',
+    rank: 'B-Rank Shadow',
+    avatar: '🐉',
+    quote: "Roaring through the skies beneath the Monarch's wings.",
+    perkText: '+100 Battle Power DMG when hitting 10,000+ daily steps',
+    perkType: 'step_burst',
+    perkValue: 100,
+    color: '#f59e0b'
+  },
+  gate_s_igris: {
+    id: 'shadow_igris',
+    gateId: 'gate_s_igris',
+    bossName: 'Bloodred Commander Igris',
+    name: 'Shadow Commander Igris',
+    koreanName: '그림자 사령관 이그리트',
+    title: 'Knight of the Bloodred Shadow',
+    rank: 'S-Rank Supreme Shadow',
+    avatar: '⚔️',
+    quote: 'My loyalty to the Monarch is absolute. ARISE.',
+    perkText: '+20% Hunter XP & DMG on all Push-Ups / Calisthenics',
+    perkType: 'calisthenics_xp',
+    perkValue: 20,
+    color: '#c084fc'
+  }
+};
+
 // Helper: Calculate today's Hunter battle power / damage dealt to dungeon bosses
 function calculateTodayDamage(db, userId, dateStr) {
   const today = dateStr || new Date().toISOString().split('T')[0];
@@ -2284,13 +2378,51 @@ function calculateTodayDamage(db, userId, dateStr) {
     });
   });
 
-  const pushupDamage = Math.round(calisthenicsReps * 3.5);
+  let pushupDamage = Math.round(calisthenicsReps * 3.5);
   const stepDamage = Math.round(steps / 40);
-  const workoutDamage = workouts.length * 150;
+  let workoutDamage = workouts.length * 150;
   const proteinDamage = Math.round((protein / 10) * 15);
   const waterDamage = Math.round((waterMl / 250) * 10);
 
-  const totalDamage = pushupDamage + stepDamage + workoutDamage + proteinDamage + waterDamage;
+  // Apply Shadow Army Passive Buffs
+  const hProfile = db.hunterProfiles?.[userId] || {};
+  const shadowArmy = hProfile.shadowArmy || [];
+  let shadowBonusDmg = 0;
+  let poisonDamage = 0;
+  let dragonDamage = 0;
+  const activeShadowPerks = [];
+
+  // 1. Shadow Kasaka: +35 passive poison damage
+  if (shadowArmy.some(s => s.id === 'shadow_kasaka')) {
+    poisonDamage = 35;
+    shadowBonusDmg += poisonDamage;
+    activeShadowPerks.push({ name: 'Shadow Kasaka', buff: '+35 Poison DMG' });
+  }
+
+  // 2. Shadow Kaiser: +100 battle power damage if steps >= 10,000
+  if (shadowArmy.some(s => s.id === 'shadow_kaiser') && steps >= 10000) {
+    dragonDamage = 100;
+    shadowBonusDmg += dragonDamage;
+    activeShadowPerks.push({ name: 'Shadow Kaiser', buff: '+100 Skyburst DMG (10k Steps Met)' });
+  }
+
+  // 3. Shadow Baruka: +15% workout damage multiplier
+  if (shadowArmy.some(s => s.id === 'shadow_baruka') && workouts.length > 0) {
+    const barukaBonus = Math.round(workoutDamage * 0.15);
+    workoutDamage += barukaBonus;
+    shadowBonusDmg += barukaBonus;
+    activeShadowPerks.push({ name: 'Shadow Baruka', buff: `+${barukaBonus} Glacial Workout DMG` });
+  }
+
+  // 4. Shadow Igris: +20% Calisthenics Push-Up damage multiplier
+  if (shadowArmy.some(s => s.id === 'shadow_igris') && calisthenicsReps > 0) {
+    const igrisBonus = Math.round(pushupDamage * 0.20);
+    pushupDamage += igrisBonus;
+    shadowBonusDmg += igrisBonus;
+    activeShadowPerks.push({ name: 'Shadow Commander Igris', buff: `+${igrisBonus} Bloodred Push-Up DMG` });
+  }
+
+  const totalDamage = pushupDamage + stepDamage + workoutDamage + proteinDamage + waterDamage + poisonDamage + dragonDamage;
 
   return {
     today,
@@ -2303,6 +2435,10 @@ function calculateTodayDamage(db, userId, dateStr) {
     workoutDamage,
     proteinDamage,
     waterDamage,
+    poisonDamage,
+    dragonDamage,
+    shadowBonusDmg,
+    activeShadowPerks,
     totalDamage
   };
 }
@@ -2360,6 +2496,8 @@ app.get('/api/hunter/dungeons', async (req, res) => {
     unlockedTitles: h.unlockedTitles,
     artifacts: h.artifacts,
     conqueredGates: h.conqueredGates,
+    shadowArmy: h.shadowArmy || [],
+    allShadows: Object.values(SHADOW_SOLDIER_DATA),
     damageStats,
     gates
   });
@@ -2475,6 +2613,88 @@ app.post('/api/hunter/equip-title', (req, res) => {
   h.title = title || 'Novice Hunter';
   writeDB(db);
   res.json({ success: true, message: `Equipped Title: ${h.title}`, title: h.title });
+});
+
+// --- SOLO LEVELING SHADOW EXTRACTION & SHADOW ARMY (ARISE / 일어서라) ---
+app.post('/api/hunter/shadows/extract', (req, res) => {
+  const { gateId } = req.body;
+  const db = readDB();
+  const userId = getAuthUserId(req, db);
+
+  if (!db.hunterProfiles || !db.hunterProfiles[userId]) {
+    return res.status(400).json({ error: 'Hunter profile not found' });
+  }
+
+  const h = db.hunterProfiles[userId];
+  h.conqueredGates = h.conqueredGates || [];
+  h.shadowArmy = h.shadowArmy || [];
+
+  if (!h.conqueredGates.includes(gateId)) {
+    return res.status(400).json({ 
+      error: 'You must conquer this Dungeon Gate Boss in a raid battle before extracting their shadow!' 
+    });
+  }
+
+  const shadowData = SHADOW_SOLDIER_DATA[gateId];
+  if (!shadowData) {
+    return res.status(404).json({ error: 'No shadow soldier template found for this gate' });
+  }
+
+  if (h.shadowArmy.some(s => s.id === shadowData.id)) {
+    return res.json({ 
+      success: true, 
+      message: `${shadowData.name} is already serving in your Shadow Army!`, 
+      shadow: shadowData, 
+      alreadyExtracted: true,
+      shadowArmy: h.shadowArmy 
+    });
+  }
+
+  const newShadow = {
+    ...shadowData,
+    extractedAt: new Date().toISOString()
+  };
+
+  h.shadowArmy.push(newShadow);
+  
+  // Award Monarch Extraction XP (+150 XP)
+  h.xp = (h.xp || 0) + 150;
+  let leveledUp = false;
+  while (h.xp >= h.level * 100) {
+    h.xp -= h.level * 100;
+    h.level += 1;
+    leveledUp = true;
+  }
+
+  writeDB(db);
+
+  res.json({
+    success: true,
+    message: `ARISE! (일어서라) - ${shadowData.name} has risen and sworn fealty to the Shadow Monarch!`,
+    shadow: newShadow,
+    shadowArmy: h.shadowArmy,
+    xpGained: 150,
+    level: h.level,
+    xp: h.xp,
+    leveledUp
+  });
+});
+
+app.get('/api/hunter/shadows', (req, res) => {
+  const db = readDB();
+  const userId = getAuthUserId(req, db);
+
+  if (!db.hunterProfiles || !db.hunterProfiles[userId]) {
+    return res.json({ success: true, shadowArmy: [], allShadows: Object.values(SHADOW_SOLDIER_DATA) });
+  }
+
+  const h = db.hunterProfiles[userId];
+  res.json({
+    success: true,
+    shadowArmy: h.shadowArmy || [],
+    allShadows: Object.values(SHADOW_SOLDIER_DATA),
+    totalArmyCount: (h.shadowArmy || []).length
+  });
 });
 
 app.get('/api/workout-plans', (req, res) => {

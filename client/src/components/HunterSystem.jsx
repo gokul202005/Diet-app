@@ -25,7 +25,10 @@ import {
   Trophy,
   Compass,
   Check,
-  ChevronRight
+  ChevronRight,
+  Ghost,
+  Eye,
+  Users
 } from 'lucide-react';
 import { api } from '../api';
 
@@ -76,6 +79,20 @@ function playSound(type) {
         gain.connect(ctx.destination);
         osc.start(ctx.currentTime + idx * 0.09);
         osc.stop(ctx.currentTime + idx * 0.09 + 0.6);
+      });
+    } else if (type === 'arise') {
+      // Dark Monarch ARISE (일어서라) sub-bass drop & spectral resonance
+      [60, 90, 140, 210, 315, 420, 630, 840].forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = idx < 2 ? 'sawtooth' : 'sine';
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.09);
+        gain.gain.setValueAtTime(0.35, ctx.currentTime + idx * 0.09);
+        gain.gain.exponentialRampToValueAtTime(0.005, ctx.currentTime + idx * 0.09 + 0.9);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime + idx * 0.09);
+        osc.stop(ctx.currentTime + idx * 0.09 + 0.9);
       });
     }
   } catch (e) {}
@@ -154,12 +171,14 @@ export default function HunterSystem({ selectedDate, currentUser }) {
   const [awakeningMessage, setAwakeningMessage] = useState('');
 
   // Solo Leveling Dungeon Gates & Boss Raids State
-  const [activeHunterTab, setActiveHunterTab] = useState('trials'); // 'trials' | 'raids' | 'trophies'
+  const [activeHunterTab, setActiveHunterTab] = useState('trials'); // 'trials' | 'raids' | 'shadows' | 'trophies'
   const [dungeonData, setDungeonData] = useState(null);
   const [selectedGateId, setSelectedGateId] = useState('gate_e_goblin');
   const [loadingDungeons, setLoadingDungeons] = useState(false);
   const [isEnteringGate, setIsEnteringGate] = useState(false);
   const [isClaimingBoss, setIsClaimingBoss] = useState(false);
+  const [extractingGateId, setExtractingGateId] = useState(null);
+  const [ariseCinematic, setAriseCinematic] = useState(null);
 
   const fetchDungeons = async () => {
     try {
@@ -278,6 +297,39 @@ export default function HunterSystem({ selectedDate, currentUser }) {
       }
     } catch (e) {
       console.warn('Equip error:', e);
+    }
+  };
+
+  const handleExtractShadow = async (gateId) => {
+    setExtractingGateId(gateId);
+    try {
+      playSound('arise');
+      const res = await api.extractShadow(gateId);
+      if (res && res.success) {
+        confetti({ 
+          particleCount: 220, 
+          spread: 120, 
+          origin: { y: 0.4 }, 
+          colors: ['#a855f7', '#6366f1', '#06b6d4', '#38bdf8'] 
+        });
+        setAriseCinematic({
+          active: true,
+          shadow: res.shadow,
+          message: res.message
+        });
+        if (typeof window !== 'undefined' && window.showToast) {
+          window.showToast(`ARISE! (일어서라) - ${res.shadow.name} joined your Shadow Legion!`, 'success', 'Shadow Extraction');
+        }
+        await Promise.all([fetchHunterData(), fetchDungeons()]);
+      } else {
+        throw new Error(res?.error || 'Extraction failed');
+      }
+    } catch (e) {
+      if (typeof window !== 'undefined' && window.showToast) {
+        window.showToast(e.message, 'warning', 'Extraction Incomplete');
+      }
+    } finally {
+      setExtractingGateId(null);
     }
   };
 
@@ -528,6 +580,23 @@ export default function HunterSystem({ selectedDate, currentUser }) {
           <span>Dungeon Gates & Boss Raids</span>
           {dungeonData?.gates?.some(g => g.isDefeated && !g.isConquered) && (
             <span className="w-2 h-2 rounded-full bg-rose-400 animate-ping" />
+          )}
+        </button>
+
+        <button
+          onClick={() => setActiveHunterTab('shadows')}
+          className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer shrink-0 ${
+            activeHunterTab === 'shadows'
+              ? 'bg-gradient-to-r from-purple-700 via-indigo-700 to-purple-900 text-white shadow-md shadow-purple-600/30 border border-purple-400/40'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+          }`}
+        >
+          <Ghost className="w-3.5 h-3.5 text-purple-300 animate-pulse" />
+          <span>Shadow Army (일어서라)</span>
+          {(dungeonData?.shadowArmy?.length || 0) > 0 && (
+            <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-purple-500/30 text-purple-200 border border-purple-400/40 font-mono">
+              {dungeonData?.shadowArmy?.length}
+            </span>
           )}
         </button>
 
@@ -793,15 +862,39 @@ export default function HunterSystem({ selectedDate, currentUser }) {
                       </div>
                     </div>
 
-                    {/* Slay & Claim Button */}
-                    {selectedGate.isDefeated ? (
+                    {/* Slay & Claim Button or ARISE Shadow Extraction */}
+                    {selectedGate.isConquered ? (
+                      (() => {
+                        const isExtracted = (dungeonData?.shadowArmy || []).some(s => s.gateId === selectedGate.id);
+                        return isExtracted ? (
+                          <div className="p-3 bg-purple-950/70 border border-purple-500/50 rounded-xl flex items-center justify-between shadow-lg shadow-purple-950/40">
+                            <div className="flex items-center space-x-2">
+                              <Ghost className="w-4 h-4 text-purple-300 animate-pulse" />
+                              <span className="text-xs font-black text-purple-200">Shadow Servant Active</span>
+                            </div>
+                            <span className="text-[10px] uppercase font-mono font-black text-cyan-300 bg-cyan-950/80 px-2 py-0.5 rounded-lg border border-cyan-500/30">
+                              Serving in Legion
+                            </span>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => handleExtractShadow(selectedGate.id)}
+                            disabled={extractingGateId === selectedGate.id}
+                            className="w-full py-3 bg-gradient-to-r from-purple-700 via-indigo-600 to-purple-900 hover:from-purple-600 hover:to-indigo-500 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-xl shadow-purple-600/50 flex items-center justify-center space-x-2 cursor-pointer transform hover:scale-[1.02] active:scale-[0.98] transition-all border border-purple-400/50 animate-pulse"
+                          >
+                            <Ghost className="w-4 h-4 text-purple-300 animate-spin" />
+                            <span>{extractingGateId === selectedGate.id ? 'Extracting Shadow...' : '일어서라 (ARISE) — Extract Shadow Soldier'}</span>
+                          </button>
+                        );
+                      })()
+                    ) : selectedGate.isDefeated ? (
                       <button
                         onClick={() => handleClaimBoss(selectedGate.id)}
                         disabled={isClaimingBoss}
                         className="w-full py-3 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-black text-xs uppercase tracking-wider rounded-xl shadow-xl shadow-emerald-500/30 flex items-center justify-center space-x-2 cursor-pointer transform hover:scale-[1.02] active:scale-[0.98] transition-all animate-bounce"
                       >
                         <Sparkles className="w-4 h-4 text-white animate-spin" />
-                        <span>{isClaimingBoss ? 'Extracting Shadow...' : '⚔️ Slay Boss & Claim Raid Rewards'}</span>
+                        <span>{isClaimingBoss ? 'Claiming Victory...' : '⚔️ Slay Boss & Claim Raid Rewards'}</span>
                       </button>
                     ) : (
                       <div className="p-2.5 bg-slate-950 border border-slate-800/80 rounded-xl text-center text-xs text-slate-400 space-y-1">
@@ -823,7 +916,183 @@ export default function HunterSystem({ selectedDate, currentUser }) {
         </div>
       )}
 
-      {/* TAB 3: TROPHY HALL & S-RANK ARTIFACTS */}
+      {/* TAB 3: SHADOW ARMY (ARISE / 일어서라) */}
+      {activeHunterTab === 'shadows' && (
+        <div className="space-y-6">
+          
+          {/* SHADOW MONARCH LEGION HERO BANNER */}
+          <div className="relative overflow-hidden bg-gradient-to-r from-slate-950 via-purple-950/80 to-indigo-950/90 border border-purple-500/50 rounded-3xl p-6 sm:p-8 shadow-2xl shadow-purple-950/60">
+            <div className="absolute top-0 right-0 w-80 h-80 bg-purple-600/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none" />
+            <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-5">
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest bg-purple-500/20 text-purple-300 border border-purple-500/40 shadow-lg shadow-purple-500/20 flex items-center space-x-1.5">
+                    <Ghost className="w-3.5 h-3.5 text-purple-400" />
+                    <span>Shadow Monarch Dominion</span>
+                  </span>
+                  <span className="text-[11px] font-mono text-purple-300/80 bg-slate-950/60 px-2 py-0.5 rounded-lg border border-purple-500/20">
+                    그림자 군단 (Shadow Legion)
+                  </span>
+                </div>
+
+                <h2 className="text-2xl sm:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-purple-200 to-indigo-300 tracking-tight">
+                  The Shadow Legion
+                </h2>
+
+                <p className="text-xs text-slate-300 max-w-xl leading-relaxed">
+                  Defeat dungeon bosses and speak the command <strong className="text-purple-300 font-mono">"ARISE" (일어서라)</strong> to resurrect them as immortal shadow soldiers that fight by your side.
+                </p>
+              </div>
+
+              {/* Legion Stats Card */}
+              <div className="bg-slate-900/90 border border-purple-500/30 p-4 rounded-2xl min-w-[220px] space-y-2 shadow-xl">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Army Size</span>
+                  <span className="text-xl font-black text-purple-300 font-mono">
+                    {dungeonData?.shadowArmy?.length || 0} / 5
+                  </span>
+                </div>
+                <div className="w-full bg-slate-950 h-2 rounded-full overflow-hidden border border-slate-800">
+                  <div 
+                    className="bg-gradient-to-r from-purple-500 to-indigo-500 h-full rounded-full transition-all duration-700 shadow-md shadow-purple-500/50"
+                    style={{ width: `${Math.min(100, ((dungeonData?.shadowArmy?.length || 0) / 5) * 100)}%` }}
+                  />
+                </div>
+                <div className="text-[10px] text-purple-300/80 pt-1 flex justify-between border-t border-slate-800">
+                  <span>Monarch Status:</span>
+                  <span className="font-bold text-emerald-400">
+                    {(dungeonData?.shadowArmy?.length || 0) > 0 ? 'Active Legion Command' : 'No Shadows Extracted Yet'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ACTIVE CUMULATIVE BUFFS BAR */}
+          <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 space-y-3">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+              <div className="flex items-center space-x-2">
+                <Zap className="w-4 h-4 text-yellow-400" />
+                <h3 className="text-xs font-black text-slate-200 uppercase tracking-wider">
+                  Active Shadow Passive Buffs ({dungeonData?.shadowArmy?.length || 0} Active)
+                </h3>
+              </div>
+              <span className="text-[11px] text-slate-400">
+                Cumulative perks applied automatically
+              </span>
+            </div>
+
+            {(dungeonData?.shadowArmy?.length || 0) === 0 ? (
+              <div className="p-4 text-center text-xs text-slate-500 italic">
+                Defeat Bosses in the Dungeon Gates tab and extract them to awaken permanent damage & XP multipliers!
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                {dungeonData.shadowArmy.map(s => (
+                  <div 
+                    key={s.id} 
+                    className="p-3 bg-purple-950/40 border border-purple-500/30 rounded-2xl flex items-center space-x-3"
+                  >
+                    <span className="text-2xl">{s.avatar}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs font-black text-white truncate">{s.name}</div>
+                      <div className="text-[11px] text-cyan-300 font-semibold truncate">{s.perkText}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* 5 SHADOW SOLDIERS ROSTER GRID */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {(dungeonData?.allShadows || [
+              { id: 'shadow_igris', gateId: 'gate_s_igris', name: 'Shadow Commander Igris', koreanName: '그림자 사령관 이그리트', title: 'Knight of the Bloodred Shadow', rank: 'S-Rank Supreme Shadow', avatar: '⚔️', quote: 'My loyalty to the Monarch is absolute. ARISE.', perkText: '+20% Hunter XP & DMG on all Push-Ups / Calisthenics', color: '#c084fc' },
+              { id: 'shadow_kaiser', gateId: 'gate_b_kaiser', name: 'Shadow Drake Kaiser', koreanName: '그림자 카이셀', title: 'Sovereign Sky Wyvern', rank: 'B-Rank Shadow', avatar: '🐉', quote: "Roaring through the skies beneath the Monarch's wings.", perkText: '+100 Battle Power DMG when hitting 10,000+ daily steps', color: '#f59e0b' },
+              { id: 'shadow_baruka', gateId: 'gate_c_baruka', name: 'Shadow Frostblade Baruka', koreanName: '그림자 바루카', title: 'Glacial Shadow Warlord', rank: 'C-Rank Shadow', avatar: '❄️', quote: 'My frozen dual blades serve your will.', perkText: '+15% Workout DMG multiplier on all gym sessions', color: '#818cf8' },
+              { id: 'shadow_kasaka', gateId: 'gate_d_kasaka', name: 'Shadow Venom Fang', koreanName: '그림자 카사카', title: 'Toxic Shadow Serpent', rank: 'D-Rank Shadow', avatar: '🐍', quote: "Venom coats the Monarch's strikes.", perkText: '+35 Passive Poison DMG dealt to all daily Dungeon Gates', color: '#06b6d4' },
+              { id: 'shadow_goblin', gateId: 'gate_e_goblin', name: 'Shadow Goblin Scout', koreanName: '그림자 고블린', title: 'Vanguard Shadow', rank: 'E-Rank Shadow', avatar: '👤', quote: 'Scouting the dungeon paths for the Monarch.', perkText: '+15 XP bonus on all completed trials', color: '#38bdf8' }
+            ]).map(s => {
+              const isExtracted = (dungeonData?.shadowArmy || []).some(army => army.id === s.id);
+              const gate = (dungeonData?.gates || []).find(g => g.id === s.gateId);
+              const isGateConquered = (dungeonData?.conqueredGates || []).includes(s.gateId);
+
+              return (
+                <div 
+                  key={s.id}
+                  className={`p-5 rounded-3xl border transition-all relative overflow-hidden flex flex-col justify-between space-y-4 ${
+                    isExtracted 
+                      ? 'bg-gradient-to-br from-slate-950 via-purple-950/50 to-indigo-950/60 border-purple-500/50 shadow-xl shadow-purple-950/40' 
+                      : 'bg-slate-900/60 border-slate-800 opacity-75'
+                  }`}
+                >
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-3xl p-2 bg-slate-950/80 rounded-2xl border border-slate-800 shadow-inner">
+                          {s.avatar}
+                        </span>
+                        <div>
+                          <span className="text-[10px] font-mono text-purple-300 font-bold block">
+                            {s.koreanName}
+                          </span>
+                          <h4 className="text-sm font-black text-white">{s.name}</h4>
+                        </div>
+                      </div>
+
+                      <span 
+                        className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase font-mono border"
+                        style={{ borderColor: s.color, color: s.color }}
+                      >
+                        {s.rank}
+                      </span>
+                    </div>
+
+                    <div className="text-[11px] text-slate-400 italic bg-slate-950/50 p-2.5 rounded-xl border border-slate-800/80">
+                      "{s.quote}"
+                    </div>
+
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                        Passive Buff
+                      </span>
+                      <div className="text-xs font-bold text-cyan-300">
+                        ⚡ {s.perkText}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    {isExtracted ? (
+                      <div className="w-full py-2 bg-purple-500/20 border border-purple-500/40 text-purple-300 font-black text-xs uppercase tracking-wider rounded-xl text-center flex items-center justify-center space-x-1.5">
+                        <Check className="w-3.5 h-3.5 text-purple-400" />
+                        <span>Serving in Active Legion</span>
+                      </div>
+                    ) : isGateConquered ? (
+                      <button
+                        onClick={() => handleExtractShadow(s.gateId)}
+                        disabled={extractingGateId === s.gateId}
+                        className="w-full py-2.5 bg-gradient-to-r from-purple-700 to-indigo-600 hover:from-purple-600 hover:to-indigo-500 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-purple-600/30 flex items-center justify-center space-x-1.5 cursor-pointer animate-pulse"
+                      >
+                        <Ghost className="w-3.5 h-3.5 text-purple-300" />
+                        <span>{extractingGateId === s.gateId ? 'Extracting...' : '일어서라 (ARISE)'}</span>
+                      </button>
+                    ) : (
+                      <div className="w-full py-2 bg-slate-950 border border-slate-800 text-slate-500 font-bold text-xs rounded-xl text-center flex items-center justify-center space-x-1">
+                        <Lock className="w-3 h-3 text-slate-600" />
+                        <span>Locked (Conquer {gate?.bossName || 'Boss'} to Extract)</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+        </div>
+      )}
+
+      {/* TAB 4: TROPHY HALL & S-RANK ARTIFACTS */}
       {activeHunterTab === 'trophies' && (
         <div className="space-y-6">
           
@@ -1189,6 +1458,62 @@ export default function HunterSystem({ selectedDate, currentUser }) {
         </div>
 
       </div>
+      )}
+
+      {/* ARISE (일어서라) SHADOW EXTRACTION CINEMATIC MODAL */}
+      {ariseCinematic?.active && (
+        <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300">
+          <div className="max-w-md w-full bg-gradient-to-b from-slate-950 via-purple-950/95 to-slate-950 border-2 border-purple-500/70 rounded-3xl p-6 sm:p-8 shadow-2xl shadow-purple-600/50 text-center space-y-5 animate-in zoom-in-95 duration-300 relative overflow-hidden">
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-cyan-400 via-purple-500 to-rose-500 animate-pulse" />
+            
+            <div className="space-y-1">
+              <span className="text-[11px] font-black uppercase tracking-widest text-purple-300 font-mono">
+                Solo Leveling Monarch Extraction
+              </span>
+              <h1 className="text-4xl sm:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-300 via-indigo-100 to-cyan-300 tracking-wider">
+                일어서라
+              </h1>
+              <span className="text-xs uppercase tracking-widest font-bold text-purple-400">
+                — ARISE —
+              </span>
+            </div>
+
+            <div className="w-24 h-24 mx-auto rounded-3xl bg-purple-500/20 border-2 border-purple-400/50 flex items-center justify-center text-5xl shadow-2xl shadow-purple-500/50 animate-bounce">
+              {ariseCinematic.shadow?.avatar || '⚔️'}
+            </div>
+
+            <div className="space-y-1.5">
+              <span className="text-xs font-mono font-bold text-purple-300">
+                {ariseCinematic.shadow?.koreanName}
+              </span>
+              <h2 className="text-2xl font-black text-white">
+                {ariseCinematic.shadow?.name}
+              </h2>
+              <p className="text-xs text-slate-300 italic max-w-xs mx-auto">
+                "{ariseCinematic.shadow?.quote}"
+              </p>
+            </div>
+
+            <div className="p-3.5 bg-slate-950/80 border border-purple-500/40 rounded-2xl text-left space-y-1">
+              <span className="text-[10px] uppercase font-bold text-purple-400 tracking-wider block">
+                Permanent Passive Perk
+              </span>
+              <div className="text-xs font-bold text-emerald-300">
+                ⚡ {ariseCinematic.shadow?.perkText}
+              </div>
+              <div className="text-[11px] text-cyan-300 font-mono">
+                +150 Monarch Experience Points (XP) Granted!
+              </div>
+            </div>
+
+            <button
+              onClick={() => setAriseCinematic(null)}
+              className="w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-purple-500/30 cursor-pointer transform hover:scale-[1.02] active:scale-[0.98] transition-all"
+            >
+              Command Shadow Soldier to Stand Guard
+            </button>
+          </div>
+        </div>
       )}
 
       {/* RESET CONFIRMATION MODAL */}

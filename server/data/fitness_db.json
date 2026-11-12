@@ -75,7 +75,26 @@
   "meals": [],
   "workouts": [],
   "workoutPlans": [],
-  "fastrackLogs": [],
+  "fastrackLogs": [
+    {
+      "id": "fastrack-1794492306756",
+      "userId": "user-google-110927726677822108966",
+      "date": "2026-11-12",
+      "deviceName": "Google Fit Cloud",
+      "steps": 0,
+      "activeCalories": 0,
+      "restingCalories": 2310,
+      "totalBurned": 2310,
+      "distanceKm": 0,
+      "avgHeartRate": 72,
+      "peakHeartRate": 72,
+      "sleepHours": 7,
+      "batteryLevel": null,
+      "isAutoSynced": true,
+      "lastAutoSyncAt": "2026-11-12T14:18:30.846Z",
+      "syncedAt": "2026-11-12T14:18:30.846Z"
+    }
+  ],
   "waterLogs": [],
   "weightLogs": [],
   "physiqueVault": [],

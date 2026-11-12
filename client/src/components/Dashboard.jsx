@@ -17,7 +17,8 @@ import {
   TrendingDown,
   TrendingUp,
   Scale,
-  Shield
+  Shield,
+  Ghost
 } from 'lucide-react';
 import { api } from '../api';
 
@@ -37,6 +38,7 @@ export default function Dashboard({
   const [energyBalance, setEnergyBalance] = useState(null);
   const [waterData, setWaterData] = useState({ amountMl: 0, targetMl: 3000 });
   const [workouts, setWorkouts] = useState([]);
+  const [shadowArmy, setShadowArmy] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Load daily dashboard data
@@ -44,12 +46,13 @@ export default function Dashboard({
     async function loadData() {
       setLoading(true);
       try {
-        const [mealsRes, watchRes, balanceRes, waterRes, workoutsRes] = await Promise.all([
+        const [mealsRes, watchRes, balanceRes, waterRes, workoutsRes, shadowsRes] = await Promise.all([
           api.getMeals(selectedDate),
           api.getFastrackSummary(selectedDate),
           api.getEnergyBalance(selectedDate),
           api.getWater(selectedDate),
-          api.getWorkouts(selectedDate)
+          api.getWorkouts(selectedDate),
+          api.getShadowArmy().catch(() => ({ shadowArmy: [] }))
         ]);
 
         setMealsData(mealsRes);
@@ -57,6 +60,9 @@ export default function Dashboard({
         setEnergyBalance(balanceRes.balance);
         setWaterData(waterRes);
         setWorkouts(workoutsRes.workouts || []);
+        if (shadowsRes && shadowsRes.shadowArmy) {
+          setShadowArmy(shadowsRes.shadowArmy);
+        }
       } catch (err) {
         console.error('Error loading dashboard:', err);
       } finally {
@@ -161,6 +167,47 @@ export default function Dashboard({
               </button>
             </div>
           </div>
+
+          {/* Solo Leveling Shadow Legion Vanguard Banner */}
+          {shadowArmy.length > 0 && (
+            <div 
+              onClick={onNavigateToHunter}
+              className="mb-6 p-3.5 bg-gradient-to-r from-purple-950/80 via-slate-950/90 to-indigo-950/80 border border-purple-500/40 hover:border-purple-400 rounded-2xl flex items-center justify-between cursor-pointer transition-all shadow-xl shadow-purple-950/30 group"
+              title="View your extracted Shadow Army in the Hunter System"
+            >
+              <div className="flex items-center space-x-3.5">
+                <div className="flex -space-x-2 overflow-hidden shrink-0">
+                  {shadowArmy.map(s => (
+                    <span 
+                      key={s.id} 
+                      className="inline-flex items-center justify-center w-8 h-8 text-lg bg-slate-900 border border-purple-500/50 rounded-full shadow-md group-hover:scale-110 transition-transform"
+                      title={`${s.name} (${s.perkText})`}
+                    >
+                      {s.avatar}
+                    </span>
+                  ))}
+                </div>
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs font-black text-white flex items-center space-x-1.5">
+                      <Ghost className="w-3.5 h-3.5 text-purple-400 animate-pulse" />
+                      <span>Shadow Legion Guarding</span>
+                    </span>
+                    <span className="text-[10px] font-mono font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30 px-1.5 py-0.2 rounded-md">
+                      {shadowArmy.length} Shadows Active
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-purple-200/80 mt-0.5">
+                    Providing permanent passive XP & damage multipliers. Tap to view Legion command.
+                  </p>
+                </div>
+              </div>
+              <span className="text-xs text-purple-300 font-bold hidden sm:flex items-center space-x-1 font-mono">
+                <span>그림자 군단</span>
+                <span className="group-hover:translate-x-1 transition-transform">→</span>
+              </span>
+            </div>
+          )}
 
           {/* Three Metric Pillars */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

@@ -606,5 +606,15 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title })
     });
+  },
+  extractShadow: async (gateId) => {
+    return safeFetch(`${BASE_URL}/hunter/shadows/extract`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ gateId })
+    });
+  },
+  getShadowArmy: async () => {
+    return safeFetch(`${BASE_URL}/hunter/shadows`);
   }
 };
