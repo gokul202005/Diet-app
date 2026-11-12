@@ -156,3 +156,53 @@ async function storePendingTelemetry(payload) {
     console.warn('[SW] Failed to cache pending telemetry:', e);
   }
 }
+
+// --- NATIVE SYSTEM NOTIFICATIONS & WEB PUSH ---
+// Displays alerts in the mobile notification shade / desktop notification corner
+self.addEventListener('push', (event) => {
+  let title = 'JARVIS';
+  let body = 'System update from your personal assistant';
+  let icon = '/icon-192.png';
+  let data = '/';
+
+  if (event.data) {
+    try {
+      const payload = event.data.json();
+      title = payload.title || title;
+      body = payload.body || body;
+      icon = payload.icon || icon;
+      data = payload.url || data;
+    } catch {
+      body = event.data.text() || body;
+    }
+  }
+
+  const options = {
+    body,
+    icon,
+    badge: '/icon-192.png',
+    vibrate: [100, 50, 100],
+    data,
+    requireInteraction: false
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const urlToOpen = event.notification.data || '/';
+
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+      for (let client of windowClients) {
+        if (client.url.includes(urlToOpen) && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      if (clients.openWindow) {
+        return clients.openWindow(urlToOpen);
+      }
+    })
+  );
+});

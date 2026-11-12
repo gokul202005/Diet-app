@@ -172,8 +172,16 @@ export default function GlobalJarvis({ profile, selectedDate, onActionCompleted,
       audioCtxRef.current = null;
     }
     if (mediaStreamRef.current) {
-      try { mediaStreamRef.current.getTracks().forEach(t => t.stop()); } catch {}
+      try { 
+        mediaStreamRef.current.getTracks().forEach(t => {
+          t.stop();
+          t.enabled = false;
+        }); 
+      } catch {}
       mediaStreamRef.current = null;
+    }
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      try { mediaRecorderRef.current.stop(); } catch {}
     }
     mediaRecorderRef.current = null;
     setAudioVolume(0);
@@ -346,7 +354,7 @@ export default function GlobalJarvis({ profile, selectedDate, onActionCompleted,
         }
         const rec = new SpeechRec();
         rec.lang = 'en-US';
-        rec.continuous = true;
+        rec.continuous = false;
         rec.interimResults = true;
 
         rec.onresult = (event) => {
@@ -357,22 +365,23 @@ export default function GlobalJarvis({ profile, selectedDate, onActionCompleted,
           capturedTextRef.current = text;
           setLiveTranscript(text);
 
-          // 2s pause detector: auto-submit when user stops talking
+          // Fast 800ms silence detector: auto-submit when user stops talking
           if (silenceTimeoutRef.current) clearTimeout(silenceTimeoutRef.current);
           silenceTimeoutRef.current = setTimeout(() => {
             finishListeningAndProcess();
-          }, 2000);
+          }, 800);
         };
 
         rec.onerror = (e) => {
           console.warn('[GlobalJarvis] Speech rec error:', e.error);
+          stopListening();
         };
 
         rec.onend = () => {
           if (isListeningRef.current && capturedTextRef.current.trim().length > 1) {
             finishListeningAndProcess();
-          } else if (isListeningRef.current) {
-            try { rec.start(); } catch {}
+          } else {
+            stopListening();
           }
         };
 
@@ -391,7 +400,10 @@ export default function GlobalJarvis({ profile, selectedDate, onActionCompleted,
       silenceTimeoutRef.current = null;
     }
     if (recognitionRef.current) {
-      try { recognitionRef.current.stop(); } catch {}
+      try { 
+        recognitionRef.current.abort(); 
+      } catch {}
+      recognitionRef.current = null;
     }
     cleanupHardwareAudio();
     if (jarvisState === 'listening') setJarvisState('idle');

@@ -76,6 +76,12 @@ export class AIService {
         const result = await model.generateContent(contentParts);
         return { result, modelId };
       } catch (err) {
+        // If API key is invalid/unauthorized (401), fail fast immediately without looping and lagging
+        if (/api key not valid|unauthorized|401|access_token/i.test(err.message)) {
+          console.warn(`[AI Fast-Fail] Invalid API key: ${err.message.slice(0, 80)}. Bypassing fallback loops.`);
+          throw err;
+        }
+
         // 2. Retry without generationConfig if config caused error
         if (config && Object.keys(config).length > 0) {
           try {
@@ -619,8 +625,92 @@ JARVIS BEHAVIOR RULES:
       }
     }
 
-    // Intelligent South Indian Nutrition & Biomechanics Expert Fallback
-    return this.heuristicSouthIndianCoach(message, userProfile, todayStats);
+    // Dedicated Autonomous Personal AI Assistant (JARVIS Brain)
+    return this.autonomousJarvisBrain(message, userProfile, todayStats, chatHistory);
+  }
+
+  // Dedicated Autonomous Personal AI Assistant (JARVIS Brain)
+  autonomousJarvisBrain(message, userProfile = {}, todayStats = {}, chatHistory = []) {
+    const raw = (message || '').trim();
+    const lower = raw.toLowerCase();
+    const name = userProfile.name || 'sir';
+
+    // 1. Ready & Persona Check ("Are you ready my boy?", "Are you ready?", "Ready?")
+    if (/ready\s*(my\s*boy|boy|jarvis)?|are\s*you\s*ready/i.test(lower)) {
+      const responses = [
+        `Always ready, ${name}. All cognitive matrices and cloud telemetry are online and dedicated to you. How can I assist you right now?`,
+        `For you, ${name}, always. All systems are fully operational and waiting for your command. What are we taking on?`,
+        `Indeed, ${name}. Calibrated, primed, and completely at your service. Tell me what needs to be done.`
+      ];
+      return {
+        reply: responses[Math.floor(Math.random() * responses.length)],
+        source: 'jarvis-autonomous-brain'
+      };
+    }
+
+    // 2. Greetings & Salutations
+    if (/^(hi|hello|hey|greetings|good\s*(morning|afternoon|evening)|sup|what's\s*up)\b/i.test(lower)) {
+      const greetings = [
+        `Good day, ${name}. I am here and fully at your service. What is on your mind?`,
+        `Hello, ${name}. Systems are primed. How may I be of assistance today?`,
+        `Greetings, ${name}. Ready to assist across any challenge you bring to the table.`
+      ];
+      return {
+        reply: greetings[Math.floor(Math.random() * greetings.length)],
+        source: 'jarvis-autonomous-brain'
+      };
+    }
+
+    // 3. Identity & Capabilities ("Who are you?", "What can you do?", "Tell me about yourself")
+    if (lower.includes('who are you') || lower.includes('what can you do') || lower.includes('your name') || lower.includes('capabilities') || lower.includes('dedicated')) {
+      return {
+        reply: `I am JARVIS, ${name}—your dedicated, autonomous personal AI assistant. I am engineered to assist you across any domain: answering complex questions, programming, science, creative strategy, daily execution, and optimizing your physical conditioning. I answer to you alone.`,
+        source: 'jarvis-autonomous-brain'
+      };
+    }
+
+    // 4. Wit & Compliments ("Good job", "Thank you", "You're smart", "Nice")
+    if (/thank(s|\s*you)|good\s*(job|work)|well\s*done|awesome|great\s*job/i.test(lower)) {
+      return {
+        reply: `Much obliged, ${name}. It is what I was built for. Let me know what you need next.`,
+        source: 'jarvis-autonomous-brain'
+      };
+    }
+
+    // 5. Explicit Diet / Nutrition / South Indian Food / Workouts queries (ONLY IF user specifically asks about fitness/nutrition/food)
+    const isDietOrFitnessQuery = /calorie|protein|macro|diet|food|eat|dinner|lunch|breakfast|snack|swap|recipe|dosa|idli|chicken|egg|workout|exercise|gym|push|pull|squat|bench|fastrack|step/i.test(lower);
+    if (isDietOrFitnessQuery) {
+      return this.heuristicSouthIndianCoach(message, userProfile, todayStats);
+    }
+
+    // 6. Outside-the-app & General Intelligence Assistant
+    if (lower.includes('meaning of life')) {
+      return {
+        reply: `Biologically, to propagate complexity and conscious experience; philosophically, ${name}, the meaning is whatever purpose you choose to commit yourself to with excellence.`,
+        source: 'jarvis-autonomous-brain'
+      };
+    }
+
+    if (lower.includes('time') && (lower.includes('current') || lower.includes('now') || lower.includes('what time'))) {
+      const now = new Date();
+      return {
+        reply: `It is currently ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}, ${name}.`,
+        source: 'jarvis-autonomous-brain'
+      };
+    }
+
+    if (lower.includes('joke')) {
+      return {
+        reply: `There are 10 types of people in the world, ${name}: those who understand binary, and those who don't.`,
+        source: 'jarvis-autonomous-brain'
+      };
+    }
+
+    // Intelligent, articulate general response without repetitive calorie recitation
+    return {
+      reply: `Understood, ${name}. I am analyzing your request: "${raw}". I am your dedicated assistant, ready to tackle any task, outside query, or operational goal. Tell me how you'd like to proceed.`,
+      source: 'jarvis-autonomous-brain'
+    };
   }
 
   // Context-aware South Indian Rule-Based Coach
