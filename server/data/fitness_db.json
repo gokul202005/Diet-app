@@ -345,8 +345,9 @@
       "totalQuestsCompleted": 0,
       "claimedQuests": {},
       "isAwakened": false,
+      "lastAwakenedLevel": 0,
       "title": "Awakened Novice",
-      "resetAt": "2026-11-12T12:11:59.240Z"
+      "resetAt": "2026-11-12T12:33:31.400Z"
     }
   },
   "chatHistory": [
