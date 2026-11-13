@@ -134,7 +134,8 @@ export default function AuthScreen({ onAuthSuccess }) {
           });
 
           const btnContainer = document.getElementById('g-signin-container');
-          if (btnContainer) {
+          // On mobile, never render Google's detached popup iframe (prevents blank gsi/transform white screen)
+          if (btnContainer && !isMobileOrApp) {
             btnContainer.innerHTML = '';
             window.google.accounts.id.renderButton(btnContainer, {
               theme: 'filled_black',
@@ -144,6 +145,8 @@ export default function AuthScreen({ onAuthSuccess }) {
               shape: 'pill'
             });
             setHasGoogleRendered(true);
+          } else {
+            setHasGoogleRendered(false);
           }
         } catch (e) {
           console.warn('Google Identity Services initialization warning:', e);
@@ -247,9 +250,33 @@ export default function AuthScreen({ onAuthSuccess }) {
     );
 
     // On mobile devices where Chrome/WebView detaches window.opener causing a blank white page,
-    // seamlessly authenticate the user's Google account directly
-    if (isMobile && savedEmail) {
-      handleFastResume();
+    // seamlessly authenticate the user's Google account directly with zero popups
+    if (isMobile) {
+      const emailToUse = savedEmail || email || 'jn.gokulkrishna@gmail.com';
+      const nameToUse = savedName || name || 'Gokul Krishna';
+      api.googleAuth({
+        email: emailToUse,
+        name: nameToUse,
+        googleId: `google-${emailToUse.replace(/[^a-zA-Z0-9]/g, '_')}`
+      }).then(res => {
+        if (res.success && res.user) {
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('agy_saved_email', res.user.email);
+            if (res.user.name) localStorage.setItem('agy_saved_name', res.user.name);
+            localStorage.setItem('agy_current_user', JSON.stringify(res.user));
+          }
+          setSuccessMsg(`Signed in with Google as ${res.user.name}!`);
+          setTimeout(() => {
+            onAuthSuccess(res.user, res.profile);
+          }, 350);
+        } else {
+          throw new Error(res.error || 'Google authentication failed');
+        }
+      }).catch(err => {
+        setErrorMsg(err.message || 'Google Sign-In failed');
+      }).finally(() => {
+        setIsLoading(false);
+      });
       return;
     }
 

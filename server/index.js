@@ -52,7 +52,8 @@ const upload = multer({
 
 app.use(cors());
 app.use((req, res, next) => {
-  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+  // Allow cross-origin communication for Google OAuth popups (prevents blank gsi/transform white screen)
+  res.setHeader('Cross-Origin-Opener-Policy', 'unsafe-none');
   next();
 });
 app.use(express.json({ limit: '50mb' }));

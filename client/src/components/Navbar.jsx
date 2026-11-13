@@ -117,23 +117,20 @@ export default function Navbar({
           paddingRight: 'max(env(safe-area-inset-right, 0px), 8px)'
         }}
       >
-        <div className="w-full max-w-7xl mx-auto px-2 sm:px-6">
-          <div className="flex items-center justify-between h-12 sm:h-14 gap-2 sm:gap-3">
+        <div className="w-full max-w-7xl mx-auto px-1.5 sm:px-6">
+          <div className="flex items-center justify-between h-12 sm:h-14 gap-1.5 sm:gap-3">
             
-            {/* Left: Brand Logo (Pinned & Guaranteed Safe on all screens) */}
+            {/* Left: Brand Logo (Always 100% visible, never clipped) */}
             <div 
-              className="flex items-center space-x-2 cursor-pointer shrink-0 select-none pl-1" 
+              className="flex items-center space-x-1.5 cursor-pointer shrink-0 select-none pl-1" 
               onClick={() => setActiveTab('dashboard')}
             >
               <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center shadow-md shadow-emerald-500/20 active:scale-95 transition-transform shrink-0">
                 <Flame className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-950 font-black" />
               </div>
               <div className="shrink-0">
-                <div className="flex items-center space-x-1.5">
+                <div className="flex items-center space-x-1">
                   <span className="font-black text-xs sm:text-sm tracking-tight text-white">AGY FIT</span>
-                  <span className="hidden sm:inline text-[8px] sm:text-[9px] uppercase font-extrabold tracking-wider px-1.5 py-0.5 rounded-md bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                    AI • WATCH
-                  </span>
                 </div>
                 <p className="hidden md:block text-[9px] text-slate-400 leading-none mt-0.5">Diet & Biomechanics</p>
               </div>
@@ -162,30 +159,44 @@ export default function Navbar({
               })}
             </nav>
 
-            {/* Right: Date Picker + Jarvis (Tablet/Desktop) + User Menu */}
-            <div className="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
+            {/* Right: Watch Pill + Jarvis Button + Date Switcher + User Menu */}
+            <div className="flex items-center space-x-1 sm:space-x-2 shrink-0">
               
-              {/* Jarvis Button (Shown on Tablet & Desktop; mobile uses central bottom dock mic) */}
+              {/* Direct Fastrack Smartwatch Pill Button */}
+              <button
+                onClick={() => setActiveTab('fastrack')}
+                className={`flex items-center space-x-1 px-2 py-1 rounded-xl text-[10px] sm:text-xs font-extrabold transition-all cursor-pointer border shrink-0 active:scale-95 ${
+                  activeTab === 'fastrack'
+                    ? 'bg-cyan-500 text-slate-950 border-cyan-400 shadow-sm shadow-cyan-500/30 font-black'
+                    : 'bg-cyan-950/60 hover:bg-cyan-900/60 text-cyan-300 border-cyan-500/30'
+                }`}
+                title="Fastrack Smartwatch & Telemetry"
+              >
+                <Watch className="w-3 h-3 text-cyan-400 shrink-0" />
+                <span className="hidden xs:inline">WATCH</span>
+              </button>
+
+              {/* Instant 1-Tap Jarvis Voice Assistant */}
               <button
                 onClick={() => window.dispatchEvent(new CustomEvent('agy-open-jarvis'))}
-                className="hidden sm:flex items-center space-x-1 px-2.5 py-1.5 bg-gradient-to-r from-cyan-950/90 to-blue-950/90 hover:from-cyan-900 hover:to-blue-900 border border-cyan-500/40 text-cyan-300 rounded-xl text-xs font-black transition-all cursor-pointer shadow-md shadow-cyan-950/40 active:scale-95"
+                className="flex items-center space-x-1 px-2 py-1 bg-gradient-to-r from-cyan-950/90 to-blue-950/90 hover:from-cyan-900 hover:to-blue-900 border border-cyan-500/40 text-cyan-300 rounded-xl text-[10px] sm:text-xs font-black transition-all cursor-pointer shadow-md shadow-cyan-950/40 active:scale-95 shrink-0"
                 title="Open Jarvis Voice AI Assistant from anywhere"
               >
-                <Radio className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
-                <span className="text-[11px] font-mono tracking-wider font-bold">JARVIS</span>
+                <Radio className="w-3 h-3 text-cyan-400 animate-pulse shrink-0" />
+                <span className="tracking-wider">JARVIS</span>
               </button>
 
               {/* Date Switcher Pill (Compact & Clean on all devices) */}
-              <div className="flex items-center bg-slate-900 border border-slate-800 rounded-xl p-0.5 text-xs text-slate-300 shadow-sm">
+              <div className="flex items-center bg-slate-900 border border-slate-800 rounded-xl p-0.5 text-xs text-slate-300 shadow-sm shrink-0">
                 <button
                   onClick={handlePrevDay}
                   title="Previous Day"
                   className="p-1 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors cursor-pointer"
                 >
-                  <ChevronLeft className="w-3.5 h-3.5" />
+                  <ChevronLeft className="w-3 h-3" />
                 </button>
-                <div className="px-1.5 font-bold flex items-center space-x-1 whitespace-nowrap text-[11px]">
-                  <Calendar className="w-3 h-3 text-emerald-400" />
+                <div className="px-1 font-bold flex items-center space-x-1 whitespace-nowrap text-[10px] sm:text-xs">
+                  <Calendar className="w-2.5 h-2.5 text-emerald-400" />
                   <span>{formatDateDisplay()}</span>
                 </div>
                 <button
@@ -193,7 +204,7 @@ export default function Navbar({
                   title="Next Day"
                   className="p-1 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors cursor-pointer"
                 >
-                  <ChevronRight className="w-3.5 h-3.5" />
+                  <ChevronRight className="w-3 h-3" />
                 </button>
               </div>
 
@@ -201,10 +212,10 @@ export default function Navbar({
               <div className="relative" ref={userMenuRef}>
                 <button
                   onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                  className="flex items-center space-x-1.5 p-1 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 rounded-xl transition-all cursor-pointer"
+                  className="flex items-center space-x-1 p-0.5 sm:p-1 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 rounded-xl transition-all cursor-pointer shrink-0"
                   title="User Profile & Settings"
                 >
-                  <div className="w-7 h-7 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 text-xs font-black shrink-0">
+                  <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 text-xs font-black shrink-0">
                     {initial}
                   </div>
                   <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${isUserMenuOpen ? 'rotate-180' : ''}`} />
