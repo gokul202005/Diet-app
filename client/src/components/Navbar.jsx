@@ -340,8 +340,21 @@ export default function Navbar({
             <span className="text-[8px] sm:text-[9px] mt-0.5 leading-none">Gym</span>
           </button>
 
-          {/* CENTER SPEAKER HERO: 100% IN THE DEAD MIDDLE (3 items left, 3 items right) */}
-          <div className="px-1.5 -mt-6 shrink-0">
+          {/* Tab 4: Fastrack Smartwatch (Integrated in Dock - No Overlapping Floating Buttons) */}
+          <button
+            onClick={() => setActiveTab('fastrack')}
+            className={`flex-1 py-1.5 flex flex-col items-center justify-center rounded-2xl transition-all cursor-pointer ${
+              activeTab === 'fastrack'
+                ? 'bg-cyan-500/15 text-cyan-400 font-black'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Watch className="w-4 h-4" />
+            <span className="text-[8px] sm:text-[9px] mt-0.5 leading-none">Watch</span>
+          </button>
+
+          {/* CENTER SPEAKER HERO: 100% IN THE DEAD MIDDLE (4 items left, 4 items right) */}
+          <div className="px-1 -mt-6 shrink-0">
             <button
               onClick={onOpenVoice || (() => window.dispatchEvent(new CustomEvent('open-universal-voice')))}
               className="w-12 h-12 rounded-full bg-gradient-to-tr from-emerald-500 to-teal-400 text-slate-950 flex items-center justify-center shadow-xl shadow-emerald-500/40 active:scale-90 transition-all border-2 border-slate-900 cursor-pointer hover:scale-105"
@@ -351,7 +364,20 @@ export default function Navbar({
             </button>
           </div>
 
-          {/* Tab 4: Vault & Trends */}
+          {/* Tab 5: Hunter Rank */}
+          <button
+            onClick={() => setActiveTab('hunter')}
+            className={`flex-1 py-1.5 flex flex-col items-center justify-center rounded-2xl transition-all cursor-pointer ${
+              activeTab === 'hunter'
+                ? 'bg-purple-500/15 text-purple-400 font-black'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Shield className="w-4 h-4" />
+            <span className="text-[8px] sm:text-[9px] mt-0.5 leading-none">Hunter</span>
+          </button>
+
+          {/* Tab 6: Vault & Trends */}
           <button
             onClick={() => setActiveTab('progress')}
             className={`flex-1 py-1.5 flex flex-col items-center justify-center rounded-2xl transition-all cursor-pointer ${
@@ -364,7 +390,7 @@ export default function Navbar({
             <span className="text-[8px] sm:text-[9px] mt-0.5 leading-none">Vault</span>
           </button>
 
-          {/* Tab 5: Meal Plan */}
+          {/* Tab 7: Meal Plan */}
           <button
             onClick={() => setActiveTab('planner')}
             className={`flex-1 py-1.5 flex flex-col items-center justify-center rounded-2xl transition-all cursor-pointer ${
@@ -377,7 +403,7 @@ export default function Navbar({
             <span className="text-[8px] sm:text-[9px] mt-0.5 leading-none">Plan</span>
           </button>
 
-          {/* Tab 6: Dedicated AI Coach Bot (Separated from Watch) */}
+          {/* Tab 8: Dedicated AI Coach Bot */}
           <button
             onClick={() => setActiveTab('coach')}
             className={`flex-1 py-1.5 flex flex-col items-center justify-center rounded-2xl transition-all cursor-pointer ${
@@ -391,22 +417,6 @@ export default function Navbar({
           </button>
 
         </div>
-      </div>
-
-      {/* 3. FLOATING FASTRACK SMARTWATCH ACCESS ICON (MOBILE ONLY) */}
-      <div className="xl:hidden fixed bottom-20 right-3.5 z-40">
-        <button
-          onClick={() => setActiveTab('fastrack')}
-          className={`flex items-center space-x-1.5 px-3 py-2 rounded-2xl backdrop-blur-xl border shadow-xl active:scale-95 transition-all cursor-pointer ${
-            activeTab === 'fastrack'
-              ? 'bg-cyan-500 text-slate-950 border-cyan-400 font-black shadow-cyan-500/40'
-              : 'bg-slate-900/90 text-cyan-400 border-cyan-500/40 hover:bg-slate-800 shadow-black/60'
-          }`}
-          title="Fastrack Smartwatch BLE & Telemetry"
-        >
-          <Watch className="w-4 h-4 animate-pulse" />
-          <span className="text-[10px] font-bold tracking-wide">Watch</span>
-        </button>
       </div>
     </>
   );

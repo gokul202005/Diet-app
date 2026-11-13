@@ -634,29 +634,16 @@ export default function GlobalJarvis({ profile, selectedDate, onActionCompleted,
     });
   };
 
-  // If user has not activated Jarvis, show a subtle floating activation beacon (visible on mobile & desktop)
+  // If user has not activated Jarvis, keep the screen clean with zero floating overlays.
+  // The user activates Jarvis at any time via the dedicated 1-tap JARVIS button in the top navbar.
   if (!isActive) {
-    return (
-      <div className="fixed bottom-24 right-3 sm:bottom-20 sm:right-4 z-40">
-        <button
-          onClick={handleToggleActive}
-          className="group relative flex items-center space-x-2 px-3.5 py-2 bg-slate-900/95 hover:bg-slate-800 text-slate-300 hover:text-cyan-400 border border-cyan-500/40 hover:border-cyan-400 rounded-full shadow-2xl shadow-cyan-950/60 backdrop-blur-xl transition-all duration-300 transform hover:scale-105 active:scale-95 cursor-pointer"
-          title="Activate Persistent Jarvis Voice Assistant"
-        >
-          <div className="relative">
-            <Radio className="w-4 h-4 text-cyan-400 group-hover:animate-pulse" />
-            <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-cyan-400 opacity-75 animate-ping" />
-          </div>
-          <span className="text-xs font-black tracking-wider uppercase text-cyan-300">Jarvis Voice</span>
-        </button>
-      </div>
-    );
+    return null;
   }
 
   // COLLAPSED COMPACT PILL MODE (Zero clutter, perfectly minimal)
   if (isCollapsed) {
     return (
-      <div className="fixed bottom-20 sm:bottom-6 right-3 sm:right-6 z-50">
+      <div className="fixed bottom-24 sm:bottom-6 right-3 sm:right-6 z-50">
         <div className="flex items-center space-x-2 px-3.5 py-2 bg-slate-950/95 border border-cyan-500/40 rounded-full shadow-2xl shadow-cyan-950/60 backdrop-blur-xl">
           <div 
             onClick={() => {

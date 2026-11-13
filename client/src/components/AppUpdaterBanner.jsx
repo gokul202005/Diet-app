@@ -9,7 +9,8 @@ export default function AppUpdaterBanner() {
   const [latestRelease, setLatestRelease] = useState(null);
   const [isDismissed, setIsDismissed] = useState(() => {
     try {
-      return sessionStorage.getItem('agy_apk_banner_dismissed') === 'true';
+      const dismissed = localStorage.getItem('agy_apk_banner_dismissed');
+      return dismissed === 'true' || Boolean(dismissed && dismissed.startsWith('v1.'));
     } catch {
       return false;
     }
@@ -58,7 +59,7 @@ export default function AppUpdaterBanner() {
   const handleDismiss = () => {
     setIsDismissed(true);
     try {
-      sessionStorage.setItem('agy_apk_banner_dismissed', 'true');
+      localStorage.setItem('agy_apk_banner_dismissed', 'true');
     } catch {}
   };
 
