@@ -605,10 +605,10 @@ Day 7 - Rest: Mobility & Meal Prep`);
             </p>
           </div>
 
-          <div className="flex flex-wrap bg-slate-950 p-1.5 rounded-2xl border border-slate-800 self-start sm:self-auto gap-1">
+          <div className="flex overflow-x-auto max-w-full pb-1 no-scrollbar bg-slate-950 p-1.5 rounded-2xl border border-slate-800 self-start sm:self-auto gap-1">
             <button
               onClick={() => setViewMode('logger')}
-              className={`px-3 py-1.5 text-xs font-bold rounded-xl flex items-center space-x-1.5 transition-all ${
+              className={`px-3 py-1.5 text-xs font-bold rounded-xl flex items-center space-x-1.5 transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                 viewMode === 'logger'
                   ? 'bg-emerald-500 text-slate-950 shadow-sm font-black'
                   : 'text-slate-400 hover:text-white'
@@ -619,18 +619,19 @@ Day 7 - Rest: Mobility & Meal Prep`);
             </button>
             <button
               onClick={() => setViewMode('ai-generator')}
-              className={`px-3 py-1.5 text-xs font-bold rounded-xl flex items-center space-x-1.5 transition-all ${
+              className={`px-3 py-1.5 text-xs font-bold rounded-xl flex items-center space-x-1.5 transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                 viewMode === 'ai-generator'
                   ? 'bg-gradient-to-r from-emerald-500 to-teal-400 text-slate-950 shadow-sm font-black'
                   : 'text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 border border-emerald-500/20'
               }`}
             >
               <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-              <span>AI Split Generator</span>
+              <span className="hidden sm:inline">AI Split Generator</span>
+              <span className="sm:hidden">Split AI</span>
             </button>
             <button
               onClick={() => setViewMode('prs')}
-              className={`px-3 py-1.5 text-xs font-bold rounded-xl flex items-center space-x-1.5 transition-all ${
+              className={`px-3 py-1.5 text-xs font-bold rounded-xl flex items-center space-x-1.5 transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                 viewMode === 'prs'
                   ? 'bg-emerald-500 text-slate-950 shadow-sm font-black'
                   : 'text-slate-400 hover:text-white'
@@ -641,7 +642,7 @@ Day 7 - Rest: Mobility & Meal Prep`);
             </button>
             <button
               onClick={() => setViewMode('analyzer')}
-              className={`px-3 py-1.5 text-xs font-bold rounded-xl flex items-center space-x-1.5 transition-all ${
+              className={`px-3 py-1.5 text-xs font-bold rounded-xl flex items-center space-x-1.5 transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                 viewMode === 'analyzer'
                   ? 'bg-emerald-500 text-slate-950 shadow-sm font-black'
                   : 'text-slate-400 hover:text-white'
@@ -652,25 +653,27 @@ Day 7 - Rest: Mobility & Meal Prep`);
             </button>
             <button
               onClick={() => setViewMode('heatmap')}
-              className={`px-3 py-1.5 text-xs font-bold rounded-xl flex items-center space-x-1.5 transition-all ${
+              className={`px-3 py-1.5 text-xs font-bold rounded-xl flex items-center space-x-1.5 transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                 viewMode === 'heatmap'
                   ? 'bg-gradient-to-r from-cyan-500 to-indigo-500 text-white shadow-md shadow-cyan-500/20 font-black'
                   : 'text-cyan-400 hover:text-cyan-300 bg-cyan-950/40 border border-cyan-800/40'
               }`}
             >
               <Layers className="w-3.5 h-3.5 text-cyan-400" />
-              <span>3D Muscle Heatmap</span>
+              <span className="hidden sm:inline">3D Muscle Heatmap</span>
+              <span className="sm:hidden">Heatmap</span>
             </button>
             <button
               onClick={() => setViewMode('hud')}
-              className={`px-3 py-1.5 text-xs font-bold rounded-xl flex items-center space-x-1.5 transition-all ${
+              className={`px-3 py-1.5 text-xs font-bold rounded-xl flex items-center space-x-1.5 transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                 viewMode === 'hud'
                   ? 'bg-gradient-to-r from-cyan-500 to-emerald-400 text-slate-950 shadow-md shadow-cyan-500/25 font-black scale-102'
                   : 'text-cyan-400 hover:text-cyan-300 bg-cyan-950/40 border border-cyan-800/40'
               }`}
             >
               <Zap className="w-3.5 h-3.5 text-cyan-400 fill-cyan-400" />
-              <span>Gym HUD</span>
+              <span className="hidden sm:inline">Gym HUD</span>
+              <span className="sm:hidden">HUD</span>
             </button>
           </div>
         </div>

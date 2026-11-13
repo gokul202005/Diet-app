@@ -16,9 +16,23 @@ import {
   Sparkles,
   ChevronRight,
   Maximize2,
-  Clock
+  Clock,
+  Layers
 } from 'lucide-react';
 import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
+import { EXERCISE_DATABASE } from './WorkoutTracker';
+
+const HUD_CATEGORIES = [
+  { id: 'all', label: 'All Popular' },
+  { id: 'Chest', label: 'Chest' },
+  { id: 'Back & Lats', label: 'Back' },
+  { id: 'Shoulders & Traps', label: 'Shoulders' },
+  { id: 'Arms - Biceps', label: 'Biceps' },
+  { id: 'Arms - Triceps', label: 'Triceps' },
+  { id: 'Legs - Quads & Hamstrings', label: 'Legs' },
+  { id: 'Core & Abs', label: 'Core / Abs' },
+  { id: 'Calisthenics', label: 'Calisthenics' }
+];
 
 const POPULAR_EXERCISES = [
   { name: 'Barbell Flat Bench Press', targetMuscle: 'Chest', defaultWeight: 70, defaultReps: 10, defaultSets: 4 },
@@ -37,10 +51,33 @@ export default function GymHUD({ onExit, onLogCompletedSet, initialExercise }) {
   const [selectedExercise, setSelectedExercise] = useState(
     initialExercise || POPULAR_EXERCISES[0]
   );
+  const [activeCategory, setActiveCategory] = useState('all');
   const [currentSet, setCurrentSet] = useState(1);
   const [totalSets, setTotalSets] = useState(selectedExercise.defaultSets || 4);
   const [weightKg, setWeightKg] = useState(selectedExercise.defaultWeight || 60);
   const [repsCount, setRepsCount] = useState(selectedExercise.defaultReps || 10);
+
+  const displayedExercises = React.useMemo(() => {
+    if (activeCategory === 'all') return POPULAR_EXERCISES;
+    if (activeCategory === 'Calisthenics') {
+      return [
+        { name: 'Standard Push-ups', targetMuscle: 'Chest & Triceps', defaultWeight: 0, defaultReps: 15, defaultSets: 3 },
+        { name: 'Pull-ups / Chin-ups', targetMuscle: 'Lats & Biceps', defaultWeight: 0, defaultReps: 8, defaultSets: 4 },
+        { name: 'Chest Dips (Parallel Bars)', targetMuscle: 'Chest & Triceps', defaultWeight: 0, defaultReps: 10, defaultSets: 3 },
+        { name: 'Bodyweight Squats', targetMuscle: 'Quads & Glutes', defaultWeight: 0, defaultReps: 20, defaultSets: 3 },
+        { name: 'Hanging Leg Raises', targetMuscle: 'Core & Abs', defaultWeight: 0, defaultReps: 12, defaultSets: 3 },
+        { name: 'Diamond Push-ups', targetMuscle: 'Triceps & Inner Chest', defaultWeight: 0, defaultReps: 12, defaultSets: 3 }
+      ];
+    }
+    const dbList = EXERCISE_DATABASE[activeCategory] || [];
+    return dbList.map(item => ({
+      name: item.name,
+      targetMuscle: activeCategory.replace('Arms - ', '').replace('Legs - ', ''),
+      defaultWeight: item.weight || (item.equipment === 'Bodyweight' ? 0 : 50),
+      defaultReps: item.reps || 10,
+      defaultSets: item.sets || 3
+    }));
+  }, [activeCategory]);
   
   // Rest Timer State
   const [restSeconds, setRestSeconds] = useState(null);
@@ -226,14 +263,37 @@ export default function GymHUD({ onExit, onLogCompletedSet, initialExercise }) {
         </div>
       </div>
 
-      {/* Exercise Picker Quick Chips */}
-      <div className="mb-6 relative z-10">
-        <div className="text-[11px] font-mono uppercase tracking-wider text-slate-400 mb-2.5 flex items-center justify-between">
-          <span>Active Movement</span>
-          <span className="text-cyan-400">{selectedExercise.targetMuscle}</span>
+      {/* Muscle Group & Exercise Picker */}
+      <div className="mb-6 relative z-10 space-y-3">
+        {/* Category Filter Tabs */}
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] font-mono uppercase tracking-wider text-slate-400">
+            Muscle Split Filter
+          </span>
+          <span className="text-xs font-mono text-cyan-400 font-bold truncate max-w-[200px]">
+            Target: {selectedExercise.targetMuscle}
+          </span>
         </div>
-        <div className="flex overflow-x-auto space-x-2 pb-2 scrollbar-none">
-          {POPULAR_EXERCISES.map((ex) => (
+
+        <div className="flex overflow-x-auto space-x-1.5 pb-1 no-scrollbar">
+          {HUD_CATEGORIES.map(cat => (
+            <button
+              key={cat.id}
+              onClick={() => setActiveCategory(cat.id)}
+              className={`px-3 py-1 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                activeCategory === cat.id
+                  ? 'bg-gradient-to-r from-cyan-500 to-emerald-400 text-slate-950 font-black shadow-md shadow-cyan-500/30'
+                  : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+              }`}
+            >
+              {cat.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Exercise Quick Chips */}
+        <div className="flex overflow-x-auto space-x-2 pb-2 no-scrollbar">
+          {displayedExercises.map((ex) => (
             <button
               key={ex.name}
               onClick={() => {
@@ -262,11 +322,11 @@ export default function GymHUD({ onExit, onLogCompletedSet, initialExercise }) {
         {/* Left Column: Big Telemetry Gauges */}
         <div className="lg:col-span-7 bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-8 flex flex-col justify-between shadow-inner">
           <div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-mono uppercase text-slate-400 tracking-wider">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-mono uppercase text-slate-400 tracking-wider shrink-0">
                 Current Set Progression
               </span>
-              <span className="text-xs font-bold text-cyan-400 bg-cyan-950/80 px-2.5 py-1 rounded-full border border-cyan-800/60">
+              <span className="text-xs font-bold text-cyan-400 bg-cyan-950/80 px-2.5 py-1 rounded-full border border-cyan-800/60 max-w-[170px] sm:max-w-xs truncate" title={selectedExercise.name}>
                 {selectedExercise.name}
               </span>
             </div>
@@ -404,15 +464,17 @@ export default function GymHUD({ onExit, onLogCompletedSet, initialExercise }) {
             )}
           </div>
 
-          {/* GIANT ARC REACTOR COMPLETE BUTTON */}
+          {/* GIANT ARC REACTOR COMPLETE BUTTON (MOBILE-RESPONSIVE) */}
           <button
             onClick={handleCompleteSet}
-            className="w-full py-6 rounded-3xl bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-500 text-slate-950 font-black text-xl tracking-tight shadow-xl shadow-emerald-500/25 hover:shadow-cyan-500/40 hover:scale-[1.01] active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center space-x-3 group relative overflow-hidden"
+            className="w-full py-4 sm:py-6 px-4 rounded-3xl bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-500 text-slate-950 font-black text-base sm:text-xl tracking-tight shadow-xl shadow-emerald-500/25 hover:shadow-cyan-500/40 hover:scale-[1.01] active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center space-x-2.5 sm:space-x-3 group relative overflow-hidden"
           >
-            <div className="w-8 h-8 rounded-full bg-slate-950/20 flex items-center justify-center group-hover:rotate-90 transition-transform">
-              <Check className="w-5 h-5 text-slate-950 stroke-[3]" />
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-slate-950/20 flex items-center justify-center group-hover:rotate-90 transition-transform shrink-0">
+              <Check className="w-4 h-4 sm:w-5 sm:h-5 text-slate-950 stroke-[3]" />
             </div>
-            <span>LOG SET {currentSet} & START REST</span>
+            <span className="truncate">
+              {isResting ? `LOG EXTRA SET ${currentSet}` : `LOG SET ${currentSet} & START REST`}
+            </span>
           </button>
         </div>
       </div>

@@ -208,15 +208,31 @@ export default function GlobalJarvis({ profile, selectedDate, onActionCompleted,
     }
   }, [isActive]);
 
-  // Listen for sync events from CoachChat toggle
+  // Listen for sync events from CoachChat toggle and global 1-tap navbar trigger
   useEffect(() => {
     const handleSync = (e) => {
       if (e?.detail?.isActive !== undefined && e.detail.isActive !== isActiveRef.current) {
         setIsActive(e.detail.isActive);
       }
     };
+    const handleOpenJarvis = () => {
+      setIsActive(true);
+      setIsCollapsed(false);
+      try {
+        localStorage.setItem('agy_jarvis_active', 'true');
+        localStorage.setItem('agy_jarvis_collapsed', 'false');
+      } catch {}
+      setTimeout(() => {
+        startListening();
+      }, 300);
+    };
+
     window.addEventListener('agy-jarvis-external-toggle', handleSync);
-    return () => window.removeEventListener('agy-jarvis-external-toggle', handleSync);
+    window.addEventListener('agy-open-jarvis', handleOpenJarvis);
+    return () => {
+      window.removeEventListener('agy-jarvis-external-toggle', handleSync);
+      window.removeEventListener('agy-open-jarvis', handleOpenJarvis);
+    };
   }, []);
 
   // Cleanup on unmount
@@ -618,13 +634,13 @@ export default function GlobalJarvis({ profile, selectedDate, onActionCompleted,
     });
   };
 
-  // If user has not activated Jarvis, show a subtle floating activation beacon
+  // If user has not activated Jarvis, show a subtle floating activation beacon (visible on mobile & desktop)
   if (!isActive) {
     return (
-      <div className="fixed bottom-20 right-4 z-40 hidden sm:block">
+      <div className="fixed bottom-24 right-3 sm:bottom-20 sm:right-4 z-40">
         <button
           onClick={handleToggleActive}
-          className="group relative flex items-center space-x-2 px-3.5 py-2 bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-cyan-400 border border-cyan-500/30 hover:border-cyan-400 rounded-full shadow-lg shadow-cyan-950/40 backdrop-blur-md transition-all duration-300 transform hover:scale-105 active:scale-95 cursor-pointer"
+          className="group relative flex items-center space-x-2 px-3.5 py-2 bg-slate-900/95 hover:bg-slate-800 text-slate-300 hover:text-cyan-400 border border-cyan-500/40 hover:border-cyan-400 rounded-full shadow-2xl shadow-cyan-950/60 backdrop-blur-xl transition-all duration-300 transform hover:scale-105 active:scale-95 cursor-pointer"
           title="Activate Persistent Jarvis Voice Assistant"
         >
           <div className="relative">

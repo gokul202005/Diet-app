@@ -143,30 +143,32 @@ export default function Dashboard({
               </h1>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 self-start sm:self-auto">
               <button
                 onClick={onNavigateToHunter}
-                className="flex items-center space-x-1.5 px-3.5 py-2 bg-gradient-to-r from-cyan-950/80 to-indigo-950/80 hover:from-cyan-900/90 hover:to-indigo-900/90 border border-cyan-500/40 hover:border-cyan-400 text-cyan-200 rounded-xl text-xs font-black transition-all shadow-md shadow-cyan-950/30 cursor-pointer"
+                className="flex items-center space-x-1.5 px-2.5 sm:px-3.5 py-2 bg-gradient-to-r from-cyan-950/80 to-indigo-950/80 hover:from-cyan-900/90 hover:to-indigo-900/90 border border-cyan-500/40 hover:border-cyan-400 text-cyan-200 rounded-xl text-xs font-black transition-all shadow-md shadow-cyan-950/30 cursor-pointer shrink-0"
                 title="Solo Leveling Hunter System & 5-Stat Radar"
               >
-                <Shield className="w-4 h-4 text-cyan-400" />
-                <span>Hunter Rank & Stats</span>
+                <Shield className="w-4 h-4 text-cyan-400 shrink-0" />
+                <span className="hidden sm:inline">Hunter Rank & Stats</span>
+                <span className="sm:hidden">Hunter</span>
               </button>
 
               <button
                 onClick={onNavigateToProgress}
-                className="flex items-center space-x-1.5 px-3.5 py-2 bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-emerald-500/50 text-slate-200 rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer"
+                className="flex items-center space-x-1.5 px-2.5 sm:px-3.5 py-2 bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-emerald-500/50 text-slate-200 rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer shrink-0"
                 title="View 7-day/30-day Trends & Photo Vault"
               >
-                <TrendingUp className="w-4 h-4 text-emerald-400" />
-                <span>Body Trends & Vault</span>
+                <TrendingUp className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span className="hidden sm:inline">Body Trends & Vault</span>
+                <span className="sm:hidden">Vault</span>
               </button>
 
               <button
                 onClick={onNavigateToDiet}
-                className="flex items-center space-x-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold rounded-xl text-xs transition-all shadow-md shadow-emerald-500/20 cursor-pointer"
+                className="flex items-center space-x-1.5 px-3 sm:px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold rounded-xl text-xs transition-all shadow-md shadow-emerald-500/20 cursor-pointer shrink-0"
               >
-                <Plus className="w-4 h-4" />
+                <Plus className="w-4 h-4 shrink-0" />
                 <span>Log Meal</span>
               </button>
             </div>

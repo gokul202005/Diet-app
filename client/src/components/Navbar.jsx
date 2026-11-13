@@ -20,7 +20,8 @@ import {
   Layers,
   ChevronDown,
   Download,
-  Shield
+  Shield,
+  Radio
 } from 'lucide-react';
 import { pwaManager } from '../utils/pwaService';
 import { api } from '../api';
@@ -107,8 +108,11 @@ export default function Navbar({
 
   return (
     <>
-      {/* 1. TOP HEADER (CLEAN & ADAPTIVE) */}
-      <header className="sticky top-0 z-40 bg-slate-950/85 backdrop-blur-xl border-b border-slate-800/80 shadow-md">
+      {/* 1. TOP HEADER (NOTCH-SAFE & ADAPTIVE) */}
+      <header 
+        className="sticky top-0 z-40 bg-slate-950/90 backdrop-blur-xl border-b border-slate-800/80 shadow-md"
+        style={{ paddingTop: 'max(env(safe-area-inset-top, 0px), 12px)' }}
+      >
         <div className="max-w-7xl mx-auto px-3 sm:px-5 lg:px-8">
           <div className="flex items-center justify-between h-14 sm:h-16 gap-2">
             
@@ -153,9 +157,19 @@ export default function Navbar({
               })}
             </nav>
 
-            {/* Right: Date Picker + Voice Button + Server Health + User Menu */}
-            <div className="flex items-center space-x-2 shrink-0">
+            {/* Right: Date Picker + Jarvis Button + Server Health + User Menu */}
+            <div className="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
               
+              {/* Instant 1-Tap Jarvis Voice Button */}
+              <button
+                onClick={() => window.dispatchEvent(new CustomEvent('agy-open-jarvis'))}
+                className="flex items-center space-x-1 px-2.5 py-1.5 bg-gradient-to-r from-cyan-950/90 to-blue-950/90 hover:from-cyan-900 hover:to-blue-900 border border-cyan-500/40 text-cyan-300 rounded-xl text-xs font-black transition-all cursor-pointer shadow-md shadow-cyan-950/40 active:scale-95"
+                title="Open Jarvis Voice AI Assistant from anywhere"
+              >
+                <Radio className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
+                <span className="text-[11px] font-mono tracking-wider font-bold">JARVIS</span>
+              </button>
+
               {/* Date Switcher Pill (Compact & Clean on all devices) */}
               <div className="flex items-center bg-slate-900 border border-slate-800 rounded-xl p-0.5 text-xs text-slate-300 shadow-sm">
                 <button
@@ -284,8 +298,11 @@ export default function Navbar({
         </div>
       </header>
 
-      {/* 2. EPIC FLOATING NATIVE MOBILE DOCK (PERFECTLY CENTERED SPEAKER) */}
-      <div className="xl:hidden fixed bottom-3 inset-x-2 sm:inset-x-8 max-w-lg mx-auto z-40 pointer-events-none">
+      {/* 2. EPIC FLOATING NATIVE MOBILE DOCK (HOME-BAR SAFE & CENTERED SPEAKER) */}
+      <div 
+        className="xl:hidden fixed inset-x-2 sm:inset-x-8 max-w-lg mx-auto z-40 pointer-events-none"
+        style={{ bottom: 'max(env(safe-area-inset-bottom, 0px), 12px)' }}
+      >
         <div className="pointer-events-auto bg-slate-900/95 backdrop-blur-2xl border border-slate-700/60 rounded-3xl p-1.5 shadow-2xl shadow-black/80 flex items-center justify-between">
           
           {/* Tab 1: Home / Dashboard */}
