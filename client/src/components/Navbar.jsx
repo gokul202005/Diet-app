@@ -108,35 +108,39 @@ export default function Navbar({
 
   return (
     <>
-      {/* 1. TOP HEADER (NOTCH-SAFE & BALANCED PC/MOBILE ALIGNMENT) */}
+      {/* 1. TOP HEADER (SLIM, NOTCH-SAFE & BALANCED PC/MOBILE ALIGNMENT) */}
       <header 
         className="sticky top-0 z-40 bg-slate-950/90 backdrop-blur-xl border-b border-slate-800/80 shadow-md"
-        style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+        style={{ 
+          paddingTop: 'env(safe-area-inset-top, 0px)',
+          paddingLeft: 'max(env(safe-area-inset-left, 0px), 8px)',
+          paddingRight: 'max(env(safe-area-inset-right, 0px), 8px)'
+        }}
       >
-        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="flex items-center justify-between h-14 sm:h-16 gap-3">
+        <div className="w-full max-w-7xl mx-auto px-2 sm:px-6">
+          <div className="flex items-center justify-between h-12 sm:h-14 gap-2 sm:gap-3">
             
-            {/* Left: Brand Logo (Guaranteed Never Clipped) */}
+            {/* Left: Brand Logo (Pinned & Guaranteed Safe on all screens) */}
             <div 
-              className="flex items-center space-x-2.5 cursor-pointer shrink-0 select-none" 
+              className="flex items-center space-x-2 cursor-pointer shrink-0 select-none pl-1" 
               onClick={() => setActiveTab('dashboard')}
             >
-              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center shadow-md shadow-emerald-500/20 active:scale-95 transition-transform shrink-0">
-                <Flame className="w-4 h-4 sm:w-5 sm:h-5 text-slate-950 font-black" />
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center shadow-md shadow-emerald-500/20 active:scale-95 transition-transform shrink-0">
+                <Flame className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-950 font-black" />
               </div>
               <div className="shrink-0">
                 <div className="flex items-center space-x-1.5">
                   <span className="font-black text-xs sm:text-sm tracking-tight text-white">AGY FIT</span>
-                  <span className="text-[8px] sm:text-[9px] uppercase font-extrabold tracking-wider px-1.5 py-0.5 rounded-md bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                  <span className="hidden sm:inline text-[8px] sm:text-[9px] uppercase font-extrabold tracking-wider px-1.5 py-0.5 rounded-md bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
                     AI • WATCH
                   </span>
                 </div>
-                <p className="hidden sm:block text-[10px] text-slate-400 leading-none mt-0.5">Diet & Biomechanics</p>
+                <p className="hidden md:block text-[9px] text-slate-400 leading-none mt-0.5">Diet & Biomechanics</p>
               </div>
             </div>
 
             {/* Center (Desktop): Sleek Segmented Pill Navigation */}
-            <nav className="hidden xl:flex items-center bg-slate-900/90 border border-slate-800/80 p-1 rounded-2xl shadow-inner shadow-black/30 shrink-0">
+            <nav className="hidden xl:flex items-center bg-slate-900/90 border border-slate-800/80 p-0.5 rounded-2xl shadow-inner shadow-black/30 shrink-0">
               {tabs.map((tab) => {
                 const Icon = tab.icon;
                 const active = activeTab === tab.id;
@@ -158,13 +162,13 @@ export default function Navbar({
               })}
             </nav>
 
-            {/* Right: Date Picker + Jarvis Button + User Menu (Clean & Compact) */}
-            <div className="flex items-center space-x-2 shrink-0">
+            {/* Right: Date Picker + Jarvis (Tablet/Desktop) + User Menu */}
+            <div className="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
               
-              {/* Instant 1-Tap Jarvis Voice Button */}
+              {/* Jarvis Button (Shown on Tablet & Desktop; mobile uses central bottom dock mic) */}
               <button
                 onClick={() => window.dispatchEvent(new CustomEvent('agy-open-jarvis'))}
-                className="flex items-center space-x-1 px-2.5 py-1.5 bg-gradient-to-r from-cyan-950/90 to-blue-950/90 hover:from-cyan-900 hover:to-blue-900 border border-cyan-500/40 text-cyan-300 rounded-xl text-xs font-black transition-all cursor-pointer shadow-md shadow-cyan-950/40 active:scale-95"
+                className="hidden sm:flex items-center space-x-1 px-2.5 py-1.5 bg-gradient-to-r from-cyan-950/90 to-blue-950/90 hover:from-cyan-900 hover:to-blue-900 border border-cyan-500/40 text-cyan-300 rounded-xl text-xs font-black transition-all cursor-pointer shadow-md shadow-cyan-950/40 active:scale-95"
                 title="Open Jarvis Voice AI Assistant from anywhere"
               >
                 <Radio className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />

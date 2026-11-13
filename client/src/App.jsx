@@ -32,6 +32,34 @@ export default function App() {
   useEffect(() => {
     async function initProfileAndAuth() {
       try {
+        // Intercept incoming Google OAuth redirect / deep link params (from website or agyfit://)
+        if (typeof window !== 'undefined' && window.location.search) {
+          try {
+            const urlParams = new URLSearchParams(window.location.search);
+            const authUserId = urlParams.get('user_id');
+            const authEmail = urlParams.get('email');
+            const authName = urlParams.get('name');
+            if (authUserId) {
+              const userObj = {
+                id: authUserId,
+                email: authEmail ? decodeURIComponent(authEmail) : '',
+                name: authName ? decodeURIComponent(authName) : 'Athlete',
+                provider: 'google'
+              };
+              localStorage.setItem('agy_current_user', JSON.stringify(userObj));
+              if (authEmail) localStorage.setItem('agy_saved_email', decodeURIComponent(authEmail));
+              if (authName) localStorage.setItem('agy_saved_name', decodeURIComponent(authName));
+              setCurrentUser(userObj);
+              healthConnectSync.setUser(userObj.id);
+              try {
+                window.history.replaceState({}, document.title, window.location.pathname);
+              } catch {}
+            }
+          } catch (e) {
+            console.warn('[App] Error parsing auth search params:', e);
+          }
+        }
+
         const authData = await api.getCurrentUser().catch(() => null);
         if (authData?.success && authData?.user?.id) {
           setCurrentUser(authData.user);

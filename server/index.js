@@ -640,12 +640,23 @@ const handleGoogleRedirectPost = async (req, res, next) => {
       <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>Authenticating with Google...</title>
+        <title>Signed in - Returning to AGY Fit...</title>
       </head>
-      <body style="background:#020617;color:#38bdf8;font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">
-        <div style="text-align:center;padding:24px;">
-          <h2 style="color:#ffffff;margin-bottom:8px;">Signed in as ${user.name}!</h2>
-          <p style="color:#94a3b8;font-size:14px;">Loading your AGY Fit dashboard...</p>
+      <body style="background:#020617;color:#38bdf8;font-family:system-ui,-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:20px;box-sizing:border-box;">
+        <div style="text-align:center;max-width:380px;background:#0f172a;border:1px solid #1e293b;padding:32px 24px;border-radius:24px;box-shadow:0 25px 50px -12px rgba(0,0,0,0.5);">
+          <div style="width:52px;height:52px;background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.3);border-radius:16px;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;">
+            <svg style="width:26px;height:26px;color:#10b981;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path></svg>
+          </div>
+          <h2 style="color:#ffffff;margin:0 0 6px;font-size:19px;font-weight:800;">Signed in as ${user.name}!</h2>
+          <p style="color:#94a3b8;font-size:13px;margin:0 0 20px;">Returning to your AGY Fit App...</p>
+
+          <a id="appBtn" href="agyfit://auth?auth_success=1&user_id=${user.id}&email=${encodeURIComponent(user.email)}&name=${encodeURIComponent(user.name)}" style="display:block;width:100%;padding:14px;background:#10b981;color:#020617;font-weight:800;font-size:14px;border-radius:16px;text-decoration:none;box-sizing:border-box;margin-bottom:12px;box-shadow:0 10px 15px -3px rgba(16,185,129,0.3);">
+            🚀 Tap to Open AGY Fit App
+          </a>
+
+          <a href="/?auth_success=1&user_id=${user.id}" style="color:#64748b;font-size:12px;text-decoration:underline;">
+            Or continue in web browser
+          </a>
         </div>
         <script>
           try {
@@ -653,7 +664,19 @@ const handleGoogleRedirectPost = async (req, res, next) => {
             localStorage.setItem('agy_saved_name', ${JSON.stringify(user.name)});
             localStorage.setItem('agy_current_user', ${JSON.stringify(JSON.stringify(db.currentUser))});
           } catch(e) {}
-          window.location.href = '/?auth_success=1&user_id=${user.id}';
+
+          var isMobile = /android|iphone|ipad|ipod/i.test(navigator.userAgent);
+          var deepLinkUrl = "agyfit://auth?auth_success=1&user_id=${user.id}&email=${encodeURIComponent(user.email)}&name=${encodeURIComponent(user.name)}";
+
+          if (isMobile) {
+            // Automatically launch the native APK app via deep link
+            window.location.href = deepLinkUrl;
+            setTimeout(function() {
+              window.location.href = '/?auth_success=1&user_id=${user.id}';
+            }, 2500);
+          } else {
+            window.location.href = '/?auth_success=1&user_id=${user.id}';
+          }
         </script>
       </body>
       </html>

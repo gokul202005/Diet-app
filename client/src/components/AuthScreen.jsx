@@ -109,7 +109,7 @@ export default function AuthScreen({ onAuthSuccess }) {
       Boolean(window.Capacitor)
     );
 
-    const redirectLoginUri = typeof window !== 'undefined' 
+    const redirectLoginUri = (typeof window !== 'undefined' && window.location.origin.includes('onrender.com'))
       ? `${window.location.origin}/api/auth/google/callback` 
       : 'https://diet-app-backend-udje.onrender.com/api/auth/google/callback';
 
