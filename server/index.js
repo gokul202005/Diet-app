@@ -51,6 +51,10 @@ const upload = multer({
 });
 
 app.use(cors());
+app.use((req, res, next) => {
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+  next();
+});
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
@@ -180,6 +184,9 @@ function getAuthUserId(req, db) {
   const bodyId = req.body?.userId;
   if (bodyId && typeof bodyId === 'string' && bodyId.trim()) {
     return bodyId.trim();
+  }
+  if (db?.currentUser?.id) {
+    return db.currentUser.id;
   }
   return null;
 }
@@ -524,6 +531,141 @@ app.post('/api/auth/google', async (req, res) => {
     res.status(500).json({ error: 'Google auth error', details: err.message });
   }
 });
+
+// Full-Page Google OAuth Redirect Handler (Eliminates popup/iframe window.opener bugs on Mobile & APK)
+const handleGoogleRedirectPost = async (req, res, next) => {
+  if (req.path === '/' && !req.body?.credential) {
+    return next ? next() : res.status(404).end();
+  }
+  try {
+    let credential = req.body?.credential;
+    if (!credential) {
+      return res.redirect('/?auth_error=no_google_credential');
+    }
+
+    let email = null;
+    let name = 'Google User';
+    let picture = null;
+    let googleId = null;
+
+    try {
+      const parts = credential.split('.');
+      if (parts.length >= 2) {
+        const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf8'));
+        email = payload.email;
+        name = payload.name || email?.split('@')[0];
+        picture = payload.picture || null;
+        googleId = payload.sub;
+      }
+    } catch (e) {
+      console.warn('Google JWT parse warning:', e.message);
+    }
+
+    if (!email) {
+      return res.redirect('/?auth_error=invalid_google_token');
+    }
+
+    const db = readDB();
+    db.users = db.users || [];
+    let user = db.users.find(u => u.email.toLowerCase() === email.toLowerCase());
+
+    if (!user) {
+      const stableId = googleId 
+        ? `user-google-${googleId}` 
+        : `user-google-${email.toLowerCase().replace(/[^a-zA-Z0-9]/g, '_')}`;
+      user = {
+        id: stableId,
+        name,
+        email: email.toLowerCase(),
+        picture,
+        googleId: googleId || `gid-${Date.now()}`,
+        provider: 'google',
+        createdAt: new Date().toISOString()
+      };
+      db.users.push(user);
+    } else {
+      if (name) user.name = name;
+      if (picture) user.picture = picture;
+    }
+
+    db.currentUser = { id: user.id, name: user.name, email: user.email, picture: user.picture, provider: 'google' };
+    db.profiles = db.profiles || {};
+
+    let cloudProfile = null;
+    if (isSupabaseReady()) {
+      try {
+        cloudProfile = await getProfileFromSupabase(user.id, user.email);
+      } catch (e) {}
+    }
+
+    if (cloudProfile && cloudProfile.isConfigured) {
+      db.profiles[user.id] = { ...cloudProfile, name: user.name };
+    } else if (!db.profiles[user.id]) {
+      db.profiles[user.id] = {
+        isConfigured: false,
+        name: user.name,
+        age: '',
+        gender: '',
+        heightCm: '',
+        weightKg: '',
+        targetWeightKg: '',
+        goal: '',
+        activityLevel: '',
+        dailyTargetCalories: 2000,
+        dailyTargetProtein: 130,
+        dailyTargetCarbs: 200,
+        dailyTargetFat: 55,
+        dailyTargetWater: 3000,
+        dailyTargetSteps: 10000,
+        recalculateTargets: true,
+        dietaryTags: [],
+        focusAreas: [],
+        goals: []
+      };
+    }
+
+    db.profile = db.profiles[user.id];
+    writeDB(db);
+
+    if (isSupabaseReady()) {
+      try {
+        await syncUserToSupabase(user);
+        await saveProfileToSupabase(user.id, { ...db.profiles[user.id], email: user.email });
+      } catch (e) {}
+    }
+
+    res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Authenticating with Google...</title>
+      </head>
+      <body style="background:#020617;color:#38bdf8;font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">
+        <div style="text-align:center;padding:24px;">
+          <h2 style="color:#ffffff;margin-bottom:8px;">Signed in as ${user.name}!</h2>
+          <p style="color:#94a3b8;font-size:14px;">Loading your AGY Fit dashboard...</p>
+        </div>
+        <script>
+          try {
+            localStorage.setItem('agy_saved_email', ${JSON.stringify(user.email)});
+            localStorage.setItem('agy_saved_name', ${JSON.stringify(user.name)});
+            localStorage.setItem('agy_current_user', ${JSON.stringify(JSON.stringify(db.currentUser))});
+          } catch(e) {}
+          window.location.href = '/?auth_success=1&user_id=${user.id}';
+        </script>
+      </body>
+      </html>
+    `);
+  } catch (err) {
+    console.error('Google redirect callback fatal:', err);
+    res.redirect('/?auth_error=' + encodeURIComponent(err.message));
+  }
+};
+
+app.post('/api/auth/google/callback', handleGoogleRedirectPost);
+app.post('/', handleGoogleRedirectPost);
 
 app.get('/api/auth/me', (req, res) => {
   const db = readDB();

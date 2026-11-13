@@ -81,14 +81,14 @@ export default function Navbar({
   };
 
   const tabs = [
-    { id: 'dashboard', label: 'Dashboard', icon: Flame },
-    { id: 'diet', label: 'Diet Tracker', icon: Utensils },
-    { id: 'workouts', label: 'Workouts', icon: Dumbbell },
-    { id: 'progress', label: 'Trends & Vault', icon: TrendingUp },
-    { id: 'hunter', label: 'Hunter Rank', icon: Shield },
-    { id: 'planner', label: 'Meal Plan', icon: Sparkles },
-    { id: 'fastrack', label: 'Fastrack', icon: Watch },
-    { id: 'coach', label: 'AI Coach', icon: Bot },
+    { id: 'dashboard', label: 'Dashboard', shortLabel: 'Dashboard', icon: Flame },
+    { id: 'diet', label: 'Diet Tracker', shortLabel: 'Diet', icon: Utensils },
+    { id: 'workouts', label: 'Workouts', shortLabel: 'Gym', icon: Dumbbell },
+    { id: 'progress', label: 'Trends & Vault', shortLabel: 'Vault', icon: TrendingUp },
+    { id: 'hunter', label: 'Hunter Rank', shortLabel: 'Hunter', icon: Shield },
+    { id: 'planner', label: 'Meal Plan', shortLabel: 'Plan', icon: Sparkles },
+    { id: 'fastrack', label: 'Fastrack', shortLabel: 'Watch', icon: Watch },
+    { id: 'coach', label: 'AI Coach', shortLabel: 'Coach', icon: Bot },
   ];
 
   const formatDateDisplay = () => {
@@ -108,23 +108,23 @@ export default function Navbar({
 
   return (
     <>
-      {/* 1. TOP HEADER (NOTCH-SAFE & ADAPTIVE) */}
+      {/* 1. TOP HEADER (NOTCH-SAFE & BALANCED PC/MOBILE ALIGNMENT) */}
       <header 
         className="sticky top-0 z-40 bg-slate-950/90 backdrop-blur-xl border-b border-slate-800/80 shadow-md"
-        style={{ paddingTop: 'max(env(safe-area-inset-top, 0px), 12px)' }}
+        style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
       >
-        <div className="max-w-7xl mx-auto px-3 sm:px-5 lg:px-8">
-          <div className="flex items-center justify-between h-14 sm:h-16 gap-2">
+        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6">
+          <div className="flex items-center justify-between h-14 sm:h-16 gap-3">
             
-            {/* Left: Brand Logo */}
+            {/* Left: Brand Logo (Guaranteed Never Clipped) */}
             <div 
               className="flex items-center space-x-2.5 cursor-pointer shrink-0 select-none" 
               onClick={() => setActiveTab('dashboard')}
             >
-              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center shadow-md shadow-emerald-500/20 active:scale-95 transition-transform">
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center shadow-md shadow-emerald-500/20 active:scale-95 transition-transform shrink-0">
                 <Flame className="w-4 h-4 sm:w-5 sm:h-5 text-slate-950 font-black" />
               </div>
-              <div>
+              <div className="shrink-0">
                 <div className="flex items-center space-x-1.5">
                   <span className="font-black text-xs sm:text-sm tracking-tight text-white">AGY FIT</span>
                   <span className="text-[8px] sm:text-[9px] uppercase font-extrabold tracking-wider px-1.5 py-0.5 rounded-md bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
@@ -144,21 +144,22 @@ export default function Navbar({
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                    className={`flex items-center space-x-1.5 px-2.5 2xl:px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
                       active
                         ? 'bg-emerald-500 text-slate-950 shadow-sm shadow-emerald-500/30 font-black'
                         : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/50'
                     }`}
                   >
                     <Icon className="w-3.5 h-3.5 shrink-0" />
-                    <span>{tab.label}</span>
+                    <span className="hidden 2xl:inline">{tab.label}</span>
+                    <span className="2xl:hidden">{tab.shortLabel || tab.label}</span>
                   </button>
                 );
               })}
             </nav>
 
-            {/* Right: Date Picker + Jarvis Button + Server Health + User Menu */}
-            <div className="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
+            {/* Right: Date Picker + Jarvis Button + User Menu (Clean & Compact) */}
+            <div className="flex items-center space-x-2 shrink-0">
               
               {/* Instant 1-Tap Jarvis Voice Button */}
               <button
@@ -169,22 +170,6 @@ export default function Navbar({
                 <Radio className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
                 <span className="text-[11px] font-mono tracking-wider font-bold">JARVIS</span>
               </button>
-
-              {/* Direct APK Download / Update Button */}
-              <a
-                href={appVersionInfo.apkUrl || "https://github.com/gokul202005/Diet-app/releases/latest/download/AGY-Fit-latest.apk"}
-                download="AGY-Fit-latest.apk"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center space-x-1 px-2.5 py-1.5 bg-gradient-to-r from-emerald-950/90 to-teal-950/90 hover:from-emerald-900 hover:to-teal-900 border border-emerald-500/40 text-emerald-300 rounded-xl text-xs font-black transition-all cursor-pointer shadow-md shadow-emerald-950/40 active:scale-95 shrink-0"
-                title={`Download Android APK (${appVersionInfo.releaseTag})`}
-              >
-                <Download className="w-3.5 h-3.5 text-emerald-400" />
-                <span className="font-mono text-[11px] font-bold">APK</span>
-                <span className="hidden sm:inline text-[9px] font-mono bg-emerald-500/20 px-1 rounded text-emerald-300 border border-emerald-500/30">
-                  {appVersionInfo.releaseTag}
-                </span>
-              </a>
 
               {/* Date Switcher Pill (Compact & Clean on all devices) */}
               <div className="flex items-center bg-slate-900 border border-slate-800 rounded-xl p-0.5 text-xs text-slate-300 shadow-sm">
@@ -206,11 +191,6 @@ export default function Navbar({
                 >
                   <ChevronRight className="w-3.5 h-3.5" />
                 </button>
-              </div>
-
-              {/* Server Status Pill (Compact on Desktop) */}
-              <div className="hidden lg:block">
-                <ServerStatusWidget variant="pill" />
               </div>
 
               {/* Unified User Avatar & Dropdown Menu */}

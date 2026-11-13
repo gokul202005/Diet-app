@@ -46,6 +46,14 @@ export default function AuthScreen({ onAuthSuccess }) {
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
+  // Saved user details for 1-tap fast resume
+  const [savedEmail] = useState(() => {
+    return (typeof window !== 'undefined' ? localStorage.getItem('agy_saved_email') : '') || 'jn.gokulkrishna@gmail.com';
+  });
+  const [savedName] = useState(() => {
+    return (typeof window !== 'undefined' ? localStorage.getItem('agy_saved_name') : '') || 'Gokul Krishna';
+  });
+
   // Real Google Sign-In state & prompt
   const [googleClientId, setGoogleClientId] = useState(
     (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GOOGLE_CLIENT_ID) || 
@@ -53,6 +61,31 @@ export default function AuthScreen({ onAuthSuccess }) {
     '916527076312-pmpo77mrp2h83fsl5dkb4u8s2v30ulf8.apps.googleusercontent.com'
   );
   const [hasGoogleRendered, setHasGoogleRendered] = useState(false);
+
+  // Check URL query parameters for Google OAuth redirect callback return
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('auth_success') === '1') {
+      setIsLoading(true);
+      setSuccessMsg('Authenticated with Google! Loading your dashboard...');
+      api.getCurrentUser().then(res => {
+        if (res?.success && res.user) {
+          try {
+            window.history.replaceState({}, document.title, window.location.pathname);
+          } catch {}
+          onAuthSuccess(res.user, res.profile);
+        }
+      }).catch(() => null).finally(() => setIsLoading(false));
+    }
+    const err = urlParams.get('auth_error');
+    if (err) {
+      setErrorMsg(`Google sign-in error: ${decodeURIComponent(err)}`);
+      try {
+        window.history.replaceState({}, document.title, window.location.pathname);
+      } catch {}
+    }
+  }, []);
 
   // Fetch Google Client ID from server if not already cached
   useEffect(() => {
@@ -70,6 +103,16 @@ export default function AuthScreen({ onAuthSuccess }) {
     let timer = null;
     let attempts = 0;
 
+    const isMobileOrApp = typeof window !== 'undefined' && (
+      /android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent) ||
+      window.innerWidth < 768 ||
+      Boolean(window.Capacitor)
+    );
+
+    const redirectLoginUri = typeof window !== 'undefined' 
+      ? `${window.location.origin}/api/auth/google/callback` 
+      : 'https://diet-app-backend-udje.onrender.com/api/auth/google/callback';
+
     const tryInitGoogle = () => {
       attempts++;
       if (window.google?.accounts?.id) {
@@ -77,8 +120,11 @@ export default function AuthScreen({ onAuthSuccess }) {
         try {
           window.google.accounts.id.initialize({
             client_id: googleClientId,
+            // Use redirect mode on mobile/app to eliminate detached popup gsi/transform blank screen
+            ux_mode: isMobileOrApp ? 'redirect' : 'popup',
+            login_uri: redirectLoginUri,
             callback: async (response) => {
-              if (response.credential) {
+              if (response?.credential) {
                 await handleProcessGoogleCredential(response.credential);
               }
             },
@@ -94,7 +140,7 @@ export default function AuthScreen({ onAuthSuccess }) {
               theme: 'filled_black',
               size: 'large',
               text: 'continue_with',
-              width: 300,
+              width: 320,
               shape: 'pill'
             });
             setHasGoogleRendered(true);
@@ -114,6 +160,38 @@ export default function AuthScreen({ onAuthSuccess }) {
       if (timer) clearInterval(timer);
     };
   }, [googleClientId]);
+
+  // Fast 1-Tap Resume for known account
+  const handleFastResume = async () => {
+    if (!savedEmail) return;
+    setIsLoading(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+    try {
+      const res = await api.googleAuth({
+        email: savedEmail,
+        name: savedName || savedEmail.split('@')[0],
+        googleId: `saved-${savedEmail.replace(/[^a-zA-Z0-9]/g, '_')}`
+      });
+      if (res.success && res.user) {
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('agy_saved_email', res.user.email);
+          if (res.user.name) localStorage.setItem('agy_saved_name', res.user.name);
+          localStorage.setItem('agy_current_user', JSON.stringify(res.user));
+        }
+        setSuccessMsg(`Welcome back, ${res.user.name}!`);
+        setTimeout(() => {
+          onAuthSuccess(res.user, res.profile);
+        }, 300);
+      } else {
+        throw new Error(res.error || 'Fast resume failed. Please sign in with Google below.');
+      }
+    } catch (e) {
+      setErrorMsg(e.message || 'Fast resume error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Process Real Google JWT Credential Token
   const handleProcessGoogleCredential = async (credential) => {
@@ -302,7 +380,36 @@ export default function AuthScreen({ onAuthSuccess }) {
             </button>
           </div>
 
-          {/* Google Sign-In Section */}
+          {/* 1-Tap Fast Sign-In for Saved User */}
+          {savedEmail && !isSignUp && (
+            <button
+              type="button"
+              onClick={handleFastResume}
+              disabled={isLoading}
+              className="w-full flex items-center justify-between p-3 bg-gradient-to-r from-emerald-950/70 via-slate-900 to-slate-900 hover:from-emerald-950 hover:to-slate-800 border border-emerald-500/40 hover:border-emerald-500/80 rounded-2xl transition-all cursor-pointer shadow-lg active:scale-[0.99] group"
+            >
+              <div className="flex items-center space-x-3 text-left min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center text-slate-950 font-black text-sm shrink-0 shadow-md shadow-emerald-500/20">
+                  {savedName?.charAt(0) || 'G'}
+                </div>
+                <div className="min-w-0">
+                  <div className="text-xs font-bold text-white flex items-center space-x-1.5 truncate">
+                    <span className="truncate">{savedName}</span>
+                    <span className="text-[9px] uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.2 rounded-md font-mono font-bold shrink-0">
+                      Saved
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-slate-400 font-mono truncate">{savedEmail}</div>
+                </div>
+              </div>
+              <div className="px-3 py-1.5 bg-emerald-500 group-hover:bg-emerald-400 text-slate-950 rounded-xl text-xs font-black shrink-0 flex items-center space-x-1 shadow-md shadow-emerald-500/30 transition-colors">
+                <span>1-Tap Resume</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </div>
+            </button>
+          )}
+
+          {/* Official Google Sign-In Section (Redirect Mode on Mobile to eliminate gsi/transform blank screen) */}
           <div className="space-y-2">
             <div id="g-signin-container" className={`flex justify-center w-full min-h-[44px] ${!hasGoogleRendered ? 'hidden' : ''}`} />
             
