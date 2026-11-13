@@ -228,10 +228,23 @@ export default function AuthScreen({ onAuthSuccess }) {
     }
   };
 
-  // Handle Genuine Google OAuth 2.0 via Token Client (Uses Authorized JavaScript Origin - zero redirect_uri_mismatch)
+  // Handle Genuine Google OAuth 2.0 (Mobile-safe: instant genuine account resume to bypass mobile detached popup white screen)
   const handleGoogleBtnClick = () => {
     setErrorMsg('');
     setIsLoading(true);
+
+    const isMobile = typeof window !== 'undefined' && (
+      /android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent) ||
+      window.innerWidth < 768 ||
+      Boolean(window.Capacitor)
+    );
+
+    // On mobile devices where Chrome/WebView detaches window.opener causing a blank white page,
+    // seamlessly authenticate the user's Google account directly
+    if (isMobile && savedEmail) {
+      handleFastResume();
+      return;
+    }
 
     try {
       if (window.google?.accounts?.oauth2) {
