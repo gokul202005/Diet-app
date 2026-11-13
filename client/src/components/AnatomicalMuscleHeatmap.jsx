@@ -38,11 +38,24 @@ export default function AnatomicalMuscleHeatmap({ workouts = [], onAddExerciseTo
 
   // Parse workouts list
   (workouts || []).forEach(w => {
-    const wDate = new Date(w.date);
-    const diffTime = Math.abs(todayDate - wDate);
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-    const setsCount = (w.sets || []).length || 3;
-    const exName = (w.name || w.exerciseName || '').toLowerCase();
+    const wDate = new Date(w.date || (w.loggedAt ? w.loggedAt.split('T')[0] : ''));
+    const diffTime = isNaN(wDate.getTime()) ? 0 : Math.abs(todayDate - wDate);
+    const diffDays = isNaN(wDate.getTime()) ? 0 : Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    
+    // Total sets in session
+    const setsCount = (w.sets || []).length || 
+                      (w.exercises || []).reduce((acc, ex) => acc + (ex.sets?.length || 1), 0) || 
+                      1;
+
+    // Aggregate all exercise titles, split types, and exercise sub-names
+    const exName = [
+      w.title,
+      w.name,
+      w.exerciseName,
+      w.splitType,
+      w.notes,
+      ...(w.exercises || []).map(e => e.name)
+    ].filter(Boolean).join(' ').toLowerCase();
 
     // Mapping heuristics
     const update = (key) => {
@@ -54,52 +67,137 @@ export default function AnatomicalMuscleHeatmap({ workouts = [], onAddExerciseTo
       }
     };
 
-    if (exName.includes('chest') || exName.includes('bench') || exName.includes('fly') || exName.includes('push-up')) update('chest');
-    if (exName.includes('overhead') || exName.includes('shoulder') || exName.includes('military') || exName.includes('front raise')) update('frontDelts');
+    // Chest & Calisthenics Push
+    if (exName.includes('chest') || exName.includes('bench') || exName.includes('fly') || exName.includes('push-up') || exName.includes('push up') || exName.includes('pushup')) {
+      update('chest');
+      update('triceps');
+      update('frontDelts');
+    }
+    // Shoulders
+    if (exName.includes('overhead') || exName.includes('shoulder') || exName.includes('military') || exName.includes('front raise') || exName.includes('press')) {
+      update('frontDelts');
+      update('sideDelts');
+    }
     if (exName.includes('lateral raise') || exName.includes('side raise')) update('sideDelts');
     if (exName.includes('face pull') || exName.includes('rear delt')) update('rearDelts');
-    if (exName.includes('curl') || exName.includes('bicep') || exName.includes('chin-up')) update('biceps');
-    if (exName.includes('tricep') || exName.includes('pushdown') || exName.includes('dip') || exName.includes('skull crusher')) update('triceps');
-    if (exName.includes('shrug')) update('traps');
-    if (exName.includes('lat') || exName.includes('pulldown') || exName.includes('row') || exName.includes('pull-up')) update('lats');
-    if (exName.includes('deadlift') || exName.includes('hyperextension')) update('lowerBack');
-    if (exName.includes('crunch') || exName.includes('plank') || exName.includes('leg raise') || exName.includes('ab')) update('abs');
-    if (exName.includes('squat') || exName.includes('leg press') || exName.includes('extension') || exName.includes('lunge')) update('quads');
-    if (exName.includes('hamstring') || exName.includes('leg curl') || exName.includes('romanian')) update('hamstrings');
+    // Biceps & Pull
+    if (exName.includes('curl') || exName.includes('bicep') || exName.includes('chin-up') || exName.includes('chin up') || exName.includes('chinup')) {
+      update('biceps');
+    }
+    // Triceps & Dips
+    if (exName.includes('tricep') || exName.includes('pushdown') || exName.includes('dip') || exName.includes('skull crusher')) {
+      update('triceps');
+    }
+    if (exName.includes('shrug') || exName.includes('trap')) update('traps');
+    // Lats & Back & Pull-ups
+    if (exName.includes('lat') || exName.includes('pulldown') || exName.includes('row') || exName.includes('pull-up') || exName.includes('pull up') || exName.includes('pullup')) {
+      update('lats');
+      update('biceps');
+    }
+    if (exName.includes('deadlift') || exName.includes('hyperextension') || exName.includes('lower back')) {
+      update('lowerBack');
+      update('hamstrings');
+      update('glutes');
+    }
+    // Core & Abs
+    if (exName.includes('crunch') || exName.includes('plank') || exName.includes('leg raise') || exName.includes('ab') || exName.includes('sit-up') || exName.includes('sit up') || exName.includes('situp')) {
+      update('abs');
+    }
+    // Quads & Legs
+    if (exName.includes('squat') || exName.includes('leg press') || exName.includes('extension') || exName.includes('lunge')) {
+      update('quads');
+      update('glutes');
+    }
+    // Hamstrings
+    if (exName.includes('hamstring') || exName.includes('leg curl') || exName.includes('romanian') || exName.includes('rdl')) {
+      update('hamstrings');
+    }
     if (exName.includes('glute') || exName.includes('hip thrust')) update('glutes');
-    if (exName.includes('calf') || exName.includes('calves')) update('calves');
+    // Calves & Running/Walking
+    if (exName.includes('calf') || exName.includes('calves') || exName.includes('run') || exName.includes('jog') || exName.includes('step') || exName.includes('cardio')) {
+      update('calves');
+    }
   });
 
-  // Color & Status Determiner
+  // Color & Status Determiner (Awakened Hunter Biomechanics Palette)
+  // 🟣 Purple: Trained Today (Active Recovery / Pump Underway)
+  // 🟢 Green / Cyan: Fresh & 100% Primed to Train
+  // 🔴 Red Glow: Overworked (Heavy Fatigue) or Neglected (>4 days untrained)
   const getMuscleStatus = (key) => {
     const data = muscleStats[key];
-    if (!data || data.lastTrainedDaysAgo >= 3) {
+    if (!data) {
       return {
-        fill: '#10b981', // Emerald green
-        stroke: '#059669',
-        glow: 'rgba(16, 185, 129, 0.4)',
-        status: 'Fresh & Primed for Growth',
+        fill: '#10b981',
+        stroke: '#34d399',
+        glow: '#10b981',
+        status: 'Fresh & Ready to Train',
         recoveryPct: 100,
-        badge: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+        badge: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
+        dotColor: 'bg-emerald-400'
       };
     }
-    if (data.lastTrainedDaysAgo === 2 || data.lastTrainedDaysAgo === 1) {
+
+    // 1. Trained TODAY (Day 0) -> 🟣 Purple (Active Recovery / Pump Underway)
+    if (data.lastTrainedDaysAgo === 0) {
       return {
-        fill: '#f59e0b', // Amber yellow
-        stroke: '#d97706',
-        glow: 'rgba(245, 158, 11, 0.4)',
-        status: 'Recovering & Hypertrophy Phase',
-        recoveryPct: 65,
-        badge: 'bg-amber-500/20 text-amber-400 border-amber-500/30'
+        fill: '#a855f7', // Vivid Purple
+        stroke: '#c084fc',
+        glow: 'rgba(168, 85, 247, 0.7)',
+        status: 'Awakened & Pump Active (Trained Today)',
+        recoveryPct: 45,
+        badge: 'bg-purple-500/20 text-purple-300 border-purple-500/40',
+        dotColor: 'bg-purple-400'
       };
     }
+
+    // 2. Overworked Volume (>16 sets in past 72h) -> 🔴 Red Glow
+    if (data.sets >= 16) {
+      return {
+        fill: '#f43f5e', // Rose / Red
+        stroke: '#fb7185',
+        glow: 'rgba(244, 63, 94, 0.8)',
+        status: 'Overworked / High Fatigue (Needs Rest)',
+        recoveryPct: 30,
+        badge: 'bg-rose-500/20 text-rose-300 border-rose-500/40',
+        dotColor: 'bg-rose-400'
+      };
+    }
+
+    // 3. Neglected (>5 days without training) -> 🔴 Red Glow
+    if (data.lastTrainedDaysAgo >= 5) {
+      return {
+        fill: '#e11d48', // Deep Red
+        stroke: '#f43f5e',
+        glow: 'rgba(225, 29, 72, 0.7)',
+        status: 'Neglected (5+ Days Untrained — Target Today!)',
+        recoveryPct: 90,
+        badge: 'bg-rose-500/20 text-rose-300 border-rose-500/40',
+        dotColor: 'bg-rose-400'
+      };
+    }
+
+    // 4. Recovering (Day 1-2) -> 🔵 Cyan / Electric Blue (Hypertrophy Synthesis)
+    if (data.lastTrainedDaysAgo === 1 || data.lastTrainedDaysAgo === 2) {
+      return {
+        fill: '#06b6d4', // Cyan
+        stroke: '#22d3ee',
+        glow: 'rgba(6, 182, 212, 0.6)',
+        status: 'Active Synthesis & Hypertrophy (70% Recovered)',
+        recoveryPct: 70,
+        badge: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40',
+        dotColor: 'bg-cyan-400'
+      };
+    }
+
+    // 5. Fresh & Fully Primed (Day 3-4) -> 🟢 Green / Emerald
     return {
-      fill: '#ef4444', // Red
-      stroke: '#dc2626',
-      glow: 'rgba(239, 68, 68, 0.5)',
-      status: 'High Fatigue (Trained Recently)',
-      recoveryPct: 30,
-      badge: 'bg-rose-500/20 text-rose-400 border-rose-500/30'
+      fill: '#10b981', // Emerald Green
+      stroke: '#34d399',
+      glow: 'rgba(16, 185, 129, 0.6)',
+      status: 'Fresh & 100% Primed for Progressive Overload',
+      recoveryPct: 100,
+      badge: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
+      dotColor: 'bg-emerald-400'
     };
   };
 
@@ -114,13 +212,16 @@ export default function AnatomicalMuscleHeatmap({ workouts = [], onAddExerciseTo
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
         <div>
           <div className="flex items-center space-x-2">
-            <Layers className="w-5 h-5 text-cyan-400" />
-            <h2 className="text-base sm:text-lg font-black text-white">
-              3D Anatomical Muscle Heatmap & Fatigue Tracker
+            <span className="text-xl">🧬</span>
+            <h2 className="text-base sm:text-lg font-black text-white tracking-tight flex items-center space-x-2">
+              <span>3D Muscle Awakening Heatmap</span>
+              <span className="text-[10px] uppercase font-black px-2 py-0.5 rounded-md bg-purple-500/15 text-purple-300 border border-purple-500/30">
+                Hunter Biomechanics
+              </span>
             </h2>
           </div>
           <p className="text-xs text-slate-400 mt-0.5">
-            Color-coded based on your real workouts over the last 72 hours. Tap any muscle to inspect recovery status.
+            Real-time anatomical body glow calculated automatically from your logged push-ups, pull-ups, squats, and gym sessions.
           </p>
         </div>
 
@@ -130,38 +231,38 @@ export default function AnatomicalMuscleHeatmap({ workouts = [], onAddExerciseTo
             onClick={() => { setViewAngle('front'); setSelectedMuscle('chest'); }}
             className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               viewAngle === 'front'
-                ? 'bg-gradient-to-r from-cyan-500 to-indigo-500 text-white shadow-md shadow-cyan-500/20'
+                ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-cyan-500 text-white shadow-md shadow-purple-500/25'
                 : 'text-slate-400 hover:text-white'
             }`}
           >
-            Front View
+            Front Silhouette
           </button>
           <button
             onClick={() => { setViewAngle('back'); setSelectedMuscle('lats'); }}
             className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               viewAngle === 'back'
-                ? 'bg-gradient-to-r from-cyan-500 to-indigo-500 text-white shadow-md shadow-cyan-500/20'
+                ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-cyan-500 text-white shadow-md shadow-purple-500/25'
                 : 'text-slate-400 hover:text-white'
             }`}
           >
-            Back View
+            Back Silhouette
           </button>
         </div>
       </div>
 
       {/* Heatmap Legend */}
-      <div className="flex flex-wrap items-center justify-center gap-4 py-1 text-xs">
+      <div className="flex flex-wrap items-center justify-center gap-4 py-1.5 text-xs bg-slate-950/40 rounded-2xl border border-slate-850">
         <span className="flex items-center space-x-1.5 text-slate-300">
-          <span className="w-3 h-3 rounded-full bg-emerald-500 inline-block shadow-sm shadow-emerald-500/50" />
-          <span>Fresh & Ready (100% Recovered)</span>
+          <span className="w-3 h-3 rounded-full bg-purple-500 inline-block shadow-sm shadow-purple-500/80 animate-pulse" />
+          <span className="font-medium text-purple-300">🟣 Trained Today (Active Recovery)</span>
         </span>
         <span className="flex items-center space-x-1.5 text-slate-300">
-          <span className="w-3 h-3 rounded-full bg-amber-500 inline-block shadow-sm shadow-amber-500/50" />
-          <span>Rebuilding (50%–70%)</span>
+          <span className="w-3 h-3 rounded-full bg-emerald-400 inline-block shadow-sm shadow-emerald-400/80" />
+          <span className="font-medium text-emerald-300">🟢 Green / Cyan (Fresh & Ready)</span>
         </span>
         <span className="flex items-center space-x-1.5 text-slate-300">
-          <span className="w-3 h-3 rounded-full bg-rose-500 inline-block shadow-sm shadow-rose-500/50" />
-          <span>Heavy Fatigue (&lt; 24h rest)</span>
+          <span className="w-3 h-3 rounded-full bg-rose-500 inline-block shadow-sm shadow-rose-500/80" />
+          <span className="font-medium text-rose-300">🔴 Red Glow (Overworked or Neglected)</span>
         </span>
       </div>
 
@@ -169,9 +270,18 @@ export default function AnatomicalMuscleHeatmap({ workouts = [], onAddExerciseTo
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
         
         {/* LEFT / CENTER: INTERACTIVE ANATOMICAL VECTOR CANVAS (7 COLS) */}
-        <div className="md:col-span-7 flex justify-center py-4 bg-slate-950/60 border border-slate-800/80 rounded-3xl relative">
+        <div className="md:col-span-7 flex justify-center py-4 bg-slate-950/80 border border-slate-800 rounded-3xl relative shadow-inner">
           
           <svg width="280" height="420" viewBox="0 0 280 420" className="overflow-visible select-none">
+            <defs>
+              <filter id="neon-glow" x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur stdDeviation="3.5" result="coloredBlur"/>
+                <feMerge>
+                  <feMergeNode in="coloredBlur"/>
+                  <feMergeNode in="SourceGraphic"/>
+                </feMerge>
+              </filter>
+            </defs>
             
             {/* HEAD & NECK */}
             <circle cx="140" cy="45" r="24" fill="#1e293b" stroke="#334155" strokeWidth="2" />
@@ -187,7 +297,7 @@ export default function AnatomicalMuscleHeatmap({ workouts = [], onAddExerciseTo
                   strokeWidth={selectedMuscle === 'chest' ? '3' : '1.5'}
                   onClick={() => setSelectedMuscle('chest')}
                   className="transition-all hover:opacity-80"
-                  filter={selectedMuscle === 'chest' ? 'drop-shadow(0 0 8px #38bdf8)' : undefined}
+                  style={{ filter: `drop-shadow(0 0 6px ${getMuscleStatus('chest').glow})` }}
                 />
 
                 {/* FRONT DELTOIDS (SHOULDERS) */}
@@ -198,6 +308,7 @@ export default function AnatomicalMuscleHeatmap({ workouts = [], onAddExerciseTo
                   strokeWidth={selectedMuscle === 'frontDelts' ? '3' : '1.5'}
                   onClick={() => setSelectedMuscle('frontDelts')}
                   className="transition-all hover:opacity-80"
+                  style={{ filter: `drop-shadow(0 0 6px ${getMuscleStatus('frontDelts').glow})` }}
                 />
                 <ellipse
                   cx="190" cy="95" rx="14" ry="18"
@@ -206,6 +317,7 @@ export default function AnatomicalMuscleHeatmap({ workouts = [], onAddExerciseTo
                   strokeWidth={selectedMuscle === 'frontDelts' ? '3' : '1.5'}
                   onClick={() => setSelectedMuscle('frontDelts')}
                   className="transition-all hover:opacity-80"
+                  style={{ filter: `drop-shadow(0 0 6px ${getMuscleStatus('frontDelts').glow})` }}
                 />
 
                 {/* BICEPS */}
@@ -216,6 +328,7 @@ export default function AnatomicalMuscleHeatmap({ workouts = [], onAddExerciseTo
                   strokeWidth={selectedMuscle === 'biceps' ? '3' : '1.5'}
                   onClick={() => setSelectedMuscle('biceps')}
                   className="transition-all hover:opacity-80"
+                  style={{ filter: `drop-shadow(0 0 6px ${getMuscleStatus('biceps').glow})` }}
                 />
                 <ellipse
                   cx="204" cy="135" rx="11" ry="20"
@@ -224,6 +337,7 @@ export default function AnatomicalMuscleHeatmap({ workouts = [], onAddExerciseTo
                   strokeWidth={selectedMuscle === 'biceps' ? '3' : '1.5'}
                   onClick={() => setSelectedMuscle('biceps')}
                   className="transition-all hover:opacity-80"
+                  style={{ filter: `drop-shadow(0 0 6px ${getMuscleStatus('biceps').glow})` }}
                 />
 
                 {/* FOREARMS */}
@@ -238,6 +352,7 @@ export default function AnatomicalMuscleHeatmap({ workouts = [], onAddExerciseTo
                   strokeWidth={selectedMuscle === 'abs' ? '3' : '1.5'}
                   onClick={() => setSelectedMuscle('abs')}
                   className="transition-all hover:opacity-80"
+                  style={{ filter: `drop-shadow(0 0 6px ${getMuscleStatus('abs').glow})` }}
                 />
 
                 {/* QUADS (THIGHS) */}
@@ -248,6 +363,7 @@ export default function AnatomicalMuscleHeatmap({ workouts = [], onAddExerciseTo
                   strokeWidth={selectedMuscle === 'quads' ? '3' : '1.5'}
                   onClick={() => setSelectedMuscle('quads')}
                   className="transition-all hover:opacity-80"
+                  style={{ filter: `drop-shadow(0 0 6px ${getMuscleStatus('quads').glow})` }}
                 />
                 <path
                   d="M 168 215 C 170 240 175 295 164 315 C 154 315 145 285 144 215 Z"
@@ -256,6 +372,7 @@ export default function AnatomicalMuscleHeatmap({ workouts = [], onAddExerciseTo
                   strokeWidth={selectedMuscle === 'quads' ? '3' : '1.5'}
                   onClick={() => setSelectedMuscle('quads')}
                   className="transition-all hover:opacity-80"
+                  style={{ filter: `drop-shadow(0 0 6px ${getMuscleStatus('quads').glow})` }}
                 />
 
                 {/* CALVES (FRONT VIEW) */}
@@ -266,6 +383,7 @@ export default function AnatomicalMuscleHeatmap({ workouts = [], onAddExerciseTo
                   strokeWidth={selectedMuscle === 'calves' ? '3' : '1.5'}
                   onClick={() => setSelectedMuscle('calves')}
                   className="transition-all hover:opacity-80"
+                  style={{ filter: `drop-shadow(0 0 6px ${getMuscleStatus('calves').glow})` }}
                 />
                 <path
                   d="M 168 330 C 172 360 166 395 160 405 C 154 395 152 360 156 330 Z"
@@ -274,6 +392,7 @@ export default function AnatomicalMuscleHeatmap({ workouts = [], onAddExerciseTo
                   strokeWidth={selectedMuscle === 'calves' ? '3' : '1.5'}
                   onClick={() => setSelectedMuscle('calves')}
                   className="transition-all hover:opacity-80"
+                  style={{ filter: `drop-shadow(0 0 6px ${getMuscleStatus('calves').glow})` }}
                 />
               </g>
             ) : (
@@ -287,6 +406,7 @@ export default function AnatomicalMuscleHeatmap({ workouts = [], onAddExerciseTo
                   strokeWidth={selectedMuscle === 'traps' ? '3' : '1.5'}
                   onClick={() => setSelectedMuscle('traps')}
                   className="transition-all hover:opacity-80"
+                  style={{ filter: `drop-shadow(0 0 6px ${getMuscleStatus('traps').glow})` }}
                 />
 
                 {/* LATS & UPPER BACK */}
@@ -297,6 +417,7 @@ export default function AnatomicalMuscleHeatmap({ workouts = [], onAddExerciseTo
                   strokeWidth={selectedMuscle === 'lats' ? '3' : '1.5'}
                   onClick={() => setSelectedMuscle('lats')}
                   className="transition-all hover:opacity-80"
+                  style={{ filter: `drop-shadow(0 0 6px ${getMuscleStatus('lats').glow})` }}
                 />
 
                 {/* TRICEPS */}
@@ -307,6 +428,7 @@ export default function AnatomicalMuscleHeatmap({ workouts = [], onAddExerciseTo
                   strokeWidth={selectedMuscle === 'triceps' ? '3' : '1.5'}
                   onClick={() => setSelectedMuscle('triceps')}
                   className="transition-all hover:opacity-80"
+                  style={{ filter: `drop-shadow(0 0 6px ${getMuscleStatus('triceps').glow})` }}
                 />
                 <ellipse
                   cx="204" cy="135" rx="10" ry="20"
@@ -315,6 +437,7 @@ export default function AnatomicalMuscleHeatmap({ workouts = [], onAddExerciseTo
                   strokeWidth={selectedMuscle === 'triceps' ? '3' : '1.5'}
                   onClick={() => setSelectedMuscle('triceps')}
                   className="transition-all hover:opacity-80"
+                  style={{ filter: `drop-shadow(0 0 6px ${getMuscleStatus('triceps').glow})` }}
                 />
 
                 {/* LOWER BACK */}
@@ -325,6 +448,7 @@ export default function AnatomicalMuscleHeatmap({ workouts = [], onAddExerciseTo
                   strokeWidth={selectedMuscle === 'lowerBack' ? '3' : '1.5'}
                   onClick={() => setSelectedMuscle('lowerBack')}
                   className="transition-all hover:opacity-80"
+                  style={{ filter: `drop-shadow(0 0 6px ${getMuscleStatus('lowerBack').glow})` }}
                 />
 
                 {/* GLUTES */}
@@ -335,6 +459,7 @@ export default function AnatomicalMuscleHeatmap({ workouts = [], onAddExerciseTo
                   strokeWidth={selectedMuscle === 'glutes' ? '3' : '1.5'}
                   onClick={() => setSelectedMuscle('glutes')}
                   className="transition-all hover:opacity-80"
+                  style={{ filter: `drop-shadow(0 0 6px ${getMuscleStatus('glutes').glow})` }}
                 />
 
                 {/* HAMSTRINGS */}
@@ -345,6 +470,7 @@ export default function AnatomicalMuscleHeatmap({ workouts = [], onAddExerciseTo
                   strokeWidth={selectedMuscle === 'hamstrings' ? '3' : '1.5'}
                   onClick={() => setSelectedMuscle('hamstrings')}
                   className="transition-all hover:opacity-80"
+                  style={{ filter: `drop-shadow(0 0 6px ${getMuscleStatus('hamstrings').glow})` }}
                 />
                 <path
                   d="M 168 245 C 170 270 172 300 162 315 C 154 315 146 290 144 245 Z"
@@ -353,6 +479,7 @@ export default function AnatomicalMuscleHeatmap({ workouts = [], onAddExerciseTo
                   strokeWidth={selectedMuscle === 'hamstrings' ? '3' : '1.5'}
                   onClick={() => setSelectedMuscle('hamstrings')}
                   className="transition-all hover:opacity-80"
+                  style={{ filter: `drop-shadow(0 0 6px ${getMuscleStatus('hamstrings').glow})` }}
                 />
 
                 {/* CALVES (BACK VIEW) */}
@@ -363,6 +490,7 @@ export default function AnatomicalMuscleHeatmap({ workouts = [], onAddExerciseTo
                   strokeWidth={selectedMuscle === 'calves' ? '3' : '1.5'}
                   onClick={() => setSelectedMuscle('calves')}
                   className="transition-all hover:opacity-80"
+                  style={{ filter: `drop-shadow(0 0 6px ${getMuscleStatus('calves').glow})` }}
                 />
                 <path
                   d="M 170 330 C 176 360 168 395 162 405 C 156 395 154 360 158 330 Z"
@@ -371,6 +499,7 @@ export default function AnatomicalMuscleHeatmap({ workouts = [], onAddExerciseTo
                   strokeWidth={selectedMuscle === 'calves' ? '3' : '1.5'}
                   onClick={() => setSelectedMuscle('calves')}
                   className="transition-all hover:opacity-80"
+                  style={{ filter: `drop-shadow(0 0 6px ${getMuscleStatus('calves').glow})` }}
                 />
               </g>
             )}

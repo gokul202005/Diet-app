@@ -75,7 +75,23 @@
   "meals": [],
   "workouts": [],
   "workoutPlans": [],
-  "fastrackLogs": [],
+  "fastrackLogs": [
+    {
+      "id": "fastrack-1794498427511",
+      "userId": "user-google-110927726677822108966",
+      "date": "2026-11-12",
+      "deviceName": "Reset / Cleared",
+      "steps": 0,
+      "activeCalories": 0,
+      "restingCalories": 2310,
+      "totalBurned": 2310,
+      "distanceKm": 0,
+      "avgHeartRate": null,
+      "peakHeartRate": null,
+      "sleepHours": null,
+      "syncedAt": "2026-11-12T15:53:06.519Z"
+    }
+  ],
   "waterLogs": [],
   "weightLogs": [],
   "physiqueVault": [],
@@ -143,7 +159,7 @@
       ],
       "dailyBossClaims": {},
       "activeGateId": "gate_e_goblin",
-      "resetAt": "2026-11-12T15:38:45.693Z"
+      "resetAt": "2026-11-12T15:52:55.700Z"
     }
   },
   "chatHistory": [],

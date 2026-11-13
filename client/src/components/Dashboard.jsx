@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import ServerStatusWidget from './ServerStatusWidget';
+import AnatomicalMuscleHeatmap from './AnatomicalMuscleHeatmap';
 import { 
   Flame, 
   Watch, 
@@ -38,6 +39,7 @@ export default function Dashboard({
   const [energyBalance, setEnergyBalance] = useState(null);
   const [waterData, setWaterData] = useState({ amountMl: 0, targetMl: 3000 });
   const [workouts, setWorkouts] = useState([]);
+  const [allWorkouts, setAllWorkouts] = useState([]);
   const [shadowArmy, setShadowArmy] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -46,12 +48,13 @@ export default function Dashboard({
     async function loadData() {
       setLoading(true);
       try {
-        const [mealsRes, watchRes, balanceRes, waterRes, workoutsRes, shadowsRes] = await Promise.all([
+        const [mealsRes, watchRes, balanceRes, waterRes, workoutsRes, allWorkoutsRes, shadowsRes] = await Promise.all([
           api.getMeals(selectedDate),
           api.getFastrackSummary(selectedDate),
           api.getEnergyBalance(selectedDate),
           api.getWater(selectedDate),
           api.getWorkouts(selectedDate),
+          api.getWorkouts().catch(() => ({ workouts: [] })),
           api.getShadowArmy().catch(() => ({ shadowArmy: [] }))
         ]);
 
@@ -60,6 +63,7 @@ export default function Dashboard({
         setEnergyBalance(balanceRes.balance);
         setWaterData(waterRes);
         setWorkouts(workoutsRes.workouts || []);
+        setAllWorkouts(allWorkoutsRes?.workouts || workoutsRes.workouts || []);
         if (shadowsRes && shadowsRes.shadowArmy) {
           setShadowArmy(shadowsRes.shadowArmy);
         }
@@ -472,7 +476,13 @@ export default function Dashboard({
 
       </div>
 
-      {/* 4. TODAY'S MEALS & WORKOUT QUICK GLANCE */}
+      {/* 4. 3D MUSCLE AWAKENING HEATMAP (ANATOMICAL RECOVERY & VOLUME) */}
+      <AnatomicalMuscleHeatmap 
+        workouts={allWorkouts.length > 0 ? allWorkouts : workouts} 
+        onAddExerciseToToday={onNavigateToWorkouts} 
+      />
+
+      {/* 5. TODAY'S MEALS & WORKOUT QUICK GLANCE */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
         {/* Meals Logged */}

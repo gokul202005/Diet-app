@@ -211,6 +211,10 @@ class HealthConnectSyncEngine {
             'https://www.googleapis.com/auth/fitness.sleep.read'
           ].join(' '),
           hint: options.hint || '',
+          error_callback: (err) => {
+            console.warn('[GoogleFit] Auth error callback:', err);
+            resolve({ success: false, error: err?.message || 'Google Fit authentication window was closed or blocked on mobile.' });
+          },
           callback: async (response) => {
             if (response.error) {
               console.warn('[GoogleFit] Auth error:', response.error);

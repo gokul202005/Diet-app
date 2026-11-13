@@ -903,8 +903,42 @@ JARVIS BEHAVIOR RULES:
       };
     }
 
-    // 8. Workout / Training
-    if (lower.includes('workout') || lower.includes('gym') || lower.includes('exercise') || lower.includes('chest') || lower.includes('leg') || lower.includes('back')) {
+    // 8. Push-ups / Calisthenics / Workouts & Training
+    if (
+      lower.includes('push up') || lower.includes('pushup') || lower.includes('push-up') ||
+      lower.includes('pull up') || lower.includes('pullup') || lower.includes('pull-up') ||
+      lower.includes('chin up') || lower.includes('chinup') || lower.includes('dip') ||
+      lower.includes('squat') || lower.includes('crunch') || lower.includes('sit up') ||
+      lower.includes('workout') || lower.includes('gym') || lower.includes('exercise') || 
+      lower.includes('chest') || lower.includes('leg') || lower.includes('back') || lower.includes('bicep')
+    ) {
+      const match = lower.match(/(\d+)\s*(?:push-?ups?|push\s+ups?|pull-?ups?|pull\s+ups?|reps?|squats?|sit-?ups?|crunches?)/i);
+      const reps = match ? parseInt(match[1]) : null;
+      const isPush = lower.includes('push');
+      const isPull = lower.includes('pull') || lower.includes('chin');
+      const isSquat = lower.includes('squat');
+
+      if (reps) {
+        const exName = isPush ? 'Push-ups' : isPull ? 'Pull-ups' : isSquat ? 'Bodyweight Squats' : 'Exercise Reps';
+        const burned = Math.max(2, Math.round(reps * 0.5));
+        const targetedMuscles = isPush 
+          ? 'Chest (Pectorals), Triceps & Front Deltoids' 
+          : isPull 
+            ? 'Lats, Rhomboids & Biceps' 
+            : isSquat 
+              ? 'Quads, Glutes & Core' 
+              : 'Target Muscle Groups';
+
+        return {
+          reply: `🔥 Fantastic effort, ${name}! You completed **${reps} ${exName}**!\n\n` +
+            `* **Estimated Burn:** ~${burned} active calories\n` +
+            `* **Awakened Muscles:** ${targetedMuscles}\n` +
+            `* **3D Heatmap:** Check your **3D Muscle Awakening Heatmap** on the Dashboard — your active muscle recovery glow has been updated!\n\n` +
+            `Keep crushing your calisthenics & strength sets, Hunter!`,
+          source: 'south-indian-smart-engine'
+        };
+      }
+
       return {
         reply: `Scientific training advice for your frame, ${name}:\n\n` +
           `* **Progressive Overload:** Focus on tracking your working weight and reps in the **Workout Logger** tab. Aim to add 1 rep or 1-2.5 kg each week.\n` +
