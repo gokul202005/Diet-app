@@ -41,8 +41,8 @@ export default function Navbar({
 }) {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [appVersionInfo, setAppVersionInfo] = useState({
-    releaseTag: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_RELEASE_TAG) || 'v1.1.0-b67',
-    buildNumber: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_BUILD_NUMBER) || '67',
+    releaseTag: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_RELEASE_TAG) || 'v1.1.0-b74',
+    buildNumber: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_BUILD_NUMBER) || '74',
     apkUrl: 'https://github.com/gokul202005/Diet-app/releases/latest/download/AGY-Fit-latest.apk'
   });
   const userMenuRef = useRef(null);
@@ -169,6 +169,22 @@ export default function Navbar({
                 <Radio className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
                 <span className="text-[11px] font-mono tracking-wider font-bold">JARVIS</span>
               </button>
+
+              {/* Direct APK Download / Update Button */}
+              <a
+                href={appVersionInfo.apkUrl || "https://github.com/gokul202005/Diet-app/releases/latest/download/AGY-Fit-latest.apk"}
+                download="AGY-Fit-latest.apk"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center space-x-1 px-2.5 py-1.5 bg-gradient-to-r from-emerald-950/90 to-teal-950/90 hover:from-emerald-900 hover:to-teal-900 border border-emerald-500/40 text-emerald-300 rounded-xl text-xs font-black transition-all cursor-pointer shadow-md shadow-emerald-950/40 active:scale-95 shrink-0"
+                title={`Download Android APK (${appVersionInfo.releaseTag})`}
+              >
+                <Download className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="font-mono text-[11px] font-bold">APK</span>
+                <span className="hidden sm:inline text-[9px] font-mono bg-emerald-500/20 px-1 rounded text-emerald-300 border border-emerald-500/30">
+                  {appVersionInfo.releaseTag}
+                </span>
+              </a>
 
               {/* Date Switcher Pill (Compact & Clean on all devices) */}
               <div className="flex items-center bg-slate-900 border border-slate-800 rounded-xl p-0.5 text-xs text-slate-300 shadow-sm">

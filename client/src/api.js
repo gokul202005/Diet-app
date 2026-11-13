@@ -538,12 +538,12 @@ export const api = {
     } catch {}
 
     // Fallback 3: Vite build env
-    const tag = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_RELEASE_TAG) || 'v1.1.0-b67';
+    const tag = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_RELEASE_TAG) || 'v1.1.0-b74';
     return {
       success: true,
       releaseTag: tag,
       version: tag.split('-')[0]?.replace('v', '') || '1.1.0',
-      buildNumber: tag.split('-b')[1] || '67',
+      buildNumber: tag.split('-b')[1] || '74',
       apkUrl: 'https://github.com/gokul202005/Diet-app/releases/latest/download/AGY-Fit-latest.apk'
     };
   },

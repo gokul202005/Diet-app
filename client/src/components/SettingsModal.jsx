@@ -50,7 +50,7 @@ export default function SettingsModal({ isOpen, onClose, onEditProfile, currentU
     clearPhotos: false,
     clearHunter: true
   });
-  const [releaseTag, setReleaseTag] = useState((typeof import.meta !== 'undefined' && import.meta.env?.VITE_RELEASE_TAG) || 'v1.1.0-b67');
+  const [releaseTag, setReleaseTag] = useState((typeof import.meta !== 'undefined' && import.meta.env?.VITE_RELEASE_TAG) || 'v1.1.0-b74');
 
   const loadDataSummary = () => {
     if (!currentUser?.id) return;

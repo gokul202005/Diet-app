@@ -113,10 +113,10 @@ async function fetchLatestGitHubRelease() {
   // Fallback to latest known build
   return {
     success: true,
-    releaseTag: 'v1.1.0-b67',
+    releaseTag: 'v1.1.0-b74',
     version: '1.1.0',
-    buildNumber: '67',
-    releaseName: 'AGY Fit v1.1.0-b67',
+    buildNumber: '74',
+    releaseName: 'AGY Fit v1.1.0-b74',
     publishedAt: new Date().toISOString(),
     apkUrl: 'https://github.com/gokul202005/Diet-app/releases/latest/download/AGY-Fit-latest.apk',
     htmlUrl: 'https://github.com/gokul202005/Diet-app/releases'
